@@ -54,14 +54,6 @@
 
 ---
 
-## 🙋 Feedback & Contributions
-
-This is a personal tool built by Austin with lots of vibes. Contributions are welcome—just open a PR or [Issue](https://github.com/anaremore/austins-trade-copier/issues) on GitHub!
-
-> "Because one account isn't degenerate enough."
-
----
-
 ## 📄 License
 
 MIT License
@@ -85,3 +77,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## 🙋 Feedback & Contributions
+
+This is a personal tool built by Austin with lots of vibes. Feel free to submit new features, fixes, or report a bug in [Issues](https://github.com/anaremore/austins-trade-copier/issues).
+
+> "Because one account isn't degenerate enough."
