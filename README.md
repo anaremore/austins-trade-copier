@@ -12,10 +12,13 @@
 
 - 📈 **Trade Mirroring**: Automatically copies market, limit, and stop orders from a lead account to any number of target accounts.
 - 🔁 **Live Sync**: Reacts to account connection status updates in real time.
-- ✅ **Start/Stop Toggle**: One-click control to start or pause copying.
-- 🧹 **Flatten All**: Instantly cancel all working orders and close open positions across accounts.
-- ➕ **Add/Remove Target Accounts**: Dynamic combo box and layout to customize account pairs.
-- 🖥️ **Clean UI**: Simple, effective WPF-based interface embedded in NinjaTrader.
+- 🧭 **Follower Dashboard**: Manage accounts in a grid with connection status, copy state, position summary, session PnL, drawdown, sizing, risk rules, and last action.
+- 🧩 **Account Groups**: Assign followers to groups such as funded, eval, personal, or provider-specific buckets, then enable, pause, flatten, or apply settings by group.
+- ⚖️ **Per-Account Sizing**: Choose 1:1, multiplier, fixed quantity, balance-ratio, or disabled sizing for each follower.
+- 🧯 **Risk Lockouts**: Set daily loss, drawdown, and profit-target thresholds per account with soft-lock or hard-flatten behavior.
+- ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
+- 🧹 **Flatten Controls**: Flatten followers, all accounts, or a selected group.
+- 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors.
 
 ---
 
@@ -31,11 +34,39 @@
 
 ## 📋 How to Use
 
-1. **Choose a Lead Account** – All trades originate here.
-2. **Add Target Accounts** – These will copy the trades from the lead account.
-3. Click **Start Copying** to begin trade mirroring.
-4. Use **Stop Copying** to pause and automatically flatten if needed.
-5. Use **Flatten All Accounts** anytime to cancel orders and exit all positions in all accounts (including lead).
+1. **Choose a Lead Account** – All copied trades originate here.
+2. **Add Follower Accounts** – Choose an account, assign a group name, then click **Add Account**.
+3. **Configure Sizing** – Pick a sizing mode per row:
+   - **OneToOne**: copies the lead filled quantity.
+   - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
+   - **Fixed**: sends a fixed quantity once per lead order.
+   - **BalanceRatio**: scales by follower equity versus lead equity.
+   - **Disabled**: keeps the row visible but does not copy entries.
+4. **Set Risk Rules** – Optional loss, drawdown, and profit-target values lock an account when hit.
+5. **Start Copying** – The dashboard shows active, ready, locked, warning, desynced, and error states.
+6. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
+7. **Flatten Deliberately** – Use follower, group, or all-account flatten buttons when you intend to close positions.
+
+---
+
+## 🧠 Sizing and Risk Model
+
+Sizing is calculated from the cumulative filled quantity of the lead order. This avoids over-copying partial fills: if the lead order fills in pieces, each follower receives only the remaining quantity needed for its configured target size.
+
+Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that follower order instead of falling back to the full lead size.
+
+`Max` caps every sizing mode when greater than zero. A value of `0` means no max cap.
+
+Risk thresholds use the row baseline captured when the follower is added or when **Reset Baselines** is clicked:
+
+- **Loss** locks when session PnL is less than or equal to the negative loss limit.
+- **DD Lim** locks when drawdown from the row's session peak reaches the limit.
+- **Target** locks when session PnL reaches the profit target.
+
+Risk actions:
+
+- **SoftLock** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
+- **HardFlatten** immediately requests a flatten for the account, then blocks new or increasing entries.
 
 ---
 
@@ -43,7 +74,10 @@
 
 - Only **connected accounts** are available for copying.
 - **Lead account cannot also be a target account**.
-- Only **filled orders** are copied—not partials or rejections.
+- Filled and partially filled lead orders are tracked by cumulative filled quantity to avoid duplicate target orders.
+- Soft-locked and manually locked accounts still allow exits that reduce an existing position.
+- Balance-ratio sizing can skip a follower if NinjaTrader does not expose usable account value data.
+- Always test new sizing and lockout rules in simulation before using live accounts.
 - **Trade responsibly**—copied trades carry the same risk as manual entries.
 
 ---
