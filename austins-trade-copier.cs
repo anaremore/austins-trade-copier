@@ -254,7 +254,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
-            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Pause copying and flatten every table account plus lead accounts used by enabled rows.");
+            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by enabled rows while leaving the copier state unchanged.");
             flattenAllButton.Click += FlattenAllButton_Click;
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
@@ -1757,6 +1757,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!isCopying || args.Order == null || args.Order.Account == null)
                 return;
 
+            if (IsCopierGeneratedOrder(args.Order))
+                return;
+
             if (!subscribedLeadAccounts.ContainsKey(args.Order.Account.Name))
                 return;
 
@@ -1764,6 +1767,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             Dispatcher.InvokeAsync(() => CopyOrderToFollowerAccounts(args.Order));
+        }
+
+        private bool IsCopierGeneratedOrder(Order order)
+        {
+            if (order == null || string.IsNullOrWhiteSpace(order.Name))
+                return false;
+
+            return string.Equals(order.Name, "ATC Copy", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(order.Name, "ATC Flatten", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(order.Name, "ATC Reconcile", StringComparison.OrdinalIgnoreCase);
         }
 
         private void CopyOrderToFollowerAccounts(Order sourceOrder)
@@ -2236,7 +2249,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show("Flatten every table account and every lead used by enabled rows?", "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            PauseCopyingTrades();
+            var wasCopying = isCopying;
+            mirroredTargetQuantities.Clear();
 
             var accounts = GetConfiguredLeadAccounts()
                 .Concat(accountRows.Select(r => r.Account))
@@ -2248,6 +2262,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var account in accounts)
                 FlattenAccount(account, "Manual flatten all");
 
+            var message = wasCopying ? "Flatten all requested; copying remains active." : "Flatten all requested.";
+            SetStatus(message);
+            Log(message);
             RefreshAllRows();
         }
 
