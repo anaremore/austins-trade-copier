@@ -789,7 +789,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             var row = sender as AccountCopyRow;
-            if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
+            if (e.PropertyName == "Enabled")
+                HandleEnabledStateChange(row);
+            else if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
                 ValidateEnabledRowAfterEdit(row);
 
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
@@ -809,7 +811,6 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             switch (propertyName)
             {
-                case "Enabled":
                 case "LeadAccountName":
                 case "SizingMode":
                 case "Multiplier":
@@ -817,6 +818,65 @@ namespace NinjaTrader.NinjaScript.AddOns
                     return true;
                 default:
                     return false;
+            }
+        }
+
+        private void HandleEnabledStateChange(AccountCopyRow row)
+        {
+            if (suppressEnableValidation || row == null)
+                return;
+
+            if (!row.Enabled)
+            {
+                suppressEnableValidation = true;
+                try
+                {
+                    row.ManualLock = false;
+                    row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                }
+                finally
+                {
+                    suppressEnableValidation = false;
+                }
+
+                return;
+            }
+
+            string skipReason;
+            if (!CanEnableRow(row, BuildDesiredLeadNames(new[] { row }), out skipReason))
+            {
+                suppressEnableValidation = true;
+                try
+                {
+                    row.Enabled = false;
+                    row.LastAction = "Enable skipped: " + skipReason;
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                }
+                finally
+                {
+                    suppressEnableValidation = false;
+                }
+
+                var message = row.AccountName + " was not enabled: " + skipReason + ".";
+                SetStatus(message);
+                Log(message);
+                return;
+            }
+
+            suppressEnableValidation = true;
+            try
+            {
+                row.ManualLock = false;
+                row.LastAction = row.AutoLocked ? "Enabled - still risk locked" : "Enabled";
+                ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
+            }
+            finally
+            {
+                suppressEnableValidation = false;
             }
         }
 
@@ -2191,9 +2251,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.Enabled = false;
                 row.ManualLock = false;
-                row.AutoLocked = false;
-                row.LockReason = string.Empty;
-                row.LastAction = "Disabled";
+                row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
             }
@@ -2319,9 +2377,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.Enabled = true;
                 row.ManualLock = false;
-                row.AutoLocked = false;
-                row.LockReason = string.Empty;
-                row.LastAction = "Enabled";
+                row.LastAction = row.AutoLocked ? "Enabled - still risk locked" : "Enabled";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
             }
