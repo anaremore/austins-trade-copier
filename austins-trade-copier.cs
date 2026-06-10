@@ -683,7 +683,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             connectedAccountNames.Clear();
             connectedAccountNames.Add(string.Empty);
 
-            foreach (var accountName in connectedAccounts.Select(a => a.Name).OrderBy(name => name))
+            var names = connectedAccounts
+                .Select(a => a.Name)
+                .Concat(accountRows.Select(r => r.LeadAccountName).Where(name => !string.IsNullOrWhiteSpace(name)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name)
+                .ToList();
+
+            foreach (var accountName in names)
                 connectedAccountNames.Add(accountName);
         }
 
@@ -1242,6 +1249,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
             lastGroupListSignature = string.Empty;
             SyncAccountRowsWithConnectedAccounts();
+            RefreshConnectedAccountNames();
             RefreshGroupList();
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
