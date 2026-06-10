@@ -98,6 +98,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private const int MaxEventLogLines = 500;
 
         private readonly ObservableCollection<AccountCopyRow> accountRows = new ObservableCollection<AccountCopyRow>();
+        private readonly ObservableCollection<string> connectedAccountNames = new ObservableCollection<string>();
         private readonly Dictionary<string, int> mirroredTargetQuantities = new Dictionary<string, int>();
         private readonly Dictionary<string, int> lockedVirtualPositions = new Dictionary<string, int>();
         private readonly Dictionary<string, int> maxNetVirtualPositions = new Dictionary<string, int>();
@@ -105,13 +106,11 @@ namespace NinjaTrader.NinjaScript.AddOns
         private readonly Queue<string> eventLogLines = new Queue<string>();
         private readonly DispatcherTimer telemetryTimer;
 
-        private Account selectedLeadAccount;
         private List<Account> connectedAccounts = new List<Account>();
         private bool isCopying;
         private bool dryRunMode;
         private string lastGroupListSignature = string.Empty;
 
-        private ComboBox leadAccountComboBox;
         private ComboBox addAccountComboBox;
         private TextBox addGroupTextBox;
         private ComboBox profileComboBox;
@@ -154,7 +153,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(120) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(220) });
 
             var leadPanel = new StackPanel
             {
@@ -163,18 +162,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
 
             var accountSetupRow = CreateToolbarRow();
-            accountSetupRow.Children.Add(CreateLabel("Group Lead"));
-            leadAccountComboBox = new ComboBox
-            {
-                DisplayMemberPath = "Name",
-                Width = 220,
-                Height = 28,
-                Margin = new Thickness(8, 0, 18, 0),
-                Padding = new Thickness(4)
-            };
-            leadAccountComboBox.SelectionChanged += LeadAccountComboBox_SelectionChanged;
-            accountSetupRow.Children.Add(leadAccountComboBox);
-
             accountSetupRow.Children.Add(CreateLabel("Add Follower"));
             addAccountComboBox = new ComboBox
             {
@@ -299,7 +286,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             groupRow.Children.Add(groupComboBox);
 
-            var setGroupLeadButton = CreateButton("Set Group Lead", Brushes.DimGray);
+            var setGroupLeadButton = CreateButton("Apply Selected Lead To Group", Brushes.DimGray);
             setGroupLeadButton.Click += SetGroupLeadButton_Click;
             groupRow.Children.Add(setGroupLeadButton);
 
@@ -544,7 +531,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             });
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 120, null, true));
-            grid.Columns.Add(CreateTextColumn("Lead", "LeadAccountName", 120, null, true));
+            grid.Columns.Add(new DataGridComboBoxColumn
+            {
+                Header = "Lead",
+                ItemsSource = connectedAccountNames,
+                SelectedItemBinding = new Binding("LeadAccountName") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+                Width = new DataGridLength(120)
+            });
             grid.Columns.Add(CreateTextColumn("Group", "GroupName", 90, null, false));
             grid.Columns.Add(new DataGridComboBoxColumn
             {
@@ -659,15 +652,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             Dispatcher.InvokeAsync(() =>
             {
-                var selectedLeadName = selectedLeadAccount != null ? selectedLeadAccount.Name : null;
                 var selectedAddAccount = addAccountComboBox.SelectedItem as Account;
                 var selectedAddName = selectedAddAccount != null ? selectedAddAccount.Name : null;
 
-                leadAccountComboBox.ItemsSource = connectedAccounts;
                 addAccountComboBox.ItemsSource = connectedAccounts;
-
-                if (!string.IsNullOrEmpty(selectedLeadName))
-                    leadAccountComboBox.SelectedItem = connectedAccounts.FirstOrDefault(a => a.Name == selectedLeadName);
+                RefreshConnectedAccountNames();
 
                 if (!string.IsNullOrEmpty(selectedAddName))
                     addAccountComboBox.SelectedItem = connectedAccounts.FirstOrDefault(a => a.Name == selectedAddName);
@@ -682,15 +671,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshAccountList();
         }
 
-        private void LeadAccountComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void RefreshConnectedAccountNames()
         {
-            var nextLead = leadAccountComboBox.SelectedItem as Account;
-            if (AccountNamesEqual(selectedLeadAccount != null ? selectedLeadAccount.Name : null, nextLead != null ? nextLead.Name : null))
-                return;
+            connectedAccountNames.Clear();
 
-            selectedLeadAccount = nextLead;
-            if (selectedLeadAccount != null)
-                Log("Selected group lead " + selectedLeadAccount.Name + ".");
+            foreach (var accountName in connectedAccounts.Select(a => a.Name).OrderBy(name => name))
+                connectedAccountNames.Add(accountName);
         }
 
         private void AddAccountButton_Click(object sender, RoutedEventArgs e)
@@ -702,36 +688,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var groupLead = selectedLeadAccount;
-            if (groupLead == null)
-            {
-                SetStatus("Select a group lead before adding a follower.");
-                return;
-            }
-
             var groupName = NormalizeGroupName(addGroupTextBox.Text);
-            var existingLeadName = GetLeadAccountNameForGroup(groupName);
-            if (!string.IsNullOrEmpty(existingLeadName) && !AccountNamesEqual(existingLeadName, groupLead.Name))
-            {
-                SetStatus("Group " + groupName + " already uses lead " + existingLeadName + ".");
-                return;
-            }
-
-            if (AccountNamesEqual(account.Name, groupLead.Name))
-            {
-                SetStatus("A group lead cannot also be a follower in that group.");
-                return;
-            }
-
             if (IsConfiguredLeadAccount(account.Name))
             {
                 SetStatus(account.Name + " is already configured as a group lead.");
-                return;
-            }
-
-            if (accountRows.Any(r => AccountNamesEqual(r.AccountName, groupLead.Name)))
-            {
-                SetStatus(groupLead.Name + " is already configured as a follower.");
                 return;
             }
 
@@ -742,12 +702,25 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var row = new AccountCopyRow(account, groupName, ReadAccountPnl(account));
-            row.LeadAccountName = groupLead.Name;
+            row.LeadAccountName = GetDefaultLeadAccountName(account, groupName);
             accountRows.Add(row);
             SyncLeadAccountSubscriptions();
             RefreshGroupList();
             RefreshAllRows();
-            Log("Added follower " + account.Name + " to group " + groupName + " with lead " + groupLead.Name + ".");
+            Log("Added follower " + account.Name + " to group " + groupName + (string.IsNullOrWhiteSpace(row.LeadAccountName) ? ". Select a lead in the table." : " with lead " + row.LeadAccountName + "."));
+        }
+
+        private string GetDefaultLeadAccountName(Account followerAccount, string groupName)
+        {
+            var existingLeadName = GetLeadAccountNameForGroup(groupName);
+            if (!string.IsNullOrWhiteSpace(existingLeadName))
+                return existingLeadName;
+
+            var defaultLead = connectedAccounts.FirstOrDefault(a =>
+                !AccountNamesEqual(a.Name, followerAccount != null ? followerAccount.Name : null)
+                && !accountRows.Any(r => AccountNamesEqual(r.AccountName, a.Name)));
+
+            return defaultLead != null ? defaultLead.Name : string.Empty;
         }
 
         private Account ResolveLeadAccountForRow(AccountCopyRow row)
@@ -762,7 +735,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             return accountRows
                 .Select(ResolveLeadAccountForRow)
-                .Where(a => a != null)
+                .Where(a => a != null && !accountRows.Any(r => AccountNamesEqual(r.AccountName, a.Name)))
                 .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList();
@@ -952,7 +925,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var root = document.CreateElement("TradeCopierProfile");
             root.SetAttribute("version", "2");
             root.SetAttribute("savedUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-            root.SetAttribute("leadAccount", selectedLeadAccount != null ? selectedLeadAccount.Name : string.Empty);
+            root.SetAttribute("leadAccount", accountRows.Select(r => r.LeadAccountName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? string.Empty);
             document.AppendChild(root);
 
             foreach (var row in accountRows)
@@ -990,11 +963,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var accounts = GetConnectedAccountsSnapshot();
             connectedAccounts = accounts;
-            leadAccountComboBox.ItemsSource = connectedAccounts;
             addAccountComboBox.ItemsSource = connectedAccounts;
-            leadAccountComboBox.SelectedItem = null;
             addAccountComboBox.SelectedItem = null;
-            selectedLeadAccount = null;
+            RefreshConnectedAccountNames();
 
             var document = new XmlDocument();
             document.Load(path);
@@ -1010,15 +981,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            if (!string.IsNullOrEmpty(leadAccountName))
-            {
-                var lead = accounts.FirstOrDefault(a => string.Equals(a.Name, leadAccountName, StringComparison.OrdinalIgnoreCase));
-                if (lead != null)
-                    leadAccountComboBox.SelectedItem = lead;
-                else
-                    Log("Profile lead account " + leadAccountName + " is not connected.");
-            }
 
             accountRows.Clear();
             mirroredTargetQuantities.Clear();
@@ -1097,14 +1059,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                 accountRows.Add(row);
                 seenAccounts.Add(accountName);
             }
-
-            if (selectedLeadAccount == null)
-            {
-                var firstLeadName = accountRows.Select(r => r.LeadAccountName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
-                if (!string.IsNullOrWhiteSpace(firstLeadName))
-                    leadAccountComboBox.SelectedItem = accounts.FirstOrDefault(a => AccountNamesEqual(a.Name, firstLeadName));
-            }
-
             lastGroupListSignature = string.Empty;
             RefreshGroupList();
             SyncLeadAccountSubscriptions();
@@ -1502,7 +1456,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 var groupName = NormalizeGroupName(row.GroupName);
                 if (groupLeadNames.ContainsKey(groupName) && !AccountNamesEqual(groupLeadNames[groupName], rowLead.Name))
-                    return "Group " + groupName + " has multiple leads. Use Set Group Lead.";
+                    return "Group " + groupName + " has multiple leads. Apply one row lead to the group.";
 
                 groupLeadNames[groupName] = rowLead.Name;
 
@@ -2150,30 +2104,47 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void SetGroupLeadButton_Click(object sender, RoutedEventArgs e)
         {
-            var groupName = GetSelectedGroupName();
+            var selectedRow = accountsGrid.SelectedItem as AccountCopyRow;
+            if (selectedRow == null)
+            {
+                SetStatus("Select a row whose lead should be applied to its group.");
+                return;
+            }
+
+            var groupName = NormalizeGroupName(GetSelectedGroupName());
+            if (string.IsNullOrEmpty(groupName))
+                groupName = NormalizeGroupName(selectedRow.GroupName);
+
             if (string.IsNullOrEmpty(groupName))
             {
                 SetStatus("Select a group before setting its lead.");
                 return;
             }
 
-            var groupLead = selectedLeadAccount;
-            if (groupLead == null)
+            var leadName = selectedRow.LeadAccountName;
+            if (string.IsNullOrWhiteSpace(leadName))
             {
-                SetStatus("Select a group lead account first.");
+                SetStatus("Choose a lead in the selected row first.");
                 return;
             }
 
-            if (accountRows.Any(r => AccountNamesEqual(r.AccountName, groupLead.Name)))
+            var groupLead = connectedAccounts.FirstOrDefault(a => AccountNamesEqual(a.Name, leadName));
+            if (groupLead == null)
             {
-                SetStatus(groupLead.Name + " is already configured as a follower.");
+                SetStatus("Selected row lead is not connected.");
+                return;
+            }
+
+            if (accountRows.Any(r => AccountNamesEqual(r.AccountName, leadName)))
+            {
+                SetStatus(leadName + " is already configured as a follower.");
                 return;
             }
 
             var rows = accountRows.Where(r => GroupEquals(r.GroupName, groupName)).ToList();
             foreach (var row in rows)
             {
-                row.LeadAccountName = groupLead.Name;
+                row.LeadAccountName = leadName;
                 row.LastAction = "Group lead set";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
@@ -2181,7 +2152,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            Log("Set group " + groupName + " lead to " + groupLead.Name + ".");
+            Log("Set group " + groupName + " lead to " + leadName + ".");
             RefreshAllRows();
         }
 
@@ -2271,6 +2242,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void TelemetryTimer_Tick(object sender, EventArgs e)
         {
+            SyncLeadAccountSubscriptions();
             RefreshAllRows();
             RefreshGroupList();
         }
