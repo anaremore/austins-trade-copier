@@ -244,12 +244,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var groupRow = CreateToolbarRow();
             groupRow.Children.Add(CreateToolbarLabel("Group"));
-            groupRow.Children.Add(CreateLabel("Group"));
             groupComboBox = new ComboBox
             {
                 Width = 140,
                 Height = 28,
-                Margin = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(0, 0, 8, 0),
                 Padding = new Thickness(4)
             };
             groupRow.Children.Add(groupComboBox);
