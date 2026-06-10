@@ -15,6 +15,7 @@
 - 🧭 **Follower Dashboard**: Manage accounts in a grid with connection status, copy state, position summary, session PnL, drawdown, sizing, risk rules, and last action.
 - 🧩 **Account Groups**: Assign followers to groups such as funded, eval, personal, or provider-specific buckets, then enable, pause, flatten, or apply settings by group.
 - 🎯 **Instrument Filters**: Restrict any follower or group to selected symbols such as `MNQ, MES`.
+- 🚪 **Exits-Only Mode**: Let a follower stop taking new entries while still following reducing/closing orders.
 - ⚖️ **Per-Account Sizing**: Choose 1:1, multiplier, fixed quantity, balance-ratio, or disabled sizing for each follower.
 - 🧱 **Max Net Position Guard**: Cap each follower's absolute resulting position per instrument.
 - 🧯 **Risk Lockouts**: Set daily loss, drawdown, and profit-target thresholds per account with soft-lock or hard-flatten behavior.
@@ -41,7 +42,7 @@
 
 1. **Choose a Lead Account** – All copied trades originate here.
 2. **Add Follower Accounts** – Choose an account, assign a group name, then click **Add Account**.
-3. **Configure Symbols and Sizing** – Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
+3. **Configure Copy Mode, Symbols, and Sizing** – Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **OneToOne**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
    - **Fixed**: sends a fixed quantity once per lead order.
@@ -81,6 +82,8 @@ Risk actions:
 
 - **SoftLock** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
 - **HardFlatten** immediately requests a flatten for the account, then blocks new or increasing entries.
+
+`ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the follower's current position.
 
 Reconciliation is selected-row only and requires confirmation. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
 

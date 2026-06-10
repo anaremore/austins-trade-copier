@@ -83,6 +83,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             HardFlatten
         }
 
+        private enum TradeCopyMode
+        {
+            All,
+            ExitsOnly
+        }
+
         private const int DefaultFixedQuantity = 1;
         private const double DefaultMultiplier = 1.0;
         private const string DefaultGroupName = "Default";
@@ -417,6 +423,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 130, null, true));
             grid.Columns.Add(CreateTextColumn("Group", "GroupName", 110, null, false));
+            grid.Columns.Add(new DataGridComboBoxColumn
+            {
+                Header = "Copy",
+                ItemsSource = Enum.GetValues(typeof(TradeCopyMode)),
+                SelectedItemBinding = new Binding("CopyMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+                Width = new DataGridLength(90)
+            });
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 90, null, true));
             grid.Columns.Add(CreateTextColumn("Status", "Status", 150, null, true));
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 125, null, true));
@@ -488,6 +501,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             AddRowTrigger(style, "Ready", Color.FromRgb(50, 50, 54));
             AddRowTrigger(style, "Warning", Color.FromRgb(94, 75, 33));
             AddRowTrigger(style, "Locked", Color.FromRgb(88, 48, 35));
+            AddRowTrigger(style, "ExitsOnly", Color.FromRgb(62, 65, 82));
             AddRowTrigger(style, "Error", Color.FromRgb(92, 38, 42));
             AddRowTrigger(style, "Disabled", Color.FromRgb(54, 54, 58));
             AddRowTrigger(style, "Desynced", Color.FromRgb(92, 38, 42));
@@ -721,6 +735,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetAttribute(rowElement, "account", row.AccountName);
                 SetAttribute(rowElement, "group", row.GroupName);
                 SetAttribute(rowElement, "enabled", row.Enabled);
+                SetAttribute(rowElement, "copyMode", row.CopyMode.ToString());
                 SetAttribute(rowElement, "sizingMode", row.SizingMode.ToString());
                 SetAttribute(rowElement, "multiplier", row.Multiplier);
                 SetAttribute(rowElement, "fixedQuantity", row.FixedQuantity);
@@ -806,6 +821,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 var row = new AccountCopyRow(account, GetStringAttribute(element, "group", DefaultGroupName), ReadAccountPnl(account));
                 row.Enabled = GetBoolAttribute(element, "enabled", true);
+                row.CopyMode = GetEnumAttribute(element, "copyMode", TradeCopyMode.All);
                 row.SizingMode = GetEnumAttribute(element, "sizingMode", SizingMode.OneToOne);
                 row.Multiplier = GetDoubleAttribute(element, "multiplier", DefaultMultiplier);
                 row.FixedQuantity = GetIntAttribute(element, "fixedQuantity", DefaultFixedQuantity);
@@ -1063,20 +1079,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                     continue;
 
                 var originalQuantity = quantityToSubmit;
-                var wasEntryLocked = row.IsEntryLocked;
-                if (row.IsEntryLocked)
+                var reduceOnlyMode = RowIsReduceOnly(row);
+                if (reduceOnlyMode)
                     quantityToSubmit = CapLockedQuantityToReducingOnly(row, sourceOrder, quantityToSubmit);
 
                 if (quantityToSubmit <= 0)
                 {
                     mirroredTargetQuantities[targetKey] = desiredQuantity;
-                    row.LastAction = "Blocked entry while locked";
-                    Log(row.AccountName + " blocked copied entry while locked.");
+                    row.LastAction = "Blocked entry";
+                    Log(row.AccountName + " blocked copied entry while in reduce-only mode.");
                     continue;
                 }
 
                 if (quantityToSubmit < originalQuantity)
-                    Log(row.AccountName + " capped locked exit from " + originalQuantity + " to " + quantityToSubmit + ".");
+                    Log(row.AccountName + " capped reduce-only exit from " + originalQuantity + " to " + quantityToSubmit + ".");
 
                 var beforeMaxNetQuantity = quantityToSubmit;
                 quantityToSubmit = CapQuantityToMaxNetPosition(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
@@ -1097,10 +1113,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 {
                     if (dryRunMode)
                     {
-                        if (wasEntryLocked)
+                        if (reduceOnlyMode)
                             ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
 
-                        mirroredTargetQuantities[targetKey] = (wasEntryLocked && quantityToSubmit < originalQuantity) || maxNetCapped
+                        mirroredTargetQuantities[targetKey] = (reduceOnlyMode && quantityToSubmit < originalQuantity) || maxNetCapped
                             ? desiredQuantity
                             : alreadyMirrored + quantityToSubmit;
                         row.LastAction = "Dry run " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
@@ -1120,10 +1136,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                         "ATC Copy");
 
                     row.Account.Submit(new[] { copiedOrder });
-                    if (wasEntryLocked)
+                    if (reduceOnlyMode)
                         ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
 
-                    mirroredTargetQuantities[targetKey] = (wasEntryLocked && quantityToSubmit < originalQuantity) || maxNetCapped
+                    mirroredTargetQuantities[targetKey] = (reduceOnlyMode && quantityToSubmit < originalQuantity) || maxNetCapped
                         ? desiredQuantity
                         : alreadyMirrored + quantityToSubmit;
                     row.LastAction = "Sent " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
@@ -1245,6 +1261,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return Math.Min(requestedQuantity, Math.Abs(signedPosition));
 
             return 0;
+        }
+
+        private bool RowIsReduceOnly(AccountCopyRow row)
+        {
+            return row.IsEntryLocked || row.CopyMode == TradeCopyMode.ExitsOnly;
         }
 
         private int CapQuantityToMaxNetPosition(AccountCopyRow row, Instrument instrument, OrderAction action, int requestedQuantity)
@@ -1434,7 +1455,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var currentSigned = target != null ? target.SignedQuantity : 0;
                 var desiredSigned = desired != null ? desired.SignedQuantity : 0;
 
-                if (row.IsEntryLocked)
+                if (RowIsReduceOnly(row))
                     desiredSigned = CalculateLockedReconcileTarget(currentSigned, desiredSigned);
 
                 desiredSigned = CapDesiredSignedPositionToMaxNet(row, desiredSigned);
@@ -1764,6 +1785,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var row in rows)
             {
                 row.SizingMode = source.SizingMode;
+                row.CopyMode = source.CopyMode;
                 row.Multiplier = source.Multiplier;
                 row.FixedQuantity = source.FixedQuantity;
                 row.MaxQuantity = source.MaxQuantity;
@@ -1801,7 +1823,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             foreach (var row in accountRows.ToList())
             {
-                if (!row.IsEntryLocked)
+                if (!RowIsReduceOnly(row))
                     ClearLockedVirtualPositions(row);
 
                 RefreshRowMetrics(row);
@@ -1904,6 +1926,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            if (row.CopyMode == TradeCopyMode.ExitsOnly)
+            {
+                row.SetStatus("ExitsOnly", isCopying ? "Exits only" : "Ready exits only");
+                return;
+            }
+
             if (IsNearRiskLimit(row))
             {
                 row.SetStatus("Warning", "Near risk limit");
@@ -1922,7 +1950,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool IsPotentiallyDesynced(AccountCopyRow row)
         {
-            if (!isCopying || leadAccount == null || row.Account == null || row.IsEntryLocked || !row.Enabled || row.SizingMode == SizingMode.Disabled)
+            if (!isCopying || leadAccount == null || row.Account == null || RowIsReduceOnly(row) || !row.Enabled || row.SizingMode == SizingMode.Disabled)
                 return false;
 
             var leadPositions = GetOpenPositionSnapshots(leadAccount);
@@ -2209,6 +2237,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             private bool enabled = true;
             private string groupName;
+            private TradeCopyMode copyMode = TradeCopyMode.All;
             private string connectionStatus = "Unknown";
             private string status = "Ready";
             private string statusLevel = "Ready";
@@ -2257,6 +2286,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return groupName; }
                 set { SetField(ref groupName, string.IsNullOrWhiteSpace(value) ? DefaultGroupName : value.Trim(), "GroupName"); }
+            }
+
+            public TradeCopyMode CopyMode
+            {
+                get { return copyMode; }
+                set { SetField(ref copyMode, value, "CopyMode"); }
             }
 
             public string ConnectionStatus
