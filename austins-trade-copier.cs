@@ -544,20 +544,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
             grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, "Editing this value switches Sizing to Fixed qty."));
             grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
+
+            grid.Columns.Add(CreateTextBoxColumn("Max Pos", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
             grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateComboBoxColumn("At Limit", "LimitAction", limitActionOptions, "Label", "Value", 94, "Soft lock blocks entries and allows exits. Auto close also flattens the row account immediately."));
+            grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
+
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
-
-            grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
-
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 72, null, TextAlignment.Right, true, false, "Caps the row's net position size. 0 disables the cap."));
-
-            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 100, "Soft lock blocks entries and allows exits. Auto close also flattens the row account immediately."));
-
             grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
