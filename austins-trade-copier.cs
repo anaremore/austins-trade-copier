@@ -132,6 +132,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool dryRunMode;
         private bool suppressEnableValidation;
         private bool suppressLiveSettingsPause;
+        private bool suppressManualLockHandling;
         private bool rowRefreshPending;
         private string heldStatusMessage = string.Empty;
         private DateTime heldStatusUntil = DateTime.MinValue;
@@ -993,6 +994,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (e.PropertyName == "Enabled")
                 HandleEnabledStateChange(row);
+            else if (e.PropertyName == "ManualLock")
+                HandleManualLockStateChange(row);
             else if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
                 ValidateEnabledRowAfterEdit(row);
 
@@ -1067,7 +1070,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 suppressEnableValidation = true;
                 try
                 {
-                    row.ManualLock = false;
+                    SetManualLockWithoutAction(row, false);
                     row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
                     ClearLockedVirtualPositions(row);
                     ClearMaxNetVirtualPositions(row);
@@ -1146,6 +1149,43 @@ namespace NinjaTrader.NinjaScript.AddOns
             Log(message);
         }
 
+        private void HandleManualLockStateChange(AccountCopyRow row)
+        {
+            if (suppressEnableValidation || suppressManualLockHandling || row == null)
+                return;
+
+            ClearLockedVirtualPositions(row);
+            ClearMaxNetVirtualPositions(row);
+
+            if (row.ManualLock)
+            {
+                row.LastAction = "Manual lock on";
+                Log(row.AccountName + " manual lock enabled. Entries are blocked; exits remain allowed.");
+            }
+            else
+            {
+                row.LastAction = "Manual lock off";
+                Log(row.AccountName + " manual lock cleared.");
+            }
+        }
+
+        private void SetManualLockWithoutAction(AccountCopyRow row, bool value)
+        {
+            if (row == null)
+                return;
+
+            var wasSuppressed = suppressManualLockHandling;
+            suppressManualLockHandling = true;
+            try
+            {
+                row.ManualLock = value;
+            }
+            finally
+            {
+                suppressManualLockHandling = wasSuppressed;
+            }
+        }
+
         private bool RowPropertyPausesLiveRow(string propertyName)
         {
             switch (propertyName)
@@ -1175,7 +1215,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var wasManualLocked = row.ManualLock;
             row.ResetBaseline(ReadAccountPnl(row.Account), false);
-            row.ManualLock = true;
+            SetManualLockWithoutAction(row, true);
             row.LastAction = wasManualLocked ? "Live settings edited - baseline reset" : "Live settings edited - row paused";
             ClearLockedVirtualPositions(row);
             ClearMaxNetVirtualPositions(row);
@@ -2301,7 +2341,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             foreach (var row in rows.Where(r => r != null).Distinct().ToList())
             {
-                row.ManualLock = true;
+                SetManualLockWithoutAction(row, true);
                 row.LastAction = lastAction + " locked";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
@@ -2669,7 +2709,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var row in rows)
             {
                 row.Enabled = false;
-                row.ManualLock = false;
+                SetManualLockWithoutAction(row, false);
                 row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
@@ -2699,7 +2739,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     autoResetCount++;
                 }
 
-                row.ManualLock = false;
+                SetManualLockWithoutAction(row, false);
                 row.AutoLocked = false;
                 row.LockReason = string.Empty;
                 row.LastAction = wasAutoLocked ? "Unlocked - baseline reset" : "Unlocked";
@@ -2803,7 +2843,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void PrepareRowAfterEnable(AccountCopyRow row, bool shouldResetLiveBaseline)
         {
             row.Enabled = true;
-            row.ManualLock = false;
+            SetManualLockWithoutAction(row, false);
             if (shouldResetLiveBaseline && isCopying && row.Account != null)
                 row.ResetBaseline(ReadAccountPnl(row.Account), false);
 
@@ -3106,7 +3146,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void TriggerRiskLock(AccountCopyRow row, string reason)
         {
             row.AutoLocked = true;
-            row.ManualLock = false;
+            SetManualLockWithoutAction(row, false);
             row.LockReason = reason;
 
             if (row.LimitAction == RiskAction.HardFlatten)
