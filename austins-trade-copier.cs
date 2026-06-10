@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Xml;
@@ -1117,6 +1118,14 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             if (accountsGrid == null)
                 return;
+
+            var focusedTextBox = Keyboard.FocusedElement as TextBox;
+            if (focusedTextBox != null)
+            {
+                var binding = focusedTextBox.GetBindingExpression(TextBox.TextProperty);
+                if (binding != null)
+                    binding.UpdateSource();
+            }
 
             accountsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             accountsGrid.CommitEdit(DataGridEditingUnit.Row, true);
