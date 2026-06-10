@@ -1624,6 +1624,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var desiredQuantity = CalculateDesiredTargetQuantity(row, sourceOrder);
                 if (desiredQuantity <= 0)
                 {
+                    if (mirroredTargetQuantities.ContainsKey(targetKey) && alreadyMirrored == desiredQuantity)
+                        continue;
+
+                    mirroredTargetQuantities[targetKey] = desiredQuantity;
                     row.LastAction = "Sizing produced 0";
                     Log(row.AccountName + " skipped " + GetInstrumentName(sourceOrder.Instrument) + " because sizing produced 0 contracts.");
                     continue;
@@ -2922,6 +2926,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (IsNearRiskLimit(row))
             {
                 row.SetStatus("Warning", "Near risk limit");
+                return;
+            }
+
+            if (row.LastAction == "Sizing produced 0")
+            {
+                row.SetStatus("Warning", "Sizing 0");
                 return;
             }
 
