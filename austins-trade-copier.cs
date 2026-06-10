@@ -3278,7 +3278,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.AutoLocked)
             {
-                row.SetStatus("Locked", string.IsNullOrEmpty(row.LockReason) ? "Auto locked" : row.LockReason);
+                row.SetStatus("Locked", GetRiskLockStatusText(row));
                 return;
             }
 
@@ -3332,6 +3332,28 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             row.SetStatus(isCopying ? "Active" : "Ready", isCopying ? "Copying" : "Ready");
+        }
+
+        private string GetRiskLockStatusText(AccountCopyRow row)
+        {
+            var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto close" : "Soft lock";
+            var reason = row == null ? string.Empty : FormatRiskReasonForStatus(row.LockReason);
+            return string.IsNullOrEmpty(reason) ? action : action + " - " + reason;
+        }
+
+        private string FormatRiskReasonForStatus(string reason)
+        {
+            switch (reason)
+            {
+                case "Daily loss limit":
+                    return "max loss";
+                case "Drawdown limit":
+                    return "max DD";
+                case "Profit target":
+                    return "target";
+                default:
+                    return string.IsNullOrWhiteSpace(reason) ? string.Empty : reason;
+            }
         }
 
         private string GetDisabledRowStatusText(AccountCopyRow row)
@@ -3639,7 +3661,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.ProfitTarget > 0)
                 parts.Add("target " + row.ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
 
-            return parts.Count == 0 ? "no risk limits" : string.Join(", ", parts);
+            if (parts.Count == 0)
+                return "no risk limits";
+
+            var action = row.LimitAction == RiskAction.HardFlatten ? "auto close" : "soft lock";
+            return string.Join(", ", parts) + "; " + action;
         }
 
         private void SetStatus(string message)
