@@ -527,12 +527,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."));
 
-            grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
-            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, "Editing this value switches Sizing to Fixed qty."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, "Caps total copied quantity for each lead order. 0 disables the cap."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
+            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, "Editing this value switches Sizing to Fixed qty."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
@@ -540,11 +540,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 72, null, TextAlignment.Right, "Caps the row's net position size. 0 disables the cap."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 72, null, TextAlignment.Right, true, false, "Caps the row's net position size. 0 disables the cap."));
 
             grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 100, "Soft lock blocks entries and allows exits. Flatten also flattens the row account."));
 
-            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
+            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
         }
@@ -609,7 +609,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
         }
 
-        private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, string tooltip)
+        private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, bool numericOnly, bool allowDecimal, string tooltip)
         {
             var factory = new FrameworkElementFactory(typeof(TextBox));
             factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
@@ -621,6 +621,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(82, 88, 96));
             factory.SetValue(TextBox.TextAlignmentProperty, textAlignment);
             factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            if (numericOnly)
+            {
+                factory.SetValue(FrameworkElement.TagProperty, allowDecimal ? "decimal" : "integer");
+                factory.AddHandler(UIElement.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
+                factory.AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
+            }
 
             var binding = new Binding(propertyName)
             {
@@ -639,6 +645,63 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CellTemplate = new DataTemplate { VisualTree = factory },
                 Width = new DataGridLength(width)
             };
+        }
+
+        private void NumericTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null)
+                return;
+
+            e.Handled = !IsValidNumericText(GetProposedText(textBox, e.Text), NumericTextBoxAllowsDecimal(textBox));
+        }
+
+        private void NumericTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null || !e.DataObject.GetDataPresent(DataFormats.Text))
+            {
+                e.CancelCommand();
+                return;
+            }
+
+            var pastedText = e.DataObject.GetData(DataFormats.Text) as string;
+            if (!IsValidNumericText(GetProposedText(textBox, pastedText ?? string.Empty), NumericTextBoxAllowsDecimal(textBox)))
+                e.CancelCommand();
+        }
+
+        private string GetProposedText(TextBox textBox, string insertedText)
+        {
+            var currentText = textBox.Text ?? string.Empty;
+            var selectionStart = Math.Max(0, Math.Min(textBox.SelectionStart, currentText.Length));
+            var selectionLength = Math.Max(0, Math.Min(textBox.SelectionLength, currentText.Length - selectionStart));
+
+            return currentText.Remove(selectionStart, selectionLength).Insert(selectionStart, insertedText ?? string.Empty);
+        }
+
+        private bool NumericTextBoxAllowsDecimal(TextBox textBox)
+        {
+            return string.Equals(textBox.Tag as string, "decimal", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsValidNumericText(string text, bool allowDecimal)
+        {
+            if (string.IsNullOrEmpty(text))
+                return true;
+
+            var trimmed = text.Trim();
+            if (trimmed.Length != text.Length)
+                return false;
+
+            if (!allowDecimal)
+                return trimmed.All(char.IsDigit);
+
+            var decimalCount = trimmed.Count(c => c == '.');
+            if (decimalCount > 1)
+                return false;
+
+            return trimmed.All(c => char.IsDigit(c) || c == '.')
+                && trimmed.Any(char.IsDigit);
         }
 
         private TextBlock CreateColumnHeader(string text, string tooltip)
