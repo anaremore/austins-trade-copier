@@ -2993,24 +2993,39 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var autoResetCount = 0;
+            var skippedBaselineCount = 0;
             foreach (var row in rows)
             {
                 var wasAutoLocked = row.AutoLocked;
+                var baselineReset = false;
                 if (wasAutoLocked)
                 {
-                    row.ResetBaseline(ReadAccountPnl(row.Account), true);
-                    autoResetCount++;
+                    if (RowHasConnectedAccount(row))
+                    {
+                        row.ResetBaseline(ReadAccountPnl(row.Account), true);
+                        autoResetCount++;
+                        baselineReset = true;
+                    }
+                    else
+                    {
+                        skippedBaselineCount++;
+                    }
                 }
 
                 SetManualLockWithoutAction(row, false);
                 row.AutoLocked = false;
                 row.LockReason = string.Empty;
-                row.LastAction = wasAutoLocked ? "Unlocked - baseline reset" : "Unlocked";
+                row.LastAction = wasAutoLocked
+                    ? baselineReset ? "Unlocked - baseline reset" : "Unlocked - baseline unchanged"
+                    : "Unlocked";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
             }
 
             var message = "Unlocked " + rows.Count + " selected row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)" : string.Empty) + ".";
+            if (skippedBaselineCount > 0)
+                message = message.TrimEnd('.') + "; skipped baseline reset for " + skippedBaselineCount + " offline row(s).";
+
             SetStatus(message);
             Log(message);
             RefreshAllRows();
