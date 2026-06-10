@@ -2491,7 +2491,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             int zeroSizingCount;
             var desiredPositions = BuildDesiredPositions(row, out zeroSizingCount);
-            var targetPositions = GetOpenPositionSnapshots(row.Account);
+            var targetPositions = GetManagedPositionSnapshots(row, row.Account);
             var instrumentNames = desiredPositions.Keys
                 .Union(targetPositions.Select(p => p.InstrumentName))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -3453,7 +3453,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var expectedSignedPositions = BuildExpectedSignedPositionsForStatus(row, rowLead);
             var leadPositions = GetOpenPositionSnapshots(rowLead);
-            var targetPositions = GetOpenPositionSnapshots(row.Account);
+            var targetPositions = GetManagedPositionSnapshots(row, row.Account);
 
             if (leadPositions.Count == 0 || expectedSignedPositions.Count == 0)
             {
@@ -3596,6 +3596,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             return snapshots;
+        }
+
+        private List<PositionSnapshot> GetManagedPositionSnapshots(AccountCopyRow row, Account account)
+        {
+            return GetOpenPositionSnapshots(account)
+                .Where(position => RowAllowsInstrument(row, position.Instrument))
+                .ToList();
         }
 
         private int GetSignedPosition(Account account, Instrument instrument)
