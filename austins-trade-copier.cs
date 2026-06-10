@@ -2940,7 +2940,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (row.LastAction == "Sizing produced 0")
+            if (row.LastAction == "Sizing produced 0" || row.LastAction == "Reconcile sizing 0")
             {
                 row.SetStatus("Warning", "Sizing 0");
                 return;
