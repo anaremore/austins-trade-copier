@@ -1321,6 +1321,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.ProfitTarget = GetDoubleAttribute(element, "profitTarget", 0);
                 row.LimitAction = GetEnumAttribute(element, "limitAction", RiskAction.SoftLock);
                 row.InstrumentFilter = GetStringAttribute(element, "instrumentFilter", string.Empty);
+                NormalizeLegacySizingMode(row);
                 row.LastAction = row.Enabled ? "Loaded profile" : "Loaded disabled";
 
                 accountRows.Add(row);
@@ -1455,6 +1456,21 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             TEnum value;
             return Enum.TryParse(element.GetAttribute(name), true, out value) ? value : fallback;
+        }
+
+        private void NormalizeLegacySizingMode(AccountCopyRow row)
+        {
+            if (row == null || row.SizingMode != SizingMode.OneToOne)
+                return;
+
+            if (row.Multiplier > 0 && Math.Abs(row.Multiplier - DefaultMultiplier) > 0.0000001)
+            {
+                row.SizingMode = SizingMode.Multiplier;
+                return;
+            }
+
+            if (row.FixedQuantity > 0 && row.FixedQuantity != DefaultFixedQuantity)
+                row.SizingMode = SizingMode.Fixed;
         }
 
         private void StartPauseButton_Click(object sender, RoutedEventArgs e)
