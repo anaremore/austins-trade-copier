@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -123,12 +124,12 @@ namespace NinjaTrader.NinjaScript.AddOns
         public TradeCopierWindow()
         {
             Caption = "Austin's Trade Copier";
-            Width = 1180;
-            Height = 720;
+            Width = 1220;
+            Height = 760;
             MinWidth = 980;
             MinHeight = 560;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            Background = new SolidColorBrush(Color.FromRgb(36, 36, 38));
+            Background = BrushRgb(30, 31, 34);
 
             CreateUI();
             RefreshAccountList();
@@ -145,7 +146,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void CreateUI()
         {
-            var root = new Grid { Margin = new Thickness(10) };
+            var root = new Grid { Margin = new Thickness(12) };
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -156,7 +157,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadPanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0)
             };
 
             leadPanel.Children.Add(CreateLabel("Lead Account"));
@@ -194,13 +195,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             addAccountButton.Click += AddAccountButton_Click;
             leadPanel.Children.Add(addAccountButton);
 
-            Grid.SetRow(leadPanel, 0);
-            root.Children.Add(leadPanel);
+            var accountSection = CreateSection("Accounts", leadPanel);
+            Grid.SetRow(accountSection, 0);
+            root.Children.Add(accountSection);
 
             var profilePanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0)
             };
 
             profilePanel.Children.Add(CreateLabel("Profile"));
@@ -234,15 +236,17 @@ namespace NinjaTrader.NinjaScript.AddOns
             deleteProfileButton.Click += DeleteProfileButton_Click;
             profilePanel.Children.Add(deleteProfileButton);
 
-            Grid.SetRow(profilePanel, 1);
-            root.Children.Add(profilePanel);
+            var profileSection = CreateSection("Profiles", profilePanel);
+            Grid.SetRow(profileSection, 1);
+            root.Children.Add(profileSection);
 
             var actionPanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0)
             };
 
+            actionPanel.Children.Add(CreateToolbarLabel("Session"));
             startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen);
             startPauseButton.Width = 130;
             startPauseButton.Click += StartPauseButton_Click;
@@ -257,6 +261,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             actionPanel.Children.Add(dryRunCheckBox);
 
+            actionPanel.Children.Add(CreateToolbarLabel("Risk"));
             var flattenFollowersButton = CreateButton("Flatten Followers", Brushes.Firebrick);
             flattenFollowersButton.Click += FlattenFollowersButton_Click;
             actionPanel.Children.Add(flattenFollowersButton);
@@ -269,6 +274,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             flattenAllButton.Click += FlattenAllButton_Click;
             actionPanel.Children.Add(flattenAllButton);
 
+            actionPanel.Children.Add(CreateToolbarLabel("Selection"));
             var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray);
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             actionPanel.Children.Add(reconcileSelectedButton);
@@ -285,6 +291,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             actionPanel.Children.Add(resetBaselineButton);
 
+            actionPanel.Children.Add(CreateToolbarLabel("Group"));
             actionPanel.Children.Add(CreateLabel("Group"));
             groupComboBox = new ComboBox
             {
@@ -310,8 +317,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             applyGroupSettingsButton.Click += ApplyGroupSettingsButton_Click;
             actionPanel.Children.Add(applyGroupSettingsButton);
 
-            Grid.SetRow(actionPanel, 2);
-            root.Children.Add(actionPanel);
+            var actionSection = CreateSection("Controls", actionPanel);
+            Grid.SetRow(actionSection, 2);
+            root.Children.Add(actionSection);
 
             accountsGrid = new DataGrid
             {
@@ -323,12 +331,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
                 RowStyle = CreateRowStyle(),
-                Background = new SolidColorBrush(Color.FromRgb(43, 43, 46)),
+                Background = BrushRgb(32, 33, 36),
                 Foreground = Brushes.White,
-                RowBackground = new SolidColorBrush(Color.FromRgb(50, 50, 54)),
-                AlternatingRowBackground = new SolidColorBrush(Color.FromRgb(44, 44, 48)),
-                HorizontalGridLinesBrush = new SolidColorBrush(Color.FromRgb(72, 72, 76)),
-                VerticalGridLinesBrush = new SolidColorBrush(Color.FromRgb(72, 72, 76)),
+                RowBackground = BrushRgb(42, 43, 47),
+                AlternatingRowBackground = BrushRgb(36, 37, 41),
+                HorizontalGridLinesBrush = BrushRgb(64, 66, 72),
+                VerticalGridLinesBrush = BrushRgb(64, 66, 72),
+                BorderBrush = BrushRgb(82, 88, 96),
+                BorderThickness = new Thickness(1),
+                RowHeaderWidth = 0,
+                ColumnHeaderHeight = 28,
+                RowHeight = 24,
+                FontSize = 12,
+                ColumnHeaderStyle = CreateGridHeaderStyle(),
+                CellStyle = CreateGridCellStyle(),
                 Margin = new Thickness(0, 0, 0, 8)
             };
             AddGridColumns(accountsGrid);
@@ -373,18 +389,55 @@ namespace NinjaTrader.NinjaScript.AddOns
                 IsReadOnly = true,
                 AcceptsReturn = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Background = new SolidColorBrush(Color.FromRgb(24, 24, 26)),
+                Background = BrushRgb(18, 19, 21),
                 Foreground = Brushes.Gainsboro,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(76, 76, 80)),
+                BorderBrush = BrushRgb(64, 66, 72),
                 TextWrapping = TextWrapping.NoWrap
             };
             Grid.SetRow(eventLogTextBox, 1);
             logPanel.Children.Add(eventLogTextBox);
 
-            Grid.SetRow(logPanel, 5);
-            root.Children.Add(logPanel);
+            var logSection = CreateSection("Event Log", logPanel);
+            Grid.SetRow(logSection, 5);
+            root.Children.Add(logSection);
 
             Content = root;
+        }
+
+        private Brush BrushRgb(byte red, byte green, byte blue)
+        {
+            return new SolidColorBrush(Color.FromRgb(red, green, blue));
+        }
+
+        private Border CreateSection(string title, UIElement content)
+        {
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var titleBlock = new TextBlock
+            {
+                Text = title.ToUpperInvariant(),
+                Foreground = BrushRgb(177, 184, 194),
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 7)
+            };
+            Grid.SetRow(titleBlock, 0);
+            grid.Children.Add(titleBlock);
+
+            Grid.SetRow(content, 1);
+            grid.Children.Add(content);
+
+            return new Border
+            {
+                Background = BrushRgb(38, 39, 43),
+                BorderBrush = BrushRgb(58, 61, 67),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 8, 10, 8),
+                Margin = new Thickness(0, 0, 0, 8),
+                Child = grid
+            };
         }
 
         private Label CreateLabel(string text)
@@ -392,9 +445,24 @@ namespace NinjaTrader.NinjaScript.AddOns
             return new Label
             {
                 Content = text,
-                Foreground = Brushes.White,
+                Foreground = BrushRgb(236, 238, 241),
                 VerticalAlignment = VerticalAlignment.Center,
-                Padding = new Thickness(0)
+                Padding = new Thickness(0),
+                Margin = new Thickness(0, 0, 4, 6)
+            };
+        }
+
+        private Label CreateToolbarLabel(string text)
+        {
+            return new Label
+            {
+                Content = text.ToUpperInvariant(),
+                Foreground = BrushRgb(177, 184, 194),
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(0),
+                Margin = new Thickness(2, 0, 8, 6)
             };
         }
 
@@ -403,13 +471,36 @@ namespace NinjaTrader.NinjaScript.AddOns
             return new Button
             {
                 Content = text,
-                Padding = new Thickness(10, 5, 10, 5),
-                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 0, 8, 6),
                 Background = background,
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(92, 92, 96)),
-                MinWidth = 92
+                BorderBrush = BrushRgb(92, 96, 104),
+                MinWidth = 92,
+                MinHeight = 28
             };
+        }
+
+        private Style CreateGridHeaderStyle()
+        {
+            var style = new Style(typeof(DataGridColumnHeader));
+            style.Setters.Add(new Setter(DataGridColumnHeader.BackgroundProperty, BrushRgb(52, 55, 61)));
+            style.Setters.Add(new Setter(DataGridColumnHeader.ForegroundProperty, BrushRgb(236, 238, 241)));
+            style.Setters.Add(new Setter(DataGridColumnHeader.BorderBrushProperty, BrushRgb(73, 77, 85)));
+            style.Setters.Add(new Setter(DataGridColumnHeader.BorderThicknessProperty, new Thickness(0, 0, 1, 1)));
+            style.Setters.Add(new Setter(DataGridColumnHeader.PaddingProperty, new Thickness(6, 0, 6, 0)));
+            style.Setters.Add(new Setter(DataGridColumnHeader.FontWeightProperty, FontWeights.Bold));
+            return style;
+        }
+
+        private Style CreateGridCellStyle()
+        {
+            var style = new Style(typeof(DataGridCell));
+            style.Setters.Add(new Setter(DataGridCell.BackgroundProperty, Brushes.Transparent));
+            style.Setters.Add(new Setter(DataGridCell.ForegroundProperty, Brushes.White));
+            style.Setters.Add(new Setter(DataGridCell.BorderThicknessProperty, new Thickness(0)));
+            style.Setters.Add(new Setter(DataGridCell.PaddingProperty, new Thickness(6, 0, 6, 0)));
+            return style;
         }
 
         private void AddGridColumns(DataGrid grid)
