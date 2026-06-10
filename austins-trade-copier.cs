@@ -2213,17 +2213,25 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            var autoResetCount = 0;
             foreach (var row in rows)
             {
+                var wasAutoLocked = row.AutoLocked;
+                if (wasAutoLocked)
+                {
+                    row.ResetBaseline(ReadAccountPnl(row.Account), true);
+                    autoResetCount++;
+                }
+
                 row.ManualLock = false;
                 row.AutoLocked = false;
                 row.LockReason = string.Empty;
-                row.LastAction = "Unlocked";
+                row.LastAction = wasAutoLocked ? "Unlocked - baseline reset" : "Unlocked";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
             }
 
-            Log("Unlocked " + rows.Count + " row(s).");
+            Log("Unlocked " + rows.Count + " row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)." : "."));
             RefreshAllRows();
         }
 
