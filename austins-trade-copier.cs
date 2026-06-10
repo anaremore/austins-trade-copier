@@ -4242,6 +4242,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                     BuildRiskSummary()
                 };
 
+                var symbolSummary = BuildSymbolSummary();
+                if (!string.IsNullOrEmpty(symbolSummary))
+                    parts.Add(symbolSummary);
+
                 if (CopyMode == TradeCopyMode.ExitsOnly)
                     parts.Add("exits only");
 
@@ -4249,7 +4253,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     parts.Add("manual lock");
 
                 if (AutoLocked)
-                    parts.Add("risk locked");
+                    parts.Add(string.IsNullOrWhiteSpace(LockReason) ? "risk locked" : "locked: " + LockReason.ToLowerInvariant());
 
                 return string.Join(" | ", parts);
             }
@@ -4286,6 +4290,21 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return caps.Count == 0 ? sizing : sizing + " (" + string.Join(", ", caps) + ")";
             }
 
+            private string BuildSymbolSummary()
+            {
+                if (string.IsNullOrWhiteSpace(InstrumentFilter))
+                    return string.Empty;
+
+                var symbols = InstrumentFilter
+                    .Split(new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(token => token.Trim())
+                    .Where(token => token.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return symbols.Count == 0 ? string.Empty : "symbols " + string.Join(",", symbols);
+            }
+
             private string BuildRiskSummary()
             {
                 var limits = new List<string>();
@@ -4316,12 +4335,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "FixedQuantity":
                     case "MaxQuantity":
                     case "MaxNetPosition":
+                    case "InstrumentFilter":
                     case "DailyLossLimit":
                     case "MaxDrawdown":
                     case "ProfitTarget":
                     case "LimitAction":
                     case "ManualLock":
                     case "AutoLocked":
+                    case "LockReason":
                         OnPropertyChanged("PlanSummary");
                         break;
                 }
