@@ -522,32 +522,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available, Lead, Copy row, or Conflict based on the enabled rows."));
-            grid.Columns.Add(new DataGridComboBoxColumn
-            {
-                Header = CreateColumnHeader("Lead", "Account whose filled orders this row mirrors."),
-                ItemsSource = connectedAccountNames,
-                SelectedItemBinding = new Binding("LeadAccountName") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(112)
-            });
-            grid.Columns.Add(new DataGridComboBoxColumn
-            {
-                Header = CreateColumnHeader("Copy", "All copies entries and exits. Exits only blocks new entries while allowing exits."),
-                ItemsSource = copyModeOptions,
-                DisplayMemberPath = "Label",
-                SelectedValuePath = "Value",
-                SelectedValueBinding = new Binding("CopyMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(78)
-            });
-
-            grid.Columns.Add(new DataGridComboBoxColumn
-            {
-                Header = CreateColumnHeader("Sizing", "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."),
-                ItemsSource = sizingModeOptions,
-                DisplayMemberPath = "Label",
-                SelectedValuePath = "Value",
-                SelectedValueBinding = new Binding("SizingMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(98)
-            });
+            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Account whose filled orders this row mirrors."));
+            grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
+            grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."));
 
             grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 70, "{0:0.##}", false, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
             grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 64, null, false, "Editing this value switches Sizing to Fixed qty."));
@@ -564,15 +541,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
             grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 72, null, false, "Caps the row's net position size. 0 disables the cap."));
 
-            grid.Columns.Add(new DataGridComboBoxColumn
-            {
-                Header = CreateColumnHeader("Limit Action", "Soft lock blocks entries and allows exits. Flatten also flattens the row account."),
-                ItemsSource = limitActionOptions,
-                DisplayMemberPath = "Label",
-                SelectedValuePath = "Value",
-                SelectedValueBinding = new Binding("LimitAction") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(100)
-            });
+            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 100, "Soft lock blocks entries and allows exits. Flatten also flattens the row account."));
 
             grid.Columns.Add(CreateTextColumn("Symbols", "InstrumentFilter", 96, null, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
@@ -591,6 +560,45 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Mode = BindingMode.TwoWay,
                 UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
             });
+
+            return new DataGridTemplateColumn
+            {
+                Header = CreateColumnHeader(header, tooltip),
+                CellTemplate = new DataTemplate { VisualTree = factory },
+                Width = new DataGridLength(width)
+            };
+        }
+
+        private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip)
+        {
+            var factory = new FrameworkElementFactory(typeof(ComboBox));
+            factory.SetValue(ItemsControl.ItemsSourceProperty, itemsSource);
+            factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+            factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            factory.SetValue(Control.PaddingProperty, new Thickness(2, 0, 2, 0));
+            factory.SetValue(Control.MinHeightProperty, 22.0);
+            factory.SetValue(Control.BackgroundProperty, BrushRgb(64, 65, 70));
+            factory.SetValue(Control.ForegroundProperty, Brushes.White);
+            factory.SetValue(Control.BorderBrushProperty, BrushRgb(92, 96, 104));
+
+            if (!string.IsNullOrWhiteSpace(displayMemberPath))
+                factory.SetValue(ItemsControl.DisplayMemberPathProperty, displayMemberPath);
+
+            var binding = new Binding(propertyName)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+            };
+
+            if (string.IsNullOrWhiteSpace(selectedValuePath))
+            {
+                factory.SetBinding(Selector.SelectedItemProperty, binding);
+            }
+            else
+            {
+                factory.SetValue(Selector.SelectedValuePathProperty, selectedValuePath);
+                factory.SetBinding(Selector.SelectedValueProperty, binding);
+            }
 
             return new DataGridTemplateColumn
             {
