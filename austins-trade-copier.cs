@@ -569,6 +569,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(UIElement.FocusableProperty, false);
             factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(CheckBoxCell_PreviewMouseLeftButtonDown));
             factory.SetBinding(ToggleButton.IsCheckedProperty, new Binding(propertyName)
             {
                 Mode = BindingMode.TwoWay,
@@ -581,6 +583,45 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CellTemplate = new DataTemplate { VisualTree = factory },
                 Width = new DataGridLength(width)
             };
+        }
+
+        private void CheckBoxCell_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var checkBox = sender as CheckBox;
+            var row = checkBox != null ? checkBox.DataContext as AccountCopyRow : null;
+            if (checkBox == null || row == null || !checkBox.IsEnabled)
+                return;
+
+            SelectRowForDirectCellAction(row);
+            checkBox.IsChecked = checkBox.IsChecked != true;
+
+            var binding = checkBox.GetBindingExpression(ToggleButton.IsCheckedProperty);
+            if (binding != null)
+                binding.UpdateSource();
+
+            e.Handled = true;
+            UpdateSelectionMarkers();
+            RefreshStatusSummary();
+        }
+
+        private void SelectRowForDirectCellAction(AccountCopyRow row)
+        {
+            if (accountsGrid == null || row == null)
+                return;
+
+            if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
+            {
+                if (!accountsGrid.SelectedItems.Contains(row))
+                    accountsGrid.SelectedItems.Add(row);
+
+                return;
+            }
+
+            if (accountsGrid.SelectedItems.Count != 1 || !accountsGrid.SelectedItems.Contains(row))
+            {
+                accountsGrid.SelectedItems.Clear();
+                accountsGrid.SelectedItems.Add(row);
+            }
         }
 
         private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip)
