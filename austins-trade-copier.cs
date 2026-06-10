@@ -545,12 +545,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AddGridColumns(DataGrid grid)
         {
-            grid.Columns.Add(new DataGridCheckBoxColumn
-            {
-                Header = CreateColumnHeader("On", "Enable this account row. Disabled rows stay visible but do not receive copied orders."),
-                Binding = new Binding("Enabled") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(40)
-            });
+            grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Enable this account row. Disabled rows stay visible but do not receive copied orders."));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available, Lead, Copy row, or Conflict based on the enabled rows."));
@@ -582,8 +577,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Width = new DataGridLength(98)
             });
 
-            grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 70, "{0:0.##}", false, "Used only when Sizing is Multiplier. 2 copies twice the lead quantity."));
-            grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 64, null, false, "Used only when Sizing is Fixed."));
+            grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 70, "{0:0.##}", false, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
+            grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 64, null, false, "Editing this value switches Sizing to Fixed qty."));
             grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 64, null, false, "Caps the quantity for each copied order. 0 disables the cap."));
             grid.Columns.Add(CreateTextColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", false, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
             grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 70, "{0:0}", false, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
@@ -592,12 +587,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
 
-            grid.Columns.Add(new DataGridCheckBoxColumn
-            {
-                Header = CreateColumnHeader("Manual Lock", "Blocks entries for this row while still allowing exits."),
-                Binding = new Binding("ManualLock") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(92)
-            });
+            grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
             grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 72, null, false, "Caps the row's net position size. 0 disables the cap."));
@@ -615,6 +605,27 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Symbols", "InstrumentFilter", 96, null, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
+        }
+
+        private DataGridTemplateColumn CreateCheckBoxColumn(string header, string propertyName, double width, string tooltip)
+        {
+            var factory = new FrameworkElementFactory(typeof(CheckBox));
+            factory.SetValue(ToggleButton.IsThreeStateProperty, false);
+            factory.SetValue(UIElement.FocusableProperty, false);
+            factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            factory.SetBinding(ToggleButton.IsCheckedProperty, new Binding(propertyName)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+            });
+
+            return new DataGridTemplateColumn
+            {
+                Header = CreateColumnHeader(header, tooltip),
+                CellTemplate = new DataTemplate { VisualTree = factory },
+                Width = new DataGridLength(width)
+            };
         }
 
         private TextBlock CreateColumnHeader(string text, string tooltip)
@@ -853,6 +864,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             var row = sender as AccountCopyRow;
+            ApplySizingModeFromEditedQuantityField(row, e.PropertyName);
+
             if (e.PropertyName == "Enabled")
                 HandleEnabledStateChange(row);
             else if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
@@ -872,6 +885,43 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (RowPropertyAffectsReadiness(e.PropertyName))
                 QueueRowRefresh();
+        }
+
+        private void ApplySizingModeFromEditedQuantityField(AccountCopyRow row, string propertyName)
+        {
+            if (suppressEnableValidation || row == null)
+                return;
+
+            if (propertyName == "Multiplier"
+                && row.Multiplier > 0
+                && Math.Abs(row.Multiplier - DefaultMultiplier) > 0.0000001
+                && row.SizingMode != SizingMode.Multiplier)
+            {
+                SetSizingModeWithoutLivePause(row, SizingMode.Multiplier);
+                return;
+            }
+
+            if (propertyName == "FixedQuantity"
+                && row.FixedQuantity > 0
+                && row.FixedQuantity != DefaultFixedQuantity
+                && row.SizingMode != SizingMode.Fixed)
+            {
+                SetSizingModeWithoutLivePause(row, SizingMode.Fixed);
+            }
+        }
+
+        private void SetSizingModeWithoutLivePause(AccountCopyRow row, SizingMode sizingMode)
+        {
+            var wasSuppressed = suppressLiveSettingsPause;
+            suppressLiveSettingsPause = true;
+            try
+            {
+                row.SizingMode = sizingMode;
+            }
+            finally
+            {
+                suppressLiveSettingsPause = wasSuppressed;
+            }
         }
 
         private bool RowPropertyCanInvalidateEnabledRow(string propertyName)
