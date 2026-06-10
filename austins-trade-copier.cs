@@ -1,6 +1,7 @@
 #region Using declarations
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -109,6 +110,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private List<Account> connectedAccounts = new List<Account>();
         private bool isCopying;
         private bool dryRunMode;
+        private bool rowRefreshPending;
         private string lastGroupListSignature = string.Empty;
 
         private ComboBox profileComboBox;
@@ -129,6 +131,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             MinHeight = 560;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = BrushRgb(30, 31, 34);
+
+            accountRows.CollectionChanged += AccountRows_CollectionChanged;
 
             CreateUI();
             RefreshAccountList();
@@ -751,6 +755,80 @@ namespace NinjaTrader.NinjaScript.AddOns
                 lead.OrderUpdate -= OnOrderUpdate;
 
             subscribedLeadAccounts.Clear();
+        }
+
+        private void AccountRows_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (AccountCopyRow row in e.OldItems)
+                    row.PropertyChanged -= AccountRow_PropertyChanged;
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (AccountCopyRow row in e.NewItems)
+                {
+                    row.PropertyChanged -= AccountRow_PropertyChanged;
+                    row.PropertyChanged += AccountRow_PropertyChanged;
+                }
+            }
+        }
+
+        private void AccountRow_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e == null || string.IsNullOrEmpty(e.PropertyName))
+                return;
+
+            if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
+                SyncLeadAccountSubscriptions();
+
+            if (e.PropertyName == "GroupName")
+            {
+                lastGroupListSignature = string.Empty;
+                RefreshGroupList();
+            }
+
+            if (RowPropertyAffectsReadiness(e.PropertyName))
+                QueueRowRefresh();
+        }
+
+        private bool RowPropertyAffectsReadiness(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case "Enabled":
+                case "LeadAccountName":
+                case "GroupName":
+                case "CopyMode":
+                case "SizingMode":
+                case "Multiplier":
+                case "FixedQuantity":
+                case "MaxQuantity":
+                case "MaxNetPosition":
+                case "DailyLossLimit":
+                case "MaxDrawdown":
+                case "ProfitTarget":
+                case "LimitAction":
+                case "InstrumentFilter":
+                case "ManualLock":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void QueueRowRefresh()
+        {
+            if (rowRefreshPending)
+                return;
+
+            rowRefreshPending = true;
+            Dispatcher.InvokeAsync(() =>
+            {
+                rowRefreshPending = false;
+                RefreshAllRows();
+            });
         }
 
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2638,6 +2716,9 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             PauseCopyingTrades(true);
             UnsubscribeAllLeadAccounts();
+            accountRows.CollectionChanged -= AccountRows_CollectionChanged;
+            foreach (var row in accountRows)
+                row.PropertyChanged -= AccountRow_PropertyChanged;
 
             Account.AccountStatusUpdate -= OnAccountStatusUpdate;
 
