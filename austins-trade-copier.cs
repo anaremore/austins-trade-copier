@@ -3884,7 +3884,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             var armedLeadCount = GetConfiguredLeadAccounts().Count;
             var lockedCount = accountRows.Count(r => IsConnectedCopyRow(r) && r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
+            var offlineCount = accountRows.Count(IsOfflineRow);
             var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            if (offlineCount > 0)
+                summary += " | Offline: " + offlineCount;
+
             var selectionSummary = BuildSelectionSummary();
             return string.IsNullOrEmpty(selectionSummary) ? summary : summary + " | " + selectionSummary;
         }
@@ -3897,6 +3901,11 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool IsConnectedCopyRow(AccountCopyRow row)
         {
             return IsConfiguredCopyRow(row) && row.Account != null && row.Account.ConnectionStatus == ConnectionStatus.Connected;
+        }
+
+        private bool IsOfflineRow(AccountCopyRow row)
+        {
+            return row != null && (row.Account == null || row.Account.ConnectionStatus != ConnectionStatus.Connected);
         }
 
         private string BuildSelectionSummary()
