@@ -298,7 +298,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
-                FrozenColumnCount = 5,
+                FrozenColumnCount = 6,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
@@ -533,7 +533,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AddGridColumns(DataGrid grid)
         {
-            grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 34, null, true, "Rows marked > are selected for the Selected Rows buttons."));
+            grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 42, null, true, "Rows marked SEL are selected for the Selected Rows buttons."));
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Enable this account row. Disabled rows stay visible but do not receive copied orders."));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
@@ -626,6 +626,28 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
         }
 
+        private void EditableCell_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            SelectEditableCellRow(sender);
+        }
+
+        private void EditableCell_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            SelectEditableCellRow(sender);
+        }
+
+        private void SelectEditableCellRow(object sender)
+        {
+            var element = sender as FrameworkElement;
+            var row = element != null ? element.DataContext as AccountCopyRow : null;
+            if (row == null)
+                return;
+
+            SelectRowForDirectCellAction(row);
+            UpdateSelectionMarkers();
+            RefreshStatusSummary();
+        }
+
         private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip)
         {
             var factory = new FrameworkElementFactory(typeof(ComboBox));
@@ -637,6 +659,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.BackgroundProperty, BrushRgb(64, 65, 70));
             factory.SetValue(Control.ForegroundProperty, Brushes.White);
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(92, 96, 104));
+            factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
+            factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
 
             if (!string.IsNullOrWhiteSpace(displayMemberPath))
                 factory.SetValue(ItemsControl.DisplayMemberPathProperty, displayMemberPath);
@@ -677,6 +701,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(82, 88, 96));
             factory.SetValue(TextBox.TextAlignmentProperty, textAlignment);
             factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
+            factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
             if (numericOnly)
             {
                 factory.SetValue(FrameworkElement.TagProperty, allowDecimal ? "decimal" : "integer");
@@ -1331,7 +1357,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var selectedRows = new HashSet<AccountCopyRow>(GetSelectedRows());
             foreach (var row in accountRows)
-                row.SelectionMarker = selectedRows.Contains(row) ? ">" : string.Empty;
+                row.SelectionMarker = selectedRows.Contains(row) ? "SEL" : string.Empty;
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
