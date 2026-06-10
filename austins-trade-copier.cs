@@ -501,6 +501,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             identityPanel.Children.Add(selectedRowNameTextBlock);
             panel.Children.Add(identityPanel);
 
+            panel.Children.Add(CreateEditorCheckField("On", "Enabled", "Enabled", 72, "Enable this account row. Disabled rows stay visible but do not receive copied orders."));
+            panel.Children.Add(CreateEditorReadOnlyField("Role", "RoleSummary", 80, "Available, Lead, Copy row, or Conflict based on enabled rows."));
+            panel.Children.Add(CreateEditorReadOnlyField("Status", "Status", 140, "Current copier state for this row."));
             panel.Children.Add(CreateEditorComboField("Lead", connectedAccountNames, "LeadAccountName", 130, "Account whose filled orders this row mirrors."));
             panel.Children.Add(CreateEditorTextField("Group", "GroupName", 90, "Free-form group name used by group actions."));
             panel.Children.Add(CreateEditorComboField("Copy", Enum.GetValues(typeof(TradeCopyMode)), "CopyMode", 90, "All copies entries and exits. ExitsOnly blocks new entries while allowing exits."));
@@ -514,7 +517,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             panel.Children.Add(CreateEditorTextField("Profit Target", "ProfitTarget", 88, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
             panel.Children.Add(CreateEditorComboField("Limit Action", Enum.GetValues(typeof(RiskAction)), "LimitAction", 105, "SoftLock blocks entries and allows exits. HardFlatten also flattens the row account."));
             panel.Children.Add(CreateEditorTextField("Symbols", "InstrumentFilter", 116, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
-            panel.Children.Add(CreateEditorCheckField("Manual Lock", "ManualLock", "Blocks entries for this row while still allowing exits."));
+            panel.Children.Add(CreateEditorCheckField("Manual Lock", "ManualLock", "Locked", 86, "Blocks entries for this row while still allowing exits."));
 
             return panel;
         }
@@ -557,11 +560,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             return CreateEditorField(label, comboBox, width, tooltip);
         }
 
-        private FrameworkElement CreateEditorCheckField(string label, string propertyName, string tooltip)
+        private FrameworkElement CreateEditorCheckField(string label, string propertyName, string content, double width, string tooltip)
         {
             var checkBox = new CheckBox
             {
-                Content = "Locked",
+                Content = content,
                 Foreground = Brushes.White,
                 Height = 26,
                 VerticalContentAlignment = VerticalAlignment.Center,
@@ -569,7 +572,45 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             checkBox.SetBinding(CheckBox.IsCheckedProperty, CreateSelectedRowBinding(propertyName, UpdateSourceTrigger.PropertyChanged));
             selectedRowEditorControls.Add(checkBox);
-            return CreateEditorField(label, checkBox, 78, tooltip);
+            return CreateEditorField(label, checkBox, width, tooltip);
+        }
+
+        private FrameworkElement CreateEditorReadOnlyField(string label, string propertyName, double width, string tooltip)
+        {
+            var textBlock = new TextBlock
+            {
+                Height = 26,
+                Padding = new Thickness(5, 4, 5, 0),
+                Background = BrushRgb(45, 46, 51),
+                Foreground = BrushRgb(236, 238, 241),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = tooltip
+            };
+            var binding = new Binding("SelectedItem." + propertyName)
+            {
+                Source = accountsGrid,
+                Mode = BindingMode.OneWay,
+                TargetNullValue = "-"
+            };
+            textBlock.SetBinding(TextBlock.TextProperty, binding);
+
+            var fieldPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Width = width,
+                Margin = new Thickness(0, 0, 8, 6)
+            };
+            fieldPanel.Children.Add(new TextBlock
+            {
+                Text = label.ToUpperInvariant(),
+                Foreground = BrushRgb(177, 184, 194),
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 3),
+                ToolTip = tooltip
+            });
+            fieldPanel.Children.Add(textBlock);
+            return fieldPanel;
         }
 
         private FrameworkElement CreateEditorField(string label, Control editor, double width, string tooltip)
