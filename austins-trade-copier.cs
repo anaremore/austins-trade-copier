@@ -1620,8 +1620,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var account = accounts.FirstOrDefault(a => string.Equals(a.Name, accountName, StringComparison.OrdinalIgnoreCase));
                 if (account == null)
                 {
-                    Log("Profile row " + accountName + " is not connected.");
-                    continue;
+                    Log("Profile row " + accountName + " is not connected; loaded disabled until it reconnects.");
                 }
 
                 var rowLeadName = GetOptionalStringAttribute(element, "leadAccount", leadAccountName);
@@ -1629,6 +1628,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var rowWasManualLocked = GetBoolAttribute(element, "manualLocked", false);
                 var rowWasAutoLocked = GetBoolAttribute(element, "autoLocked", false);
                 Account rowLead = null;
+
+                if (account == null && rowEnabled)
+                {
+                    rowEnabled = false;
+                    Log("Profile disabled " + accountName + " until its account reconnects.");
+                }
 
                 if (rowWasAutoLocked && rowEnabled)
                 {
@@ -1655,7 +1660,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     Log("Profile disabled " + accountName + " because no lead is saved.");
                 }
 
-                var row = new AccountCopyRow(account, ReadAccountPnl(account));
+                var row = account != null
+                    ? new AccountCopyRow(account, ReadAccountPnl(account))
+                    : new AccountCopyRow(accountName, 0);
                 row.LeadAccountName = rowLead != null ? rowLead.Name : rowLeadName;
                 row.Enabled = rowEnabled;
                 row.CopyMode = GetEnumAttribute(element, "copyMode", TradeCopyMode.All);
@@ -4066,6 +4073,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Account = account;
                 AccountName = account != null ? account.Name : string.Empty;
                 BaselinePnl = baselinePnl;
+                PeakPnl = 0;
+            }
+
+            public AccountCopyRow(string accountName, double baselinePnl)
+            {
+                AccountName = accountName ?? string.Empty;
+                BaselinePnl = baselinePnl;
+                connectionStatus = "Not connected";
+                positionSummary = "No account";
                 PeakPnl = 0;
             }
 
