@@ -2684,6 +2684,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            if (row.AutoLocked)
+            {
+                row.SetStatus("Locked", string.IsNullOrEmpty(row.LockReason) ? "Auto locked" : row.LockReason);
+                return;
+            }
+
             if (!row.Enabled || row.SizingMode == SizingMode.Disabled)
             {
                 row.SetStatus("Disabled", "Disabled");
@@ -2700,12 +2706,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsConfiguredLeadAccount(row.AccountName))
             {
                 row.SetStatus("Error", "Also used as lead");
-                return;
-            }
-
-            if (row.AutoLocked)
-            {
-                row.SetStatus("Locked", string.IsNullOrEmpty(row.LockReason) ? "Auto locked" : row.LockReason);
                 return;
             }
 
