@@ -1599,11 +1599,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var validationMessage = ValidateReadyToStart();
-            if (!string.IsNullOrEmpty(validationMessage))
+            var validationIssues = ValidateReadyToStart();
+            if (validationIssues.Count > 0)
             {
+                var validationMessage = FormatStartBlockedMessage(validationIssues);
                 SetStatus(validationMessage);
-                Log("Start blocked: " + validationMessage);
+                foreach (var issue in validationIssues)
+                    Log("Start blocked: " + issue + ".");
+
+                RefreshAllRows();
                 return;
             }
 
@@ -1849,51 +1853,90 @@ namespace NinjaTrader.NinjaScript.AddOns
             return Math.Max(0, desiredQuantity);
         }
 
-        private string ValidateReadyToStart()
+        private List<string> ValidateReadyToStart()
         {
+            var issues = new List<string>();
             var activeRows = accountRows.Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled).ToList();
+            var desiredLeadNames = BuildDesiredLeadNames(activeRows);
 
             foreach (var row in activeRows)
             {
-                if (row.Account == null)
-                    return "Account " + row.AccountName + " has no account.";
+                string skipReason;
+                if (!CanEnableRow(row, desiredLeadNames, out skipReason))
+                {
+                    AddStartIssue(issues, row, DescribeStartSkipReason(skipReason));
+                    continue;
+                }
 
-                var rowLead = ResolveLeadAccountForRow(row);
-                if (rowLead == null)
-                    return "Account " + row.AccountName + " needs a connected lead.";
-
-                if (AccountNamesEqual(row.AccountName, rowLead.Name))
-                    return "Account " + row.AccountName + " cannot copy from itself.";
-
-                if (IsConfiguredLeadAccount(row.AccountName))
-                    return "Account " + row.AccountName + " is also used as a lead by another row.";
-
-                if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
-                    return "Account " + row.AccountName + " is disconnected.";
-
-                if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
-                    return "Account " + row.AccountName + " needs a multiplier greater than 0.";
-
-                if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
-                    return "Account " + row.AccountName + " needs a fixed quantity greater than 0.";
-            }
-
-            if (activeRows.Any(r => r.SizingMode == SizingMode.BalanceRatio))
-            {
-                foreach (var row in activeRows.Where(r => r.SizingMode == SizingMode.BalanceRatio))
+                if (row.SizingMode == SizingMode.BalanceRatio)
                 {
                     var rowLead = ResolveLeadAccountForRow(row);
                     double leadBalance;
+                    double rowBalance;
                     if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0)
-                        return "Balance-ratio sizing needs usable lead value data for " + row.AccountName + ".";
+                    {
+                        AddStartIssue(issues, row, "balance-ratio sizing needs usable lead value data");
+                        continue;
+                    }
 
-                    double followerBalance;
-                    if (!TryGetSizingBalance(row.Account, out followerBalance) || followerBalance <= 0)
-                        return "Balance-ratio sizing needs usable value data for " + row.AccountName + ".";
+                    if (!TryGetSizingBalance(row.Account, out rowBalance) || rowBalance <= 0)
+                    {
+                        AddStartIssue(issues, row, "balance-ratio sizing needs usable account value data");
+                        continue;
+                    }
                 }
             }
 
-            return string.Empty;
+            return issues;
+        }
+
+        private void AddStartIssue(List<string> issues, AccountCopyRow row, string issue)
+        {
+            var accountName = row != null && !string.IsNullOrWhiteSpace(row.AccountName) ? row.AccountName : "Unknown";
+            issues.Add(accountName + ": " + issue);
+
+            if (row != null)
+                row.LastAction = "Start blocked: " + issue;
+        }
+
+        private string FormatStartBlockedMessage(List<string> issues)
+        {
+            if (issues.Count == 0)
+                return string.Empty;
+
+            if (issues.Count == 1)
+                return "Start blocked: " + issues[0] + ".";
+
+            return "Start blocked: " + issues.Count + " row issues. First: " + issues[0] + ".";
+        }
+
+        private string DescribeStartSkipReason(string skipReason)
+        {
+            switch (skipReason)
+            {
+                case "no account":
+                    return "no account object is available";
+                case "disconnected":
+                    return "account is disconnected";
+                case "sizing disabled":
+                    return "sizing is disabled";
+                case "no lead":
+                    return "choose a lead account";
+                case "lead disconnected":
+                    return "lead account is disconnected";
+                case "self-copy":
+                    return "cannot copy from itself";
+                case "lead is copy row":
+                    return "lead is already an active copy row";
+                case "used as lead":
+                    return "account is used as a lead by another active row";
+                case "bad multiplier":
+                    return "multiplier must be greater than 0";
+                case "bad fixed qty":
+                    return "fixed quantity must be greater than 0";
+                default:
+                    return string.IsNullOrWhiteSpace(skipReason) ? "not ready" : skipReason;
+            }
         }
 
         private int CalculateBalanceRatioQuantity(AccountCopyRow row, int sourceFilledQuantity)
