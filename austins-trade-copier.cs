@@ -1888,9 +1888,31 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (dryRunCheckBox != null)
                 dryRunCheckBox.IsEnabled = false;
 
-            SetStatus(dryRunMode ? "Dry run active. Orders are simulated only." : "Copying active. Configured leads are armed.");
-            Log(dryRunMode ? "Dry run started. No copied orders will be submitted." : "Copying started.");
+            var startMessage = BuildStartStatusMessage();
+            SetStatus(startMessage);
+            Log(startMessage);
             RefreshAllRows();
+        }
+
+        private string BuildStartStatusMessage()
+        {
+            var leadCount = GetConfiguredLeadAccounts().Count;
+            var entryActiveCount = accountRows.Count(r => IsConnectedCopyRow(r) && !RowIsReduceOnly(r));
+            var exitsOnlyCount = accountRows.Count(r => IsConnectedCopyRow(r) && RowIsReduceOnly(r));
+            var lockedCount = accountRows.Count(r => IsConnectedCopyRow(r) && r.IsEntryLocked);
+
+            var message = (dryRunMode ? "Dry run active" : "Copying active")
+                + ": " + leadCount + " lead(s), "
+                + entryActiveCount + " entry row(s)";
+
+            if (exitsOnlyCount > 0)
+                message += ", " + exitsOnlyCount + " exits-only row(s)";
+
+            if (lockedCount > 0)
+                message += ", " + lockedCount + " locked row(s)";
+
+            message += dryRunMode ? ". Orders simulated only." : ".";
+            return message;
         }
 
         private void PauseCopyingTrades(bool silent)
