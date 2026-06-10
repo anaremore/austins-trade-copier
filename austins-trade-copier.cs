@@ -1297,6 +1297,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             SyncLeadAccountSubscriptions();
+            ResetActiveRiskBaselines();
             mirroredTargetQuantities.Clear();
             lockedVirtualPositions.Clear();
             maxNetVirtualPositions.Clear();
@@ -1336,6 +1337,22 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void PauseCopyingTrades()
         {
             PauseCopyingTrades(false);
+        }
+
+        private void ResetActiveRiskBaselines()
+        {
+            var rows = accountRows
+                .Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled && r.Account != null)
+                .ToList();
+
+            foreach (var row in rows)
+            {
+                row.ResetBaseline(ReadAccountPnl(row.Account));
+                row.LastAction = "Session baseline reset";
+            }
+
+            if (rows.Count > 0)
+                Log("Reset session risk baselines for " + rows.Count + " active row(s).");
         }
 
         private void OnOrderUpdate(object sender, OrderEventArgs args)
