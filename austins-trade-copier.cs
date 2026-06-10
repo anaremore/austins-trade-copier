@@ -1002,6 +1002,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
                 SyncLeadAccountSubscriptions();
 
+            if (RowPropertyAppliesRiskImmediately(e.PropertyName))
+                ApplyRiskSettingsEdit(row);
+
             if (RowPropertyPausesLiveRow(e.PropertyName))
                 PauseLiveRowAfterSettingsEdit(row);
 
@@ -1197,15 +1200,42 @@ namespace NinjaTrader.NinjaScript.AddOns
                 case "FixedQuantity":
                 case "MaxQuantity":
                 case "MaxNetPosition":
-                case "DailyLossLimit":
-                case "MaxDrawdown":
-                case "ProfitTarget":
-                case "LimitAction":
                 case "InstrumentFilter":
                     return true;
                 default:
                     return false;
             }
+        }
+
+        private bool RowPropertyAppliesRiskImmediately(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case "DailyLossLimit":
+                case "MaxDrawdown":
+                case "ProfitTarget":
+                case "LimitAction":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void ApplyRiskSettingsEdit(AccountCopyRow row)
+        {
+            if (suppressEnableValidation || row == null || !isCopying || !row.Enabled || row.Account == null)
+                return;
+
+            RefreshRowMetrics(row);
+            if (row.AutoLocked)
+            {
+                if (row.LimitAction == RiskAction.HardFlatten)
+                    AutoCloseRiskLockedRow(row, string.IsNullOrEmpty(row.LockReason) ? "Risk limit" : row.LockReason);
+
+                return;
+            }
+
+            TryTriggerRiskLock(row);
         }
 
         private void PauseLiveRowAfterSettingsEdit(AccountCopyRow row)
@@ -3150,23 +3180,29 @@ namespace NinjaTrader.NinjaScript.AddOns
             row.LockReason = reason;
 
             if (row.LimitAction == RiskAction.HardFlatten)
-            {
-                if (dryRunMode)
-                {
-                    row.LastAction = reason + " - dry run auto close";
-                    Log("DRY RUN " + row.AccountName + " would auto-close by " + reason + ".");
-                    return;
-                }
-
-                row.LastAction = reason + " - auto close";
-                Log(row.AccountName + " auto-closed by " + reason + "; entries blocked.");
-                FlattenAccount(row.Account, reason);
-            }
+                AutoCloseRiskLockedRow(row, reason);
             else
             {
                 row.LastAction = reason + " - soft lock";
                 Log(row.AccountName + " soft locked by " + reason + ". Entries blocked; exits allowed.");
             }
+        }
+
+        private void AutoCloseRiskLockedRow(AccountCopyRow row, string reason)
+        {
+            if (row == null || row.Account == null)
+                return;
+
+            if (dryRunMode)
+            {
+                row.LastAction = reason + " - dry run auto close";
+                Log("DRY RUN " + row.AccountName + " would auto-close by " + reason + ".");
+                return;
+            }
+
+            row.LastAction = reason + " - auto close";
+            Log(row.AccountName + " auto-closed by " + reason + "; copied orders blocked.");
+            FlattenAccount(row.Account, reason);
         }
 
         private void UpdateRowStatus(AccountCopyRow row)
