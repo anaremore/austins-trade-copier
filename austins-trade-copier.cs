@@ -304,7 +304,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
-                FrozenColumnCount = 4,
+                FrozenColumnCount = 5,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
