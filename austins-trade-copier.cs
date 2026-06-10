@@ -510,23 +510,24 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             grid.Columns.Add(new DataGridCheckBoxColumn
             {
-                Header = "On",
+                Header = CreateColumnHeader("On", "Enable this account row. Disabled rows stay visible but do not receive copied orders."),
                 Binding = new Binding("Enabled") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(42)
             });
 
-            grid.Columns.Add(CreateTextColumn("Account", "AccountName", 120, null, true));
+            grid.Columns.Add(CreateTextColumn("Account", "AccountName", 120, null, true, "Connected NinjaTrader account."));
+            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 86, null, true, "Available, Lead, Copy row, or Conflict based on the enabled rows."));
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = "Lead",
+                Header = CreateColumnHeader("Lead", "Account whose filled orders this row mirrors."),
                 ItemsSource = connectedAccountNames,
                 SelectedItemBinding = new Binding("LeadAccountName") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(120)
             });
-            grid.Columns.Add(CreateTextColumn("Group", "GroupName", 90, null, false));
+            grid.Columns.Add(CreateTextColumn("Group", "GroupName", 90, null, false, "Free-form group name used by group actions."));
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = "Copy",
+                Header = CreateColumnHeader("Copy", "All copies entries and exits. ExitsOnly blocks new entries while allowing exits."),
                 ItemsSource = Enum.GetValues(typeof(TradeCopyMode)),
                 SelectedItemBinding = new Binding("CopyMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(90)
@@ -534,46 +535,55 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = "Sizing",
+                Header = CreateColumnHeader("Sizing", "OneToOne uses lead quantity. Multiplier scales it. Fixed uses Fixed Qty. BalanceRatio scales by account value."),
                 ItemsSource = Enum.GetValues(typeof(SizingMode)),
                 SelectedItemBinding = new Binding("SizingMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(105)
             });
 
-            grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 82, "{0:0.##}", false));
-            grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 72, null, false));
-            grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 72, null, false));
-            grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 76, null, false));
-            grid.Columns.Add(CreateTextColumn("Max Loss", "DailyLossLimit", 82, "{0:0}", false));
-            grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 78, "{0:0}", false));
-            grid.Columns.Add(CreateTextColumn("Profit Target", "ProfitTarget", 96, "{0:0}", false));
+            grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 82, "{0:0.##}", false, "Used only when Sizing is Multiplier. 2 copies twice the lead quantity."));
+            grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 72, null, false, "Used only when Sizing is Fixed."));
+            grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 72, null, false, "Caps the quantity for each copied order. 0 disables the cap."));
+            grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 76, null, false, "Caps the row's net position size. 0 disables the cap."));
+            grid.Columns.Add(CreateTextColumn("Loss Limit", "DailyLossLimit", 82, "{0:0}", false, "Locks this row when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 78, "{0:0}", false, "Locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextColumn("Profit Target", "ProfitTarget", 96, "{0:0}", false, "Locks this row after this session profit target is reached. 0 disables the target."));
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = "Limit Action",
+                Header = CreateColumnHeader("Limit Action", "SoftLock blocks entries and allows exits. HardFlatten also flattens the row account."),
                 ItemsSource = Enum.GetValues(typeof(RiskAction)),
                 SelectedItemBinding = new Binding("LimitAction") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(105)
             });
 
-            grid.Columns.Add(CreateTextColumn("Symbols", "InstrumentFilter", 100, null, false));
-            grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 90, null, true));
-            grid.Columns.Add(CreateTextColumn("Status", "Status", 150, null, true));
-            grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 125, null, true));
-            grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 80, "{0:C0}", true));
-            grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 80, "{0:C0}", true));
+            grid.Columns.Add(CreateTextColumn("Symbols", "InstrumentFilter", 100, null, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
+            grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 90, null, true, "Current NinjaTrader connection status."));
+            grid.Columns.Add(CreateTextColumn("Status", "Status", 150, null, true, "Current copier state for this row."));
+            grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 125, null, true, "Current account position summary."));
+            grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 80, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
+            grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 80, "{0:C0}", true, "Drawdown from peak session PnL."));
 
             grid.Columns.Add(new DataGridCheckBoxColumn
             {
-                Header = "Manual Lock",
+                Header = CreateColumnHeader("Manual Lock", "Blocks entries for this row while still allowing exits."),
                 Binding = new Binding("ManualLock") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(95)
             });
 
-            grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 220, null, true));
+            grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 220, null, true, "Most recent copier action or skip reason for this row."));
         }
 
-        private DataGridTextColumn CreateTextColumn(string header, string propertyName, double width, string stringFormat, bool readOnly)
+        private TextBlock CreateColumnHeader(string text, string tooltip)
+        {
+            var header = new TextBlock { Text = text };
+            if (!string.IsNullOrWhiteSpace(tooltip))
+                header.ToolTip = tooltip;
+
+            return header;
+        }
+
+        private DataGridTextColumn CreateTextColumn(string header, string propertyName, double width, string stringFormat, bool readOnly, string tooltip)
         {
             var binding = new Binding(propertyName)
             {
@@ -586,7 +596,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             return new DataGridTextColumn
             {
-                Header = header,
+                Header = CreateColumnHeader(header, tooltip),
                 Binding = binding,
                 Width = new DataGridLength(width),
                 IsReadOnly = readOnly
@@ -2072,7 +2082,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var skippedCount = 0;
             foreach (var row in rows)
             {
-                if (row.SizingMode == SizingMode.Disabled || string.IsNullOrWhiteSpace(row.LeadAccountName) || AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                if (row.SizingMode == SizingMode.Disabled || string.IsNullOrWhiteSpace(row.LeadAccountName) || ResolveLeadAccountForRow(row) == null || AccountNamesEqual(row.AccountName, row.LeadAccountName))
                 {
                     row.LastAction = "Group enable skipped";
                     skippedCount++;
@@ -2212,6 +2222,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 RefreshRowMetrics(row);
                 EvaluateRisk(row);
                 UpdateRowStatus(row);
+                UpdateRowRole(row);
             }
 
             SetStatus(BuildSummaryStatus());
@@ -2335,6 +2346,32 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             row.SetStatus(isCopying ? "Active" : "Ready", isCopying ? "Copying" : "Ready");
+        }
+
+        private void UpdateRowRole(AccountCopyRow row)
+        {
+            if (row.Account == null || row.Account.ConnectionStatus != ConnectionStatus.Connected)
+            {
+                row.RoleSummary = "Offline";
+                return;
+            }
+
+            var usedAsLead = IsConfiguredLeadAccount(row.AccountName);
+            var activeCopyRow = row.Enabled && row.SizingMode != SizingMode.Disabled;
+
+            if (activeCopyRow && usedAsLead)
+            {
+                row.RoleSummary = "Conflict";
+                return;
+            }
+
+            if (activeCopyRow)
+            {
+                row.RoleSummary = "Copy row";
+                return;
+            }
+
+            row.RoleSummary = usedAsLead ? "Lead" : "Available";
         }
 
         private bool IsNearRiskLimit(AccountCopyRow row)
@@ -2640,6 +2677,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string connectionStatus = "Unknown";
             private string status = "Ready";
             private string statusLevel = "Ready";
+            private string roleSummary = "Available";
             private string positionSummary = "Flat";
             private string instrumentFilter = string.Empty;
             private double sessionPnl;
@@ -2722,6 +2760,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return statusLevel; }
                 private set { SetField(ref statusLevel, value, "StatusLevel"); }
+            }
+
+            public string RoleSummary
+            {
+                get { return roleSummary; }
+                set { SetField(ref roleSummary, value, "RoleSummary"); }
             }
 
             public string PositionSummary
