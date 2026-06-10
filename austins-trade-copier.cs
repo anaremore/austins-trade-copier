@@ -3320,9 +3320,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (IsPotentiallyDesynced(row))
+            var desyncStatus = GetDesyncStatusText(row);
+            if (!string.IsNullOrEmpty(desyncStatus))
             {
-                row.SetStatus("Desynced", "Check position sync");
+                row.SetStatus("Desynced", desyncStatus);
                 return;
             }
 
@@ -3429,18 +3430,21 @@ namespace NinjaTrader.NinjaScript.AddOns
                 || (row.ProfitTarget > 0 && row.SessionPnl >= Math.Abs(row.ProfitTarget) * 0.9);
         }
 
-        private bool IsPotentiallyDesynced(AccountCopyRow row)
+        private string GetDesyncStatusText(AccountCopyRow row)
         {
             var rowLead = ResolveLeadAccountForRow(row);
             if (!isCopying || rowLead == null || row.Account == null || RowIsReduceOnly(row) || !row.Enabled || row.SizingMode == SizingMode.Disabled)
-                return false;
+                return string.Empty;
 
             var expectedSignedPositions = BuildExpectedSignedPositionsForStatus(row, rowLead);
             var leadPositions = GetOpenPositionSnapshots(rowLead);
             var targetPositions = GetOpenPositionSnapshots(row.Account);
 
             if (leadPositions.Count == 0 || expectedSignedPositions.Count == 0)
-                return targetPositions.Any(p => p.SignedQuantity != 0);
+            {
+                var extraPosition = targetPositions.FirstOrDefault(p => p.SignedQuantity != 0);
+                return extraPosition == null ? string.Empty : "Extra " + DescribeSignedPosition(extraPosition.InstrumentName, extraPosition.SignedQuantity);
+            }
 
             var instrumentNames = expectedSignedPositions.Keys
                 .Union(targetPositions.Select(p => p.InstrumentName), StringComparer.OrdinalIgnoreCase)
@@ -3452,10 +3456,34 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var targetPosition = targetPositions.FirstOrDefault(p => string.Equals(p.InstrumentName, instrumentName, StringComparison.OrdinalIgnoreCase));
                 var currentSigned = targetPosition != null ? targetPosition.SignedQuantity : 0;
                 if (currentSigned != expectedSigned)
-                    return true;
+                    return BuildDesyncMismatchText(instrumentName, expectedSigned, currentSigned);
             }
 
-            return false;
+            return string.Empty;
+        }
+
+        private string BuildDesyncMismatchText(string instrumentName, int expectedSigned, int currentSigned)
+        {
+            if (expectedSigned == 0)
+                return "Extra " + DescribeSignedPosition(instrumentName, currentSigned);
+
+            if (currentSigned == 0)
+                return "Need " + DescribeSignedPosition(instrumentName, expectedSigned);
+
+            return "Need " + DescribeSignedPosition(instrumentName, expectedSigned) + " has " + DescribeSignedQuantity(currentSigned);
+        }
+
+        private string DescribeSignedPosition(string instrumentName, int signedQuantity)
+        {
+            return (instrumentName ?? string.Empty) + " " + DescribeSignedQuantity(signedQuantity);
+        }
+
+        private string DescribeSignedQuantity(int signedQuantity)
+        {
+            if (signedQuantity == 0)
+                return "flat";
+
+            return Math.Abs(signedQuantity).ToString(CultureInfo.InvariantCulture) + (signedQuantity > 0 ? "L" : "S");
         }
 
         private Dictionary<string, int> BuildExpectedSignedPositionsForStatus(AccountCopyRow row, Account rowLead)
