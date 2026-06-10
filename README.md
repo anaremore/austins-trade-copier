@@ -18,6 +18,7 @@
 - 🧯 **Risk Lockouts**: Set daily loss, drawdown, and profit-target thresholds per account with soft-lock or hard-flatten behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
 - 🧹 **Flatten Controls**: Flatten followers, all accounts, or a selected group.
+- 💾 **Profiles**: Save, load, and delete copier profiles so groups, sizing, and risk rules survive restarts.
 - 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors.
 
 ---
@@ -43,9 +44,10 @@
    - **BalanceRatio**: scales by follower equity versus lead equity.
    - **Disabled**: keeps the row visible but does not copy entries.
 4. **Set Risk Rules** – Optional loss, drawdown, and profit-target values lock an account when hit.
-5. **Start Copying** – The dashboard shows active, ready, locked, warning, desynced, and error states.
-6. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-7. **Flatten Deliberately** – Use follower, group, or all-account flatten buttons when you intend to close positions.
+5. **Save a Profile** – Store the current dashboard as a profile if you want to reuse the setup.
+6. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states.
+7. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
+8. **Flatten Deliberately** – Use follower, group, or all-account flatten buttons when you intend to close positions.
 
 ---
 
@@ -56,6 +58,12 @@ Sizing is calculated from the cumulative filled quantity of the lead order. This
 Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that follower order instead of falling back to the full lead size.
 
 `Max` caps every sizing mode when greater than zero. A value of `0` means no max cap.
+
+Before copying starts, enabled rows are validated. Disconnected followers, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
+
+Profiles are stored under your NinjaTrader documents templates folder:
+
+`Documents\NinjaTrader 8\templates\AustinTradeCopier`
 
 Risk thresholds use the row baseline captured when the follower is added or when **Reset Baselines** is clicked:
 

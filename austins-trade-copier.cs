@@ -3,12 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Xml;
 using NinjaTrader.Cbi;
 using NinjaTrader.Gui.Tools;
 using NinjaTrader.NinjaScript;
@@ -83,10 +86,14 @@ namespace NinjaTrader.NinjaScript.AddOns
         private const int DefaultFixedQuantity = 1;
         private const double DefaultMultiplier = 1.0;
         private const string DefaultGroupName = "Default";
+        private const string ProfileFolderName = "AustinTradeCopier";
+        private const string ProfileFileExtension = ".xml";
+        private const int MaxEventLogLines = 500;
 
         private readonly ObservableCollection<AccountCopyRow> accountRows = new ObservableCollection<AccountCopyRow>();
         private readonly Dictionary<string, int> mirroredTargetQuantities = new Dictionary<string, int>();
         private readonly Dictionary<string, int> lockedVirtualPositions = new Dictionary<string, int>();
+        private readonly Queue<string> eventLogLines = new Queue<string>();
         private readonly DispatcherTimer telemetryTimer;
 
         private Account leadAccount;
@@ -97,6 +104,8 @@ namespace NinjaTrader.NinjaScript.AddOns
         private ComboBox leadAccountComboBox;
         private ComboBox addAccountComboBox;
         private TextBox addGroupTextBox;
+        private ComboBox profileComboBox;
+        private TextBox profileNameTextBox;
         private ComboBox groupComboBox;
         private DataGrid accountsGrid;
         private Button startPauseButton;
@@ -115,6 +124,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             CreateUI();
             RefreshAccountList();
+            RefreshProfileList();
 
             Account.AccountStatusUpdate += OnAccountStatusUpdate;
 
@@ -128,6 +138,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void CreateUI()
         {
             var root = new Grid { Margin = new Thickness(10) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -177,6 +188,46 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             Grid.SetRow(leadPanel, 0);
             root.Children.Add(leadPanel);
+
+            var profilePanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            profilePanel.Children.Add(CreateLabel("Profile"));
+            profileComboBox = new ComboBox
+            {
+                Width = 180,
+                Margin = new Thickness(8, 0, 8, 0),
+                Padding = new Thickness(4)
+            };
+            profileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
+            profilePanel.Children.Add(profileComboBox);
+
+            profileNameTextBox = new TextBox
+            {
+                Text = "Default",
+                Width = 160,
+                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(4)
+            };
+            profilePanel.Children.Add(profileNameTextBox);
+
+            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray);
+            saveProfileButton.Click += SaveProfileButton_Click;
+            profilePanel.Children.Add(saveProfileButton);
+
+            var loadProfileButton = CreateButton("Load Profile", Brushes.DimGray);
+            loadProfileButton.Click += LoadProfileButton_Click;
+            profilePanel.Children.Add(loadProfileButton);
+
+            var deleteProfileButton = CreateButton("Delete Profile", Brushes.DimGray);
+            deleteProfileButton.Click += DeleteProfileButton_Click;
+            profilePanel.Children.Add(deleteProfileButton);
+
+            Grid.SetRow(profilePanel, 1);
+            root.Children.Add(profilePanel);
 
             var actionPanel = new StackPanel
             {
@@ -234,7 +285,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             applyGroupSettingsButton.Click += ApplyGroupSettingsButton_Click;
             actionPanel.Children.Add(applyGroupSettingsButton);
 
-            Grid.SetRow(actionPanel, 1);
+            Grid.SetRow(actionPanel, 2);
             root.Children.Add(actionPanel);
 
             accountsGrid = new DataGrid
@@ -257,7 +308,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             AddGridColumns(accountsGrid);
 
-            Grid.SetRow(accountsGrid, 2);
+            Grid.SetRow(accountsGrid, 3);
             root.Children.Add(accountsGrid);
 
             statusTextBlock = new TextBlock
@@ -267,7 +318,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Margin = new Thickness(0, 0, 0, 8),
                 Text = "Ready. Add follower accounts, set sizing and risk rules, then start copying."
             };
-            Grid.SetRow(statusTextBlock, 3);
+            Grid.SetRow(statusTextBlock, 4);
             root.Children.Add(statusTextBlock);
 
             eventLogTextBox = new TextBox
@@ -280,7 +331,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 BorderBrush = new SolidColorBrush(Color.FromRgb(76, 76, 80)),
                 TextWrapping = TextWrapping.NoWrap
             };
-            Grid.SetRow(eventLogTextBox, 4);
+            Grid.SetRow(eventLogTextBox, 5);
             root.Children.Add(eventLogTextBox);
 
             Content = root;
@@ -486,6 +537,332 @@ namespace NinjaTrader.NinjaScript.AddOns
             Log("Added follower " + account.Name + " to group " + groupName + ".");
         }
 
+        private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var profileName = profileComboBox.SelectedItem as string;
+            if (!string.IsNullOrEmpty(profileName))
+                profileNameTextBox.Text = profileName;
+        }
+
+        private void SaveProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            var profileName = NormalizeProfileName(profileNameTextBox.Text);
+            if (string.IsNullOrEmpty(profileName))
+            {
+                SetStatus("Enter a profile name before saving.");
+                return;
+            }
+
+            try
+            {
+                SaveProfile(profileName);
+                RefreshProfileList();
+                profileComboBox.SelectedItem = profileName;
+                SetStatus("Saved profile " + profileName + ".");
+                Log("Saved profile " + profileName + ".");
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Profile save failed.");
+                Log("ERROR profile save failed: " + ex.Message);
+            }
+        }
+
+        private void LoadProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (isCopying)
+            {
+                SetStatus("Pause copying before loading a profile.");
+                return;
+            }
+
+            var profileName = NormalizeProfileName(profileNameTextBox.Text);
+            if (string.IsNullOrEmpty(profileName))
+            {
+                SetStatus("Select or enter a profile name before loading.");
+                return;
+            }
+
+            try
+            {
+                LoadProfile(profileName);
+                SetStatus("Loaded profile " + profileName + ".");
+                Log("Loaded profile " + profileName + ".");
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Profile load failed.");
+                Log("ERROR profile load failed: " + ex.Message);
+            }
+        }
+
+        private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            var profileName = NormalizeProfileName(profileNameTextBox.Text);
+            if (string.IsNullOrEmpty(profileName))
+            {
+                SetStatus("Select or enter a profile name before deleting.");
+                return;
+            }
+
+            var path = GetProfilePath(profileName);
+            if (!File.Exists(path))
+            {
+                SetStatus("Profile " + profileName + " does not exist.");
+                return;
+            }
+
+            if (MessageBox.Show("Delete profile " + profileName + "?", "Confirm Delete Profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                File.Delete(path);
+                RefreshProfileList();
+                SetStatus("Deleted profile " + profileName + ".");
+                Log("Deleted profile " + profileName + ".");
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Profile delete failed.");
+                Log("ERROR profile delete failed: " + ex.Message);
+            }
+        }
+
+        private void SaveProfile(string profileName)
+        {
+            Directory.CreateDirectory(GetProfileDirectoryPath());
+
+            var document = new XmlDocument();
+            var root = document.CreateElement("TradeCopierProfile");
+            root.SetAttribute("version", "1");
+            root.SetAttribute("savedUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            root.SetAttribute("leadAccount", leadAccount != null ? leadAccount.Name : string.Empty);
+            document.AppendChild(root);
+
+            foreach (var row in accountRows)
+            {
+                var rowElement = document.CreateElement("Follower");
+                SetAttribute(rowElement, "account", row.AccountName);
+                SetAttribute(rowElement, "group", row.GroupName);
+                SetAttribute(rowElement, "enabled", row.Enabled);
+                SetAttribute(rowElement, "sizingMode", row.SizingMode.ToString());
+                SetAttribute(rowElement, "multiplier", row.Multiplier);
+                SetAttribute(rowElement, "fixedQuantity", row.FixedQuantity);
+                SetAttribute(rowElement, "maxQuantity", row.MaxQuantity);
+                SetAttribute(rowElement, "dailyLossLimit", row.DailyLossLimit);
+                SetAttribute(rowElement, "maxDrawdown", row.MaxDrawdown);
+                SetAttribute(rowElement, "profitTarget", row.ProfitTarget);
+                SetAttribute(rowElement, "limitAction", row.LimitAction.ToString());
+                root.AppendChild(rowElement);
+            }
+
+            document.Save(GetProfilePath(profileName));
+        }
+
+        private void LoadProfile(string profileName)
+        {
+            var path = GetProfilePath(profileName);
+            if (!File.Exists(path))
+            {
+                SetStatus("Profile " + profileName + " does not exist.");
+                return;
+            }
+
+            var accounts = GetConnectedAccountsSnapshot();
+            connectedAccounts = accounts;
+            leadAccountComboBox.ItemsSource = connectedAccounts;
+            addAccountComboBox.ItemsSource = connectedAccounts;
+            leadAccountComboBox.SelectedItem = null;
+            addAccountComboBox.SelectedItem = null;
+
+            var document = new XmlDocument();
+            document.Load(path);
+
+            var root = document.DocumentElement;
+            if (root == null || root.Name != "TradeCopierProfile")
+                throw new InvalidOperationException("Invalid profile file.");
+
+            var leadAccountName = root.GetAttribute("leadAccount");
+            if (!string.IsNullOrEmpty(leadAccountName))
+            {
+                var lead = accounts.FirstOrDefault(a => string.Equals(a.Name, leadAccountName, StringComparison.OrdinalIgnoreCase));
+                if (lead != null)
+                    leadAccountComboBox.SelectedItem = lead;
+                else
+                    Log("Profile lead account " + leadAccountName + " is not connected.");
+            }
+
+            accountRows.Clear();
+            mirroredTargetQuantities.Clear();
+            lockedVirtualPositions.Clear();
+
+            var seenAccounts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (XmlNode node in root.SelectNodes("Follower"))
+            {
+                var element = node as XmlElement;
+                if (element == null)
+                    continue;
+
+                var accountName = element.GetAttribute("account");
+                if (string.IsNullOrWhiteSpace(accountName))
+                    continue;
+
+                if (seenAccounts.Contains(accountName))
+                {
+                    Log("Profile skipped duplicate follower " + accountName + ".");
+                    continue;
+                }
+
+                var account = accounts.FirstOrDefault(a => string.Equals(a.Name, accountName, StringComparison.OrdinalIgnoreCase));
+                if (account == null)
+                {
+                    Log("Profile follower " + accountName + " is not connected.");
+                    continue;
+                }
+
+                if (leadAccount != null && account == leadAccount)
+                {
+                    Log("Profile skipped follower " + accountName + " because it is the lead account.");
+                    continue;
+                }
+
+                var row = new AccountCopyRow(account, GetStringAttribute(element, "group", DefaultGroupName), ReadAccountPnl(account));
+                row.Enabled = GetBoolAttribute(element, "enabled", true);
+                row.SizingMode = GetEnumAttribute(element, "sizingMode", SizingMode.OneToOne);
+                row.Multiplier = GetDoubleAttribute(element, "multiplier", DefaultMultiplier);
+                row.FixedQuantity = GetIntAttribute(element, "fixedQuantity", DefaultFixedQuantity);
+                row.MaxQuantity = GetIntAttribute(element, "maxQuantity", 0);
+                row.DailyLossLimit = GetDoubleAttribute(element, "dailyLossLimit", 0);
+                row.MaxDrawdown = GetDoubleAttribute(element, "maxDrawdown", 0);
+                row.ProfitTarget = GetDoubleAttribute(element, "profitTarget", 0);
+                row.LimitAction = GetEnumAttribute(element, "limitAction", RiskAction.SoftLock);
+                row.LastAction = "Loaded profile";
+
+                accountRows.Add(row);
+                seenAccounts.Add(accountName);
+            }
+
+            lastGroupListSignature = string.Empty;
+            RefreshGroupList();
+            RefreshAllRows();
+        }
+
+        private List<Account> GetConnectedAccountsSnapshot()
+        {
+            try
+            {
+                lock (Account.All)
+                    return Account.All.Where(a => a.ConnectionStatus == ConnectionStatus.Connected).ToList();
+            }
+            catch (Exception ex)
+            {
+                Log("Unable to refresh account list: " + ex.Message);
+                return new List<Account>();
+            }
+        }
+
+        private void RefreshProfileList()
+        {
+            if (profileComboBox == null)
+                return;
+
+            var selected = profileComboBox.SelectedItem as string;
+            var profiles = GetProfileNames();
+            profileComboBox.ItemsSource = profiles;
+
+            if (!string.IsNullOrEmpty(selected) && profiles.Any(p => string.Equals(p, selected, StringComparison.OrdinalIgnoreCase)))
+                profileComboBox.SelectedItem = profiles.First(p => string.Equals(p, selected, StringComparison.OrdinalIgnoreCase));
+            else if (profiles.Count > 0)
+                profileComboBox.SelectedIndex = 0;
+        }
+
+        private List<string> GetProfileNames()
+        {
+            var directory = GetProfileDirectoryPath();
+            if (!Directory.Exists(directory))
+                return new List<string>();
+
+            return Directory.GetFiles(directory, "*" + ProfileFileExtension)
+                .Select(Path.GetFileNameWithoutExtension)
+                .OrderBy(name => name)
+                .ToList();
+        }
+
+        private string GetProfileDirectoryPath()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "NinjaTrader 8",
+                "templates",
+                ProfileFolderName);
+        }
+
+        private string GetProfilePath(string profileName)
+        {
+            return Path.Combine(GetProfileDirectoryPath(), NormalizeProfileName(profileName) + ProfileFileExtension);
+        }
+
+        private string NormalizeProfileName(string profileName)
+        {
+            if (string.IsNullOrWhiteSpace(profileName))
+                return string.Empty;
+
+            var invalid = Path.GetInvalidFileNameChars();
+            var sanitized = new string(profileName.Trim().Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+            return sanitized.Trim();
+        }
+
+        private void SetAttribute(XmlElement element, string name, bool value)
+        {
+            element.SetAttribute(name, value ? "true" : "false");
+        }
+
+        private void SetAttribute(XmlElement element, string name, int value)
+        {
+            element.SetAttribute(name, value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private void SetAttribute(XmlElement element, string name, double value)
+        {
+            element.SetAttribute(name, value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private void SetAttribute(XmlElement element, string name, string value)
+        {
+            element.SetAttribute(name, value ?? string.Empty);
+        }
+
+        private string GetStringAttribute(XmlElement element, string name, string fallback)
+        {
+            var value = element.GetAttribute(name);
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private bool GetBoolAttribute(XmlElement element, string name, bool fallback)
+        {
+            bool value;
+            return bool.TryParse(element.GetAttribute(name), out value) ? value : fallback;
+        }
+
+        private int GetIntAttribute(XmlElement element, string name, int fallback)
+        {
+            int value;
+            return int.TryParse(element.GetAttribute(name), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) ? value : fallback;
+        }
+
+        private double GetDoubleAttribute(XmlElement element, string name, double fallback)
+        {
+            double value;
+            return double.TryParse(element.GetAttribute(name), NumberStyles.Float, CultureInfo.InvariantCulture, out value) ? value : fallback;
+        }
+
+        private TEnum GetEnumAttribute<TEnum>(XmlElement element, string name, TEnum fallback) where TEnum : struct
+        {
+            TEnum value;
+            return Enum.TryParse(element.GetAttribute(name), true, out value) ? value : fallback;
+        }
+
         private void StartPauseButton_Click(object sender, RoutedEventArgs e)
         {
             if (!isCopying)
@@ -511,6 +888,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountRows.Any(r => r.Account == leadAccount))
             {
                 SetStatus("The lead account cannot also be a follower.");
+                return;
+            }
+
+            var validationMessage = ValidateReadyToStart();
+            if (!string.IsNullOrEmpty(validationMessage))
+            {
+                SetStatus(validationMessage);
+                Log("Start blocked: " + validationMessage);
                 return;
             }
 
@@ -554,6 +939,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 if (row.Account == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
                     continue;
+
+                if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
+                {
+                    row.SetStatus("Error", "Disconnected");
+                    row.LastAction = "Skipped disconnected";
+                    Log(row.AccountName + " skipped because account is disconnected.");
+                    continue;
+                }
 
                 if (row.Account == leadAccount)
                 {
@@ -649,6 +1042,42 @@ namespace NinjaTrader.NinjaScript.AddOns
                 desiredQuantity = Math.Min(desiredQuantity, row.MaxQuantity);
 
             return Math.Max(0, desiredQuantity);
+        }
+
+        private string ValidateReadyToStart()
+        {
+            var activeRows = accountRows.Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled).ToList();
+
+            foreach (var row in activeRows)
+            {
+                if (row.Account == null)
+                    return "Follower " + row.AccountName + " has no account.";
+
+                if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
+                    return "Follower " + row.AccountName + " is disconnected.";
+
+                if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+                    return "Follower " + row.AccountName + " needs a multiplier greater than 0.";
+
+                if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+                    return "Follower " + row.AccountName + " needs a fixed quantity greater than 0.";
+            }
+
+            if (activeRows.Any(r => r.SizingMode == SizingMode.BalanceRatio))
+            {
+                double leadBalance;
+                if (!TryGetSizingBalance(leadAccount, out leadBalance) || leadBalance <= 0)
+                    return "Balance-ratio sizing needs usable lead account value data.";
+
+                foreach (var row in activeRows.Where(r => r.SizingMode == SizingMode.BalanceRatio))
+                {
+                    double followerBalance;
+                    if (!TryGetSizingBalance(row.Account, out followerBalance) || followerBalance <= 0)
+                        return "Balance-ratio sizing needs usable value data for " + row.AccountName + ".";
+                }
+            }
+
+            return string.Empty;
         }
 
         private int CalculateBalanceRatioQuantity(AccountCopyRow row, int sourceFilledQuantity)
@@ -1301,7 +1730,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string BuildSummaryStatus()
         {
-            var activeCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !r.IsEntryLocked);
+            var activeCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !r.IsEntryLocked && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
             var lockedCount = accountRows.Count(r => r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
             return (isCopying ? "Copying" : "Paused") + " | Active followers: " + activeCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
@@ -1318,7 +1747,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (eventLogTextBox == null)
                 return;
 
-            eventLogTextBox.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + message + Environment.NewLine);
+            eventLogLines.Enqueue(DateTime.Now.ToString("HH:mm:ss") + "  " + message);
+            while (eventLogLines.Count > MaxEventLogLines)
+                eventLogLines.Dequeue();
+
+            eventLogTextBox.Text = string.Join(Environment.NewLine, eventLogLines.ToArray());
+            eventLogTextBox.AppendText(Environment.NewLine);
             eventLogTextBox.ScrollToEnd();
         }
 
