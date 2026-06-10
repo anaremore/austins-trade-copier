@@ -3265,9 +3265,10 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var entryActiveCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !RowIsReduceOnly(r) && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
             var exitsOnlyCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && RowIsReduceOnly(r) && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
+            var armedLeadCount = GetConfiguredLeadAccounts().Count;
             var lockedCount = accountRows.Count(r => r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
-            var summary = mode + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
             var selectionSummary = BuildSelectionSummary();
             return string.IsNullOrEmpty(selectionSummary) ? summary : summary + " | " + selectionSummary;
         }
