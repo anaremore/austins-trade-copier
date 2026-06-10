@@ -3615,14 +3615,24 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountRows.Count == 0)
                 return mode + " | No connected accounts";
 
-            var entryActiveCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !RowIsReduceOnly(r) && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
-            var exitsOnlyCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && RowIsReduceOnly(r) && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
+            var entryActiveCount = accountRows.Count(r => IsConnectedCopyRow(r) && !RowIsReduceOnly(r));
+            var exitsOnlyCount = accountRows.Count(r => IsConnectedCopyRow(r) && RowIsReduceOnly(r));
             var armedLeadCount = GetConfiguredLeadAccounts().Count;
-            var lockedCount = accountRows.Count(r => r.IsEntryLocked);
+            var lockedCount = accountRows.Count(r => IsConnectedCopyRow(r) && r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
             var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
             var selectionSummary = BuildSelectionSummary();
             return string.IsNullOrEmpty(selectionSummary) ? summary : summary + " | " + selectionSummary;
+        }
+
+        private bool IsConfiguredCopyRow(AccountCopyRow row)
+        {
+            return row != null && row.Enabled && row.SizingMode != SizingMode.Disabled;
+        }
+
+        private bool IsConnectedCopyRow(AccountCopyRow row)
+        {
+            return IsConfiguredCopyRow(row) && row.Account != null && row.Account.ConnectionStatus == ConnectionStatus.Connected;
         }
 
         private string BuildSelectionSummary()
@@ -3635,7 +3645,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return string.Empty;
 
             if (rows.Count > 1)
-                return "Selected: " + rows.Count + " rows";
+            {
+                var enabledCount = rows.Count(IsConfiguredCopyRow);
+                var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
+                var attentionCount = rows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
+                return "Selected: " + rows.Count + " rows | Enabled: " + enabledCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
+            }
 
             var row = rows[0];
             var lead = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "no lead" : row.LeadAccountName;
