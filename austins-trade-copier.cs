@@ -806,8 +806,23 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Header = CreateColumnHeader(header, tooltip),
                 Binding = binding,
                 Width = new DataGridLength(width),
-                IsReadOnly = readOnly
+                IsReadOnly = readOnly,
+                ElementStyle = CreateTextCellStyle(propertyName, stringFormat)
             };
+        }
+
+        private Style CreateTextCellStyle(string propertyName, string stringFormat)
+        {
+            var style = new Style(typeof(TextBlock));
+            style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+            style.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+
+            var tooltipBinding = new Binding(propertyName);
+            if (!string.IsNullOrEmpty(stringFormat))
+                tooltipBinding.StringFormat = stringFormat;
+
+            style.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, tooltipBinding));
+            return style;
         }
 
         private Style CreateRowStyle()
