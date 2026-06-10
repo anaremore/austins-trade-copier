@@ -946,7 +946,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var row = accountRows.FirstOrDefault(r => AccountNamesEqual(r.AccountName, account.Name));
                 if (row != null)
                 {
+                    var wasUnavailable = row.Account == null || IsUnavailableConnectionStatus(row.ConnectionStatus);
                     row.RefreshAccount(account);
+                    if (wasUnavailable)
+                    {
+                        row.ResetBaseline(ReadAccountPnl(account), false);
+                        row.LastAction = "Account reconnected - baseline reset";
+                        ClearLockedVirtualPositions(row);
+                        ClearMaxNetVirtualPositions(row);
+                        Log(row.AccountName + " reconnected; risk baseline reset.");
+                    }
+
                     continue;
                 }
 
@@ -984,6 +994,13 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool AccountNamesEqual(string left, string right)
         {
             return string.Equals(left ?? string.Empty, right ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsUnavailableConnectionStatus(string status)
+        {
+            return !string.IsNullOrWhiteSpace(status)
+                && !string.Equals(status, "Connected", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(status, "Unknown", StringComparison.OrdinalIgnoreCase);
         }
 
         private void SyncLeadAccountSubscriptions()
