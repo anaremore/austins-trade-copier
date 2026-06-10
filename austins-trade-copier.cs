@@ -1086,15 +1086,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             suppressEnableValidation = true;
             try
             {
-                row.ManualLock = false;
-                row.LastAction = row.AutoLocked ? "Enabled - still risk locked" : "Enabled";
-                ClearLockedVirtualPositions(row);
-                ClearMaxNetVirtualPositions(row);
+                PrepareRowAfterEnable(row, true);
             }
             finally
             {
                 suppressEnableValidation = false;
             }
+
+            var enabledMessage = row.AccountName + (isCopying
+                ? row.AutoLocked ? " enabled while copying; still risk locked." : " enabled while copying; risk baseline reset."
+                : " enabled.");
+            SetStatus(enabledMessage);
+            Log(enabledMessage);
         }
 
         private void ValidateEnabledRowAfterEdit(AccountCopyRow row)
@@ -2630,9 +2633,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             var desiredLeadNames = BuildDesiredLeadNames(targetRows);
 
             var enabledCount = 0;
+            var liveBaselineResetCount = 0;
             var skipReasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in targetRows)
             {
+                var shouldResetLiveBaseline = isCopying && !row.Enabled;
                 string skipReason;
                 if (!TryEnableRow(row, desiredLeadNames, out skipReason))
                 {
@@ -2642,11 +2647,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
 
                 enabledCount++;
+                if (shouldResetLiveBaseline)
+                    liveBaselineResetCount++;
             }
 
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
-            var message = "Enabled " + enabledCount + " " + scopeDescription + " row(s)" + FormatSkipReasons(skipReasons) + ".";
+            var message = "Enabled " + enabledCount + " " + scopeDescription + " row(s)" + FormatSkipReasons(skipReasons);
+            if (liveBaselineResetCount > 0)
+                message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
+
+            message += ".";
             SetStatus(message);
             Log(message);
         }
@@ -2666,14 +2677,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!CanEnableRow(row, desiredLeadNames, out skipReason))
                 return false;
 
+            var shouldResetLiveBaseline = !row.Enabled;
             suppressEnableValidation = true;
             try
             {
-                row.Enabled = true;
-                row.ManualLock = false;
-                row.LastAction = row.AutoLocked ? "Enabled - still risk locked" : "Enabled";
-                ClearLockedVirtualPositions(row);
-                ClearMaxNetVirtualPositions(row);
+                PrepareRowAfterEnable(row, shouldResetLiveBaseline);
             }
             finally
             {
@@ -2681,6 +2689,31 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             return true;
+        }
+
+        private void PrepareRowAfterEnable(AccountCopyRow row, bool shouldResetLiveBaseline)
+        {
+            row.Enabled = true;
+            row.ManualLock = false;
+            if (shouldResetLiveBaseline && isCopying && row.Account != null)
+                row.ResetBaseline(ReadAccountPnl(row.Account), false);
+
+            row.LastAction = GetEnableLastAction(row, shouldResetLiveBaseline);
+            ClearLockedVirtualPositions(row);
+            ClearMaxNetVirtualPositions(row);
+        }
+
+        private string GetEnableLastAction(AccountCopyRow row, bool liveBaselineReset)
+        {
+            if (isCopying)
+            {
+                if (row.AutoLocked)
+                    return liveBaselineReset ? "Enabled live - still risk locked" : "Enabled - still risk locked";
+
+                return liveBaselineReset ? "Enabled live - baseline reset" : "Enabled";
+            }
+
+            return row.AutoLocked ? "Enabled - still risk locked" : "Enabled";
         }
 
         private bool CanEnableRow(AccountCopyRow row, List<string> desiredLeadNames, out string skipReason)
