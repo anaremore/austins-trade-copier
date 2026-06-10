@@ -97,6 +97,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private const string ProfileFolderName = "AustinTradeCopier";
         private const string ProfileFileExtension = ".xml";
         private const int MaxEventLogLines = 500;
+        private const int StatusMessageHoldSeconds = 6;
 
         private readonly ObservableCollection<AccountCopyRow> accountRows = new ObservableCollection<AccountCopyRow>();
         private readonly ObservableCollection<string> connectedAccountNames = new ObservableCollection<string>();
@@ -114,6 +115,8 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressEnableValidation;
         private bool rowRefreshPending;
         private string lastGroupListSignature = string.Empty;
+        private string heldStatusMessage = string.Empty;
+        private DateTime heldStatusUntil = DateTime.MinValue;
 
         private ComboBox profileComboBox;
         private TextBox profileNameTextBox;
@@ -341,6 +344,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 8),
+                TextTrimming = TextTrimming.CharacterEllipsis,
                 Text = "Ready. Enable accounts, choose each row's lead/group/sizing/risk, then start copying."
             };
             Grid.SetRow(statusTextBlock, 4);
@@ -1082,7 +1086,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateSelectedRowEditor();
-            SetStatus(BuildSummaryStatus());
+            RefreshStatusSummary();
         }
 
         private void UpdateSelectedRowEditor()
@@ -2808,7 +2812,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 UpdateRowRole(row);
             }
 
-            SetStatus(BuildSummaryStatus());
+            RefreshStatusSummary();
         }
 
         private void RefreshRowMetrics(AccountCopyRow row)
@@ -3254,8 +3258,27 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void SetStatus(string message)
         {
-            if (statusTextBlock != null)
-                statusTextBlock.Text = message;
+            heldStatusMessage = message ?? string.Empty;
+            heldStatusUntil = DateTime.Now.AddSeconds(StatusMessageHoldSeconds);
+            RefreshStatusSummary();
+        }
+
+        private void RefreshStatusSummary()
+        {
+            if (statusTextBlock == null)
+                return;
+
+            var summary = BuildSummaryStatus();
+            if (!string.IsNullOrWhiteSpace(heldStatusMessage) && DateTime.Now <= heldStatusUntil)
+            {
+                statusTextBlock.Text = heldStatusMessage + " | " + summary;
+                statusTextBlock.ToolTip = summary;
+                return;
+            }
+
+            heldStatusMessage = string.Empty;
+            statusTextBlock.Text = summary;
+            statusTextBlock.ToolTip = summary;
         }
 
         private void Log(string message)
