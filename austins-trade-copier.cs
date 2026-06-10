@@ -104,6 +104,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private readonly Dictionary<string, int> lockedVirtualPositions = new Dictionary<string, int>();
         private readonly Dictionary<string, int> maxNetVirtualPositions = new Dictionary<string, int>();
         private readonly Dictionary<string, Account> subscribedLeadAccounts = new Dictionary<string, Account>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<AccountCopyRow> observedAccountRows = new HashSet<AccountCopyRow>();
         private readonly Queue<string> eventLogLines = new Queue<string>();
         private readonly DispatcherTimer telemetryTimer;
 
@@ -768,20 +769,46 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AccountRows_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                foreach (var row in observedAccountRows.ToList())
+                    DetachAccountRow(row);
+
+                foreach (var row in accountRows)
+                    AttachAccountRow(row);
+
+                return;
+            }
+
             if (e.OldItems != null)
             {
                 foreach (AccountCopyRow row in e.OldItems)
-                    row.PropertyChanged -= AccountRow_PropertyChanged;
+                    DetachAccountRow(row);
             }
 
             if (e.NewItems != null)
             {
                 foreach (AccountCopyRow row in e.NewItems)
-                {
-                    row.PropertyChanged -= AccountRow_PropertyChanged;
-                    row.PropertyChanged += AccountRow_PropertyChanged;
-                }
+                    AttachAccountRow(row);
             }
+        }
+
+        private void AttachAccountRow(AccountCopyRow row)
+        {
+            if (row == null || observedAccountRows.Contains(row))
+                return;
+
+            row.PropertyChanged += AccountRow_PropertyChanged;
+            observedAccountRows.Add(row);
+        }
+
+        private void DetachAccountRow(AccountCopyRow row)
+        {
+            if (row == null || !observedAccountRows.Contains(row))
+                return;
+
+            row.PropertyChanged -= AccountRow_PropertyChanged;
+            observedAccountRows.Remove(row);
         }
 
         private void AccountRow_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -3082,8 +3109,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             PauseCopyingTrades(true);
             UnsubscribeAllLeadAccounts();
             accountRows.CollectionChanged -= AccountRows_CollectionChanged;
-            foreach (var row in accountRows)
-                row.PropertyChanged -= AccountRow_PropertyChanged;
+            foreach (var row in observedAccountRows.ToList())
+                DetachAccountRow(row);
 
             if (accountsGrid != null)
                 accountsGrid.SelectionChanged -= AccountsGrid_SelectionChanged;
