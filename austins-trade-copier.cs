@@ -563,7 +563,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Group", "GroupName", 80, null, false, "Free-form group name used by group actions."));
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = CreateColumnHeader("Copy", "All copies entries and exits. ExitsOnly blocks new entries while allowing exits."),
+                Header = CreateColumnHeader("Copy", "All copies entries and exits. Exits only blocks new entries while allowing exits."),
                 ItemsSource = copyModeOptions,
                 DisplayMemberPath = "Label",
                 SelectedValuePath = "Value",
@@ -573,7 +573,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = CreateColumnHeader("Sizing", "OneToOne uses lead quantity. Multiplier scales it. Fixed uses Fixed Qty. BalanceRatio scales by account value."),
+                Header = CreateColumnHeader("Sizing", "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."),
                 ItemsSource = sizingModeOptions,
                 DisplayMemberPath = "Label",
                 SelectedValuePath = "Value",
@@ -603,7 +603,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
-                Header = CreateColumnHeader("Limit Action", "SoftLock blocks entries and allows exits. HardFlatten also flattens the row account."),
+                Header = CreateColumnHeader("Limit Action", "Soft lock blocks entries and allows exits. Flatten also flattens the row account."),
                 ItemsSource = limitActionOptions,
                 DisplayMemberPath = "Label",
                 SelectedValuePath = "Value",
