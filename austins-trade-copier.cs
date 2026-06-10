@@ -100,6 +100,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private readonly ObservableCollection<AccountCopyRow> accountRows = new ObservableCollection<AccountCopyRow>();
         private readonly Dictionary<string, int> mirroredTargetQuantities = new Dictionary<string, int>();
         private readonly Dictionary<string, int> lockedVirtualPositions = new Dictionary<string, int>();
+        private readonly Dictionary<string, int> maxNetVirtualPositions = new Dictionary<string, int>();
         private readonly Queue<string> eventLogLines = new Queue<string>();
         private readonly DispatcherTimer telemetryTimer;
 
@@ -652,6 +653,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             leadAccount = leadAccountComboBox.SelectedItem as Account;
             mirroredTargetQuantities.Clear();
+            maxNetVirtualPositions.Clear();
 
             if (leadAccount != null)
             {
@@ -879,6 +881,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             accountRows.Clear();
             mirroredTargetQuantities.Clear();
             lockedVirtualPositions.Clear();
+            maxNetVirtualPositions.Clear();
 
             var seenAccounts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (XmlNode node in root.SelectNodes("Follower"))
@@ -1092,6 +1095,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             lockedVirtualPositions.Clear();
+            maxNetVirtualPositions.Clear();
             dryRunMode = dryRunCheckBox != null && dryRunCheckBox.IsChecked == true;
             isCopying = true;
             startPauseButton.Content = "Pause Copying";
@@ -1104,18 +1108,30 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshAllRows();
         }
 
-        private void PauseCopyingTrades()
+        private void PauseCopyingTrades(bool silent)
         {
             isCopying = false;
             dryRunMode = false;
-            startPauseButton.Content = "Start Copying";
-            startPauseButton.Background = Brushes.SeaGreen;
+            if (startPauseButton != null)
+            {
+                startPauseButton.Content = "Start Copying";
+                startPauseButton.Background = Brushes.SeaGreen;
+            }
+
             if (dryRunCheckBox != null)
                 dryRunCheckBox.IsEnabled = true;
+
+            if (silent)
+                return;
 
             SetStatus("Copying paused. Positions were left untouched.");
             Log("Copying paused.");
             RefreshAllRows();
+        }
+
+        private void PauseCopyingTrades()
+        {
+            PauseCopyingTrades(false);
         }
 
         private void OnOrderUpdate(object sender, OrderEventArgs args)
@@ -1207,6 +1223,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         if (reduceOnlyMode)
                             ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
 
+                        ApplyMaxNetVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
                         mirroredTargetQuantities[targetKey] = (reduceOnlyMode && quantityToSubmit < originalQuantity) || maxNetCapped
                             ? desiredQuantity
                             : alreadyMirrored + quantityToSubmit;
@@ -1230,6 +1247,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (reduceOnlyMode)
                         ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
 
+                    ApplyMaxNetVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
                     mirroredTargetQuantities[targetKey] = (reduceOnlyMode && quantityToSubmit < originalQuantity) || maxNetCapped
                         ? desiredQuantity
                         : alreadyMirrored + quantityToSubmit;
@@ -1364,7 +1382,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.MaxNetPosition <= 0 || requestedQuantity <= 0)
                 return requestedQuantity;
 
-            var currentSigned = GetSignedPosition(row.Account, instrument);
+            var currentSigned = GetMaxNetVirtualPosition(row, instrument);
             var signedDelta = IsBuyAction(action) ? requestedQuantity : -requestedQuantity;
             var requestedResult = currentSigned + signedDelta;
 
@@ -1375,6 +1393,49 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return Math.Min(requestedQuantity, Math.Max(0, row.MaxNetPosition - currentSigned));
 
             return Math.Min(requestedQuantity, Math.Max(0, currentSigned + row.MaxNetPosition));
+        }
+
+        private int GetMaxNetVirtualPosition(AccountCopyRow row, Instrument instrument)
+        {
+            var key = GetAccountInstrumentKey(row, instrument);
+            var actualSigned = GetSignedPosition(row.Account, instrument);
+            int virtualSigned;
+
+            if (!maxNetVirtualPositions.TryGetValue(key, out virtualSigned))
+            {
+                maxNetVirtualPositions[key] = actualSigned;
+                return actualSigned;
+            }
+
+            if (ShouldPreferActualPosition(actualSigned, virtualSigned))
+            {
+                maxNetVirtualPositions[key] = actualSigned;
+                return actualSigned;
+            }
+
+            return virtualSigned;
+        }
+
+        private bool ShouldPreferActualPosition(int actualSigned, int virtualSigned)
+        {
+            if (actualSigned == 0)
+                return false;
+
+            if (Math.Sign(actualSigned) != Math.Sign(virtualSigned))
+                return true;
+
+            return Math.Abs(actualSigned) > Math.Abs(virtualSigned);
+        }
+
+        private void ApplyMaxNetVirtualFill(AccountCopyRow row, Instrument instrument, OrderAction action, int quantity)
+        {
+            if (row.MaxNetPosition <= 0 || quantity <= 0)
+                return;
+
+            var key = GetAccountInstrumentKey(row, instrument);
+            var signedPosition = GetMaxNetVirtualPosition(row, instrument);
+            var signedDelta = IsBuyAction(action) ? quantity : -quantity;
+            maxNetVirtualPositions[key] = signedPosition + signedDelta;
         }
 
         private int GetLockedVirtualPosition(AccountCopyRow row, Instrument instrument)
@@ -1403,6 +1464,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string GetLockedVirtualPositionKey(AccountCopyRow row, Instrument instrument)
         {
+            return GetAccountInstrumentKey(row, instrument);
+        }
+
+        private string GetAccountInstrumentKey(AccountCopyRow row, Instrument instrument)
+        {
             var instrumentName = instrument != null ? instrument.FullName : string.Empty;
             return row.AccountName + "|" + instrumentName;
         }
@@ -1412,6 +1478,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             var prefix = row.AccountName + "|";
             foreach (var key in lockedVirtualPositions.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
                 lockedVirtualPositions.Remove(key);
+        }
+
+        private void ClearMaxNetVirtualPositions(AccountCopyRow row)
+        {
+            var prefix = row.AccountName + "|";
+            foreach (var key in maxNetVirtualPositions.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+                maxNetVirtualPositions.Remove(key);
         }
 
         private bool IsBuyAction(OrderAction action)
@@ -1429,8 +1502,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show("Flatten all follower accounts?", "Confirm Flatten Followers", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            foreach (var row in accountRows.ToList())
+            var rows = accountRows.ToList();
+            LockRowsForManualFlatten(rows, "Manual follower flatten");
+            foreach (var row in rows)
                 FlattenAccount(row.Account, "Manual follower flatten");
+
+            RefreshAllRows();
         }
 
         private void FlattenSelectedButton_Click(object sender, RoutedEventArgs e)
@@ -1445,8 +1522,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show("Flatten selected follower accounts?", "Confirm Flatten Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
+            LockRowsForManualFlatten(rows, "Manual selected flatten");
             foreach (var row in rows)
                 FlattenAccount(row.Account, "Manual selected flatten");
+
+            RefreshAllRows();
         }
 
         private void FlattenAllButton_Click(object sender, RoutedEventArgs e)
@@ -1475,11 +1555,25 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show("Flatten all accounts in group " + groupName + "?", "Confirm Flatten Group", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            foreach (var row in accountRows.Where(r => GroupEquals(r.GroupName, groupName)).ToList())
+            var rows = accountRows.Where(r => GroupEquals(r.GroupName, groupName)).ToList();
+            LockRowsForManualFlatten(rows, "Manual group flatten");
+            foreach (var row in rows)
+                FlattenAccount(row.Account, "Manual group flatten");
+
+            RefreshAllRows();
+        }
+
+        private void LockRowsForManualFlatten(IEnumerable<AccountCopyRow> rows, string lastAction)
+        {
+            foreach (var row in rows.Where(r => r != null).Distinct().ToList())
             {
                 row.ManualLock = true;
-                FlattenAccount(row.Account, "Manual group flatten");
+                row.LastAction = lastAction + " locked";
+                ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
             }
+
+            Log("Locked " + rows.Count(r => r != null) + " row(s) after flatten request. Entries are blocked; exits remain allowed.");
         }
 
         private void ReconcileSelectedButton_Click(object sender, RoutedEventArgs e)
@@ -1555,8 +1649,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (delta == 0)
                     continue;
 
-                SubmitReconcileAdjustment(row, instrument, delta);
-                submitted++;
+                if (SubmitReconcileAdjustment(row, instrument, delta))
+                    submitted++;
             }
 
             if (IsDryRunSelected())
@@ -1640,17 +1734,29 @@ namespace NinjaTrader.NinjaScript.AddOns
             return Math.Max(-row.MaxNetPosition, Math.Min(row.MaxNetPosition, desiredSigned));
         }
 
-        private void SubmitReconcileAdjustment(AccountCopyRow row, Instrument instrument, int signedDelta)
+        private bool SubmitReconcileAdjustment(AccountCopyRow row, Instrument instrument, int signedDelta)
         {
             var action = signedDelta > 0 ? OrderAction.Buy : OrderAction.Sell;
-            var quantity = Math.Abs(signedDelta);
+            var requestedQuantity = Math.Abs(signedDelta);
+            var quantity = CapQuantityToMaxNetPosition(row, instrument, action, requestedQuantity);
+
+            if (quantity <= 0)
+            {
+                row.LastAction = "Reconcile blocked by max net";
+                Log(row.AccountName + " reconcile blocked " + GetInstrumentName(instrument) + " because max net position would be exceeded.");
+                return false;
+            }
+
+            if (quantity < requestedQuantity)
+                Log(row.AccountName + " capped reconcile from " + requestedQuantity + " to " + quantity + " by max net position.");
 
             try
             {
                 if (IsDryRunSelected())
                 {
                     Log("DRY RUN " + row.AccountName + " would reconcile with " + DescribeOrder(action, quantity, instrument) + ".");
-                    return;
+                    ApplyMaxNetVirtualFill(row, instrument, action, quantity);
+                    return true;
                 }
 
                 var order = CreateAccountOrder(
@@ -1665,13 +1771,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                     "ATC Reconcile");
 
                 row.Account.Submit(new[] { order });
+                ApplyMaxNetVirtualFill(row, instrument, action, quantity);
                 Log(row.AccountName + " reconcile sent " + DescribeOrder(action, quantity, instrument) + ".");
+                return true;
             }
             catch (Exception ex)
             {
                 row.SetStatus("Error", "Reconcile failed");
                 row.LastAction = "Reconcile failed";
                 Log("ERROR " + row.AccountName + " reconcile failed: " + ex.Message);
+                return false;
             }
         }
 
@@ -1760,6 +1869,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         "ATC Flatten");
 
                     account.Submit(new[] { closeOrder });
+                    MarkFlattenRequested(account, position.Instrument);
                     Log(account.Name + " closing " + DescribeOrder(closeAction, quantity, position.Instrument) + ".");
                 }
                 catch (Exception ex)
@@ -1767,6 +1877,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                     Log("ERROR " + account.Name + " close failed: " + ex.Message);
                 }
             }
+        }
+
+        private void MarkFlattenRequested(Account account, Instrument instrument)
+        {
+            var row = accountRows.FirstOrDefault(r => r.Account == account);
+            if (row == null)
+                return;
+
+            var key = GetAccountInstrumentKey(row, instrument);
+            lockedVirtualPositions[key] = 0;
+            maxNetVirtualPositions[key] = 0;
         }
 
         private Order CreateAccountOrder(Account account, Instrument instrument, OrderAction action, OrderType orderType, TimeInForce timeInForce, int quantity, double limitPrice, double stopPrice, string name)
@@ -1785,6 +1906,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             foreach (var row in rows)
             {
+                ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
                 accountRows.Remove(row);
                 Log("Removed follower " + row.AccountName + ".");
             }
@@ -1802,6 +1925,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LockReason = string.Empty;
                 row.LastAction = "Unlocked";
                 ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
             }
 
             Log("Unlocked " + rows.Count + " row(s).");
@@ -1838,6 +1962,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LockReason = string.Empty;
                 row.LastAction = "Group enabled";
                 ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
             }
 
             Log("Enabled group " + groupName + ".");
@@ -1916,6 +2041,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 if (!RowIsReduceOnly(row))
                     ClearLockedVirtualPositions(row);
+
+                if (!isCopying)
+                    ClearMaxNetVirtualPositions(row);
 
                 RefreshRowMetrics(row);
                 EvaluateRisk(row);
@@ -2165,9 +2293,11 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var accountName = order.Account != null ? order.Account.Name : string.Empty;
             var instrumentName = order.Instrument != null ? order.Instrument.FullName : string.Empty;
-            var orderId = string.IsNullOrEmpty(order.OrderId) ? "no-order-id" : order.OrderId;
+            if (!string.IsNullOrEmpty(order.OrderId))
+                return accountName + "|" + instrumentName + "|" + order.OrderId;
+
             var orderName = string.IsNullOrEmpty(order.Name) ? "no-name" : order.Name;
-            return accountName + "|" + instrumentName + "|" + orderName + "|" + orderId + "|" + order.Time.Ticks;
+            return accountName + "|" + instrumentName + "|" + orderName + "|" + order.Time.Ticks;
         }
 
         private string DescribeOrder(OrderAction action, int quantity, Instrument instrument)
@@ -2256,11 +2386,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string BuildSummaryStatus()
         {
-            var activeCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !r.IsEntryLocked && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
+            var entryActiveCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !RowIsReduceOnly(r) && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
+            var exitsOnlyCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && RowIsReduceOnly(r) && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
             var lockedCount = accountRows.Count(r => r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
             var mode = isCopying ? dryRunMode ? "Dry Run" : "Copying" : "Paused";
-            return mode + " | Active followers: " + activeCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            return mode + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
         }
 
         private void SetStatus(string message)
@@ -2290,7 +2421,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void TradeCopierWindow_Closing(object sender, CancelEventArgs e)
         {
-            PauseCopyingTrades();
+            PauseCopyingTrades(true);
 
             if (leadAccount != null)
                 leadAccount.OrderUpdate -= OnOrderUpdate;
