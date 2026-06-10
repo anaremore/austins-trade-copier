@@ -551,7 +551,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 70, "{0:0.##}", false, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
             grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 64, null, false, "Editing this value switches Sizing to Fixed qty."));
-            grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 64, null, false, "Caps the quantity for each copied order. 0 disables the cap."));
+            grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 64, null, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
             grid.Columns.Add(CreateTextColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", false, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
             grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 70, "{0:0}", false, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
             grid.Columns.Add(CreateTextColumn("Profit Target", "ProfitTarget", 86, "{0:0}", false, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
@@ -1622,6 +1622,13 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var targetKey = GetTargetMirrorKey(sourceOrder, row);
                 var alreadyMirrored = mirroredTargetQuantities.ContainsKey(targetKey) ? mirroredTargetQuantities[targetKey] : 0;
                 var desiredQuantity = CalculateDesiredTargetQuantity(row, sourceOrder);
+                if (desiredQuantity <= 0)
+                {
+                    row.LastAction = "Sizing produced 0";
+                    Log(row.AccountName + " skipped " + GetInstrumentName(sourceOrder.Instrument) + " because sizing produced 0 contracts.");
+                    continue;
+                }
+
                 var quantityToSubmit = desiredQuantity - alreadyMirrored;
 
                 if (quantityToSubmit <= 0)
