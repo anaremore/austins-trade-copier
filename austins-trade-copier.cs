@@ -192,15 +192,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             profilePanel.Children.Add(profileNameTextBox);
 
-            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray);
+            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, leads, groups, sizing, and risk settings.");
             saveProfileButton.Click += SaveProfileButton_Click;
             profilePanel.Children.Add(saveProfileButton);
 
-            var loadProfileButton = CreateButton("Load Profile", Brushes.DimGray);
+            var loadProfileButton = CreateButton("Load Profile", Brushes.DimGray, "Load the named profile. Copying must be paused before loading.");
             loadProfileButton.Click += LoadProfileButton_Click;
             profilePanel.Children.Add(loadProfileButton);
 
-            var deleteProfileButton = CreateButton("Delete Profile", Brushes.DimGray);
+            var deleteProfileButton = CreateButton("Delete Profile", Brushes.DimGray, "Delete the named saved profile after confirmation.");
             deleteProfileButton.Click += DeleteProfileButton_Click;
             profilePanel.Children.Add(deleteProfileButton);
 
@@ -216,7 +216,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var sessionRiskRow = CreateToolbarRow();
             sessionRiskRow.Children.Add(CreateToolbarLabel("Session"));
-            startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen);
+            startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen, "Start or pause copying for enabled rows after preflight validation.");
             startPauseButton.Width = 130;
             startPauseButton.Click += StartPauseButton_Click;
             sessionRiskRow.Children.Add(startPauseButton);
@@ -226,20 +226,21 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Content = "Dry Run",
                 Foreground = Brushes.White,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 12, 0)
+                Margin = new Thickness(0, 0, 12, 0),
+                ToolTip = "Simulate copied and reconcile orders without submitting live orders."
             };
             sessionRiskRow.Children.Add(dryRunCheckBox);
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
-            var flattenFollowersButton = CreateButton("Flatten Enabled", Brushes.Firebrick);
+            var flattenFollowersButton = CreateButton("Flatten Enabled", Brushes.Firebrick, "Flatten every enabled account row and manual-lock entries afterward.");
             flattenFollowersButton.Click += FlattenFollowersButton_Click;
             sessionRiskRow.Children.Add(flattenFollowersButton);
 
-            var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick);
+            var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick, "Flatten selected account rows and manual-lock entries afterward.");
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
-            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed);
+            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Pause copying and flatten every table account plus configured lead accounts.");
             flattenAllButton.Click += FlattenAllButton_Click;
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
@@ -256,43 +257,42 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             groupRow.Children.Add(groupComboBox);
 
-            var enableGroupButton = CreateButton("Enable Group", Brushes.DimGray);
+            var enableGroupButton = CreateButton("Enable Group", Brushes.DimGray, "Enable all valid rows in the selected group. Invalid rows are skipped with reasons.");
             enableGroupButton.Click += EnableGroupButton_Click;
             groupRow.Children.Add(enableGroupButton);
 
-            var pauseGroupButton = CreateButton("Pause Group", Brushes.DimGray);
+            var pauseGroupButton = CreateButton("Pause Group", Brushes.DimGray, "Manual-lock all enabled rows in the selected group. Exits remain allowed.");
             pauseGroupButton.Click += PauseGroupButton_Click;
             groupRow.Children.Add(pauseGroupButton);
 
-            var flattenGroupButton = CreateButton("Flatten Group", Brushes.Firebrick);
+            var flattenGroupButton = CreateButton("Flatten Group", Brushes.Firebrick, "Flatten enabled rows in the selected group and manual-lock entries afterward.");
             flattenGroupButton.Click += FlattenGroupButton_Click;
             groupRow.Children.Add(flattenGroupButton);
             actionPanel.Children.Add(groupRow);
 
             var selectionRow = CreateToolbarRow();
             selectionRow.Children.Add(CreateToolbarLabel("Selection"));
-            var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray);
+            var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
-            var enableSelectedButton = CreateButton("Enable Selected", Brushes.DimGray);
+            var enableSelectedButton = CreateButton("Enable Selected", Brushes.DimGray, "Enable selected valid rows. Invalid rows are skipped with reasons.");
             enableSelectedButton.Click += EnableSelectedButton_Click;
             selectionRow.Children.Add(enableSelectedButton);
 
-            var removeSelectedButton = CreateButton("Disable Selected", Brushes.DimGray);
+            var removeSelectedButton = CreateButton("Disable Selected", Brushes.DimGray, "Disable selected rows. Rows stay visible and saved in profiles.");
             removeSelectedButton.Click += RemoveSelectedButton_Click;
             selectionRow.Children.Add(removeSelectedButton);
 
-            var unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray);
+            var unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines.");
             unlockSelectedButton.Click += UnlockSelectedButton_Click;
             selectionRow.Children.Add(unlockSelectedButton);
 
-            var resetBaselineButton = CreateButton("Reset Baselines", Brushes.DimGray);
+            var resetBaselineButton = CreateButton("Reset Baselines", Brushes.DimGray, "Reset selected rows' session PnL baselines and clear auto risk locks.");
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            var copyGroupSettingsButton = CreateButton("Copy Sizing/Risk To Group", Brushes.DimGray);
-            copyGroupSettingsButton.ToolTip = "Copies copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to its group. Lead and group are not changed.";
+            var copyGroupSettingsButton = CreateButton("Copy Sizing/Risk To Group", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to its group. Lead and group are not changed.");
             copyGroupSettingsButton.Click += CopyGroupSettingsButton_Click;
             selectionRow.Children.Add(copyGroupSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -378,11 +378,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 HorizontalAlignment = HorizontalAlignment.Right
             };
 
-            var exportLogButton = CreateButton("Export Log", Brushes.DimGray);
+            var exportLogButton = CreateButton("Export Log", Brushes.DimGray, "Export the current event log to the profile logs folder.");
             exportLogButton.Click += ExportLogButton_Click;
             logButtonPanel.Children.Add(exportLogButton);
 
-            var clearLogButton = CreateButton("Clear Log", Brushes.DimGray);
+            var clearLogButton = CreateButton("Clear Log", Brushes.DimGray, "Clear the visible event log for this window session.");
             clearLogButton.Click += ClearLogButton_Click;
             logButtonPanel.Children.Add(clearLogButton);
 
@@ -672,7 +672,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
         }
 
-        private Button CreateButton(string text, Brush background)
+        private Button CreateButton(string text, Brush background, string tooltip = null)
         {
             return new Button
             {
@@ -683,7 +683,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Foreground = Brushes.White,
                 BorderBrush = BrushRgb(92, 96, 104),
                 MinWidth = 92,
-                MinHeight = 28
+                MinHeight = 28,
+                ToolTip = tooltip
             };
         }
 
