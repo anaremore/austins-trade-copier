@@ -422,6 +422,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 125, null, true));
             grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 80, "{0:C0}", true));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 80, "{0:C0}", true));
+            grid.Columns.Add(CreateTextColumn("Symbols", "InstrumentFilter", 100, null, false));
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
@@ -727,6 +728,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetAttribute(rowElement, "maxDrawdown", row.MaxDrawdown);
                 SetAttribute(rowElement, "profitTarget", row.ProfitTarget);
                 SetAttribute(rowElement, "limitAction", row.LimitAction.ToString());
+                SetAttribute(rowElement, "instrumentFilter", row.InstrumentFilter);
                 root.AppendChild(rowElement);
             }
 
@@ -810,6 +812,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.MaxDrawdown = GetDoubleAttribute(element, "maxDrawdown", 0);
                 row.ProfitTarget = GetDoubleAttribute(element, "profitTarget", 0);
                 row.LimitAction = GetEnumAttribute(element, "limitAction", RiskAction.SoftLock);
+                row.InstrumentFilter = GetStringAttribute(element, "instrumentFilter", string.Empty);
                 row.LastAction = "Loaded profile";
 
                 accountRows.Add(row);
@@ -1038,6 +1041,13 @@ namespace NinjaTrader.NinjaScript.AddOns
                 {
                     row.SetStatus("Error", "Lead selected as follower");
                     row.LastAction = "Skipped lead account";
+                    continue;
+                }
+
+                if (!RowAllowsInstrument(row, sourceOrder.Instrument))
+                {
+                    row.LastAction = "Skipped filtered symbol";
+                    Log(row.AccountName + " skipped " + GetInstrumentName(sourceOrder.Instrument) + " due to symbol filter.");
                     continue;
                 }
 
@@ -1442,6 +1452,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             foreach (var leadPosition in GetOpenPositionSnapshots(leadAccount))
             {
+                if (!RowAllowsInstrument(row, leadPosition.Instrument))
+                    continue;
+
                 var quantity = CalculateDesiredQuantityFromBase(row, leadPosition.Quantity);
                 if (quantity <= 0)
                     continue;
@@ -1712,6 +1725,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.MaxDrawdown = source.MaxDrawdown;
                 row.ProfitTarget = source.ProfitTarget;
                 row.LimitAction = source.LimitAction;
+                row.InstrumentFilter = source.InstrumentFilter;
                 row.LastAction = "Group settings applied";
             }
 
@@ -1996,6 +2010,47 @@ namespace NinjaTrader.NinjaScript.AddOns
             return action + " " + quantity + " " + instrumentName;
         }
 
+        private bool RowAllowsInstrument(AccountCopyRow row, Instrument instrument)
+        {
+            var filters = ParseInstrumentFilter(row.InstrumentFilter);
+            if (filters.Count == 0)
+                return true;
+
+            var fullName = GetInstrumentName(instrument);
+            var rootName = GetInstrumentRootName(instrument);
+
+            return filters.Any(filter =>
+                string.Equals(filter, fullName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(filter, rootName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private List<string> ParseInstrumentFilter(string filterText)
+        {
+            if (string.IsNullOrWhiteSpace(filterText))
+                return new List<string>();
+
+            return filterText
+                .Split(new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(token => token.Trim())
+                .Where(token => token.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private string GetInstrumentName(Instrument instrument)
+        {
+            return instrument != null ? instrument.FullName : string.Empty;
+        }
+
+        private string GetInstrumentRootName(Instrument instrument)
+        {
+            var fullName = GetInstrumentName(instrument);
+            if (string.IsNullOrWhiteSpace(fullName))
+                return string.Empty;
+
+            return fullName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? fullName;
+        }
+
         private string NormalizeGroupName(string groupName)
         {
             return string.IsNullOrWhiteSpace(groupName) ? DefaultGroupName : groupName.Trim();
@@ -2111,6 +2166,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string status = "Ready";
             private string statusLevel = "Ready";
             private string positionSummary = "Flat";
+            private string instrumentFilter = string.Empty;
             private double sessionPnl;
             private double drawdown;
             private double peakPnl;
@@ -2177,6 +2233,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return positionSummary; }
                 set { SetField(ref positionSummary, value, "PositionSummary"); }
+            }
+
+            public string InstrumentFilter
+            {
+                get { return instrumentFilter; }
+                set { SetField(ref instrumentFilter, value == null ? string.Empty : value.Trim(), "InstrumentFilter"); }
             }
 
             public double SessionPnl
