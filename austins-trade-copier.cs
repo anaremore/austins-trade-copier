@@ -321,6 +321,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             AddGridColumns(accountsGrid);
             accountsGrid.SelectionChanged += AccountsGrid_SelectionChanged;
+            accountsGrid.CurrentCellChanged += AccountsGrid_CurrentCellChanged;
 
             Grid.SetRow(accountsGrid, 2);
             root.Children.Add(accountsGrid);
@@ -1259,12 +1260,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshStatusSummary();
         }
 
+        private void AccountsGrid_CurrentCellChanged(object sender, EventArgs e)
+        {
+            UpdateSelectionMarkers();
+            RefreshStatusSummary();
+        }
+
         private void UpdateSelectionMarkers()
         {
             if (accountsGrid == null)
                 return;
 
-            var selectedRows = new HashSet<AccountCopyRow>(accountsGrid.SelectedItems.OfType<AccountCopyRow>());
+            var selectedRows = new HashSet<AccountCopyRow>(GetSelectedRows());
             foreach (var row in accountRows)
                 row.SelectionMarker = selectedRows.Contains(row) ? ">" : string.Empty;
         }
@@ -2715,7 +2722,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             CommitGridEdits();
 
-            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
+            var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
                 SetStatus("Select one or more rows to enable.");
@@ -2727,7 +2734,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RemoveSelectedButton_Click(object sender, RoutedEventArgs e)
         {
-            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
+            var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
                 SetStatus("Select one or more rows to disable.");
@@ -3097,7 +3104,18 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private List<AccountCopyRow> GetSelectedRows()
         {
-            return accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
+            if (accountsGrid == null)
+                return new List<AccountCopyRow>();
+
+            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().Distinct().ToList();
+            if (rows.Count > 0)
+                return rows;
+
+            var currentRow = accountsGrid.CurrentItem as AccountCopyRow;
+            if (currentRow != null)
+                rows.Add(currentRow);
+
+            return rows;
         }
 
         private void TelemetryTimer_Tick(object sender, EventArgs e)
@@ -3537,7 +3555,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountsGrid == null)
                 return string.Empty;
 
-            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
+            var rows = GetSelectedRows();
             if (rows.Count == 0)
                 return string.Empty;
 
