@@ -2454,10 +2454,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show(BuildFlattenRowsPrompt("enabled", rows), "Confirm Flatten Enabled", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            LockRowsForManualFlatten(rows, "Manual enabled flatten");
-            foreach (var row in rows)
-                FlattenRow(row, "Manual enabled flatten");
-
+            FlattenRows(rows, "Manual enabled flatten");
             RefreshAllRows();
         }
 
@@ -2475,10 +2472,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show(BuildFlattenRowsPrompt("selected", rows), "Confirm Flatten Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            LockRowsForManualFlatten(rows, "Manual selected flatten");
-            foreach (var row in rows)
-                FlattenRow(row, "Manual selected flatten");
-
+            FlattenRows(rows, "Manual selected flatten");
             RefreshAllRows();
         }
 
@@ -2529,12 +2523,39 @@ namespace NinjaTrader.NinjaScript.AddOns
             Log("Locked " + rows.Count(r => r != null) + " row(s) after flatten request. Entries are blocked; exits remain allowed.");
         }
 
+        private void FlattenRows(IList<AccountCopyRow> rows, string reason)
+        {
+            var targetRows = rows == null ? new List<AccountCopyRow>() : rows.Where(r => r != null).Distinct().ToList();
+            LockRowsForManualFlatten(targetRows, reason);
+
+            var connectedRows = targetRows.Where(RowHasConnectedAccount).ToList();
+            var offlineRows = targetRows.Where(r => !RowHasConnectedAccount(r)).ToList();
+
+            foreach (var row in connectedRows)
+                FlattenRow(row, reason);
+
+            foreach (var row in offlineRows)
+                row.LastAction = reason + " skipped - offline";
+
+            var message = "Flatten requested for " + connectedRows.Count + " connected row(s)";
+            if (offlineRows.Count > 0)
+                message += "; skipped " + offlineRows.Count + " offline row(s)";
+
+            message += ". Rows are manual-locked.";
+            SetStatus(message);
+            Log(message);
+        }
+
         private string BuildFlattenRowsPrompt(string scope, IList<AccountCopyRow> rows)
         {
             var rowCount = rows == null ? 0 : rows.Count(r => r != null);
             var filteredCount = rows == null ? 0 : rows.Count(HasInstrumentFilter);
+            var offlineCount = rows == null ? 0 : rows.Count(r => r != null && !RowHasConnectedAccount(r));
             var prompt = "Flatten " + rowCount + " " + scope + " row(s)?\n\n"
                 + "This cancels active orders and closes managed positions for those rows.";
+
+            if (offlineCount > 0)
+                prompt += "\n" + offlineCount + " offline row(s) will be manual-locked but cannot submit flatten orders.";
 
             if (filteredCount > 0)
                 prompt += "\n" + filteredCount + " row(s) will only flatten matching Symbols filters.";
