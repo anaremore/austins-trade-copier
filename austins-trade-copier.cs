@@ -247,11 +247,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             sessionRiskRow.Children.Add(dryRunCheckBox);
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
-            var flattenFollowersButton = CreateButton("Flatten Enabled", Brushes.Firebrick, "Flatten every enabled account row and manual-lock entries afterward.");
+            var flattenFollowersButton = CreateButton("Flatten Enabled", Brushes.Firebrick, "Flatten enabled rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
             flattenFollowersButton.Click += FlattenFollowersButton_Click;
             sessionRiskRow.Children.Add(flattenFollowersButton);
 
-            var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick, "Flatten selected account rows and manual-lock entries afterward.");
+            var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick, "Flatten selected rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
@@ -2383,7 +2383,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             LockRowsForManualFlatten(rows, "Manual enabled flatten");
             foreach (var row in rows)
-                FlattenAccount(row.Account, "Manual enabled flatten");
+                FlattenRow(row, "Manual enabled flatten");
 
             RefreshAllRows();
         }
@@ -2404,7 +2404,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             LockRowsForManualFlatten(rows, "Manual selected flatten");
             foreach (var row in rows)
-                FlattenAccount(row.Account, "Manual selected flatten");
+                FlattenRow(row, "Manual selected flatten");
 
             RefreshAllRows();
         }
@@ -2672,19 +2672,33 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void FlattenAccount(Account account, string reason)
         {
+            FlattenAccount(account, reason, null, null);
+        }
+
+        private void FlattenRow(AccountCopyRow row, string reason)
+        {
+            if (row == null)
+                return;
+
+            var hasSymbolFilter = HasInstrumentFilter(row);
+            FlattenAccount(row.Account, reason, hasSymbolFilter ? new Func<Instrument, bool>(instrument => RowAllowsInstrument(row, instrument)) : null, row);
+        }
+
+        private void FlattenAccount(Account account, string reason, Func<Instrument, bool> instrumentFilter, AccountCopyRow statusRow)
+        {
             if (account == null)
                 return;
 
             try
             {
-                CancelActiveOrders(account);
-                CloseOpenPositions(account);
-                Log(account.Name + " flatten requested: " + reason + ".");
+                CancelActiveOrders(account, instrumentFilter);
+                CloseOpenPositions(account, instrumentFilter);
+                Log(account.Name + " flatten requested" + (instrumentFilter == null ? string.Empty : " for matching symbols") + ": " + reason + ".");
             }
             catch (Exception ex)
             {
                 Log("ERROR " + account.Name + " flatten failed: " + ex.Message);
-                var row = accountRows.FirstOrDefault(r => r.Account == account);
+                var row = statusRow ?? accountRows.FirstOrDefault(r => r.Account == account);
                 if (row != null)
                 {
                     row.SetStatus("Error", "Flatten failed");
@@ -2693,7 +2707,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
         }
 
-        private void CancelActiveOrders(Account account)
+        private void CancelActiveOrders(Account account, Func<Instrument, bool> instrumentFilter)
         {
             Order[] orders;
             lock (account.Orders)
@@ -2702,6 +2716,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var order in orders)
             {
                 if (!IsActiveOrder(order))
+                    continue;
+
+                if (instrumentFilter != null && !instrumentFilter(order.Instrument))
                     continue;
 
                 try
@@ -2727,7 +2744,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     || order.OrderState == OrderState.Working);
         }
 
-        private void CloseOpenPositions(Account account)
+        private void CloseOpenPositions(Account account, Func<Instrument, bool> instrumentFilter)
         {
             Position[] positions;
             lock (account.Positions)
@@ -2736,6 +2753,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var position in positions)
             {
                 if (position.Quantity == 0 || position.MarketPosition == MarketPosition.Flat)
+                    continue;
+
+                if (instrumentFilter != null && !instrumentFilter(position.Instrument))
                     continue;
 
                 var closeAction = position.MarketPosition == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
@@ -3702,6 +3722,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             return filters.Any(filter =>
                 string.Equals(filter, fullName, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(filter, rootName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool HasInstrumentFilter(AccountCopyRow row)
+        {
+            return row != null && ParseInstrumentFilter(row.InstrumentFilter).Count > 0;
         }
 
         private List<string> ParseInstrumentFilter(string filterText)
