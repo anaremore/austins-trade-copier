@@ -2353,6 +2353,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void FlattenFollowersButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = accountRows.Where(r => r.Enabled).ToList();
             if (rows.Count == 0)
             {
@@ -2372,6 +2374,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void FlattenSelectedButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
@@ -2391,6 +2395,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void FlattenAllButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             if (MessageBox.Show("Flatten every table account and every lead used by enabled rows?", "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
@@ -2775,6 +2781,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RemoveSelectedButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
@@ -2798,6 +2806,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void UnlockSelectedButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
@@ -2829,6 +2839,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ResetBaselinesButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
