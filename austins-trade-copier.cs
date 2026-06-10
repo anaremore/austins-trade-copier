@@ -3027,13 +3027,29 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            var resetCount = 0;
+            var skippedCount = 0;
             foreach (var row in rows)
             {
+                if (!RowHasConnectedAccount(row))
+                {
+                    if (row != null)
+                        row.LastAction = "Baseline reset skipped - offline";
+
+                    skippedCount++;
+                    continue;
+                }
+
                 row.ResetBaseline(ReadAccountPnl(row.Account));
                 row.LastAction = "Baseline reset";
+                resetCount++;
             }
 
-            var message = "Reset risk baselines for " + rows.Count + " selected row(s).";
+            var message = "Reset risk baselines for " + resetCount + " selected row(s)";
+            if (skippedCount > 0)
+                message += "; skipped " + skippedCount + " offline row(s)";
+
+            message += ".";
             SetStatus(message);
             Log(message);
             RefreshAllRows();
@@ -3947,7 +3963,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool IsConnectedCopyRow(AccountCopyRow row)
         {
-            return IsConfiguredCopyRow(row) && row.Account != null && row.Account.ConnectionStatus == ConnectionStatus.Connected;
+            return IsConfiguredCopyRow(row) && RowHasConnectedAccount(row);
+        }
+
+        private bool RowHasConnectedAccount(AccountCopyRow row)
+        {
+            return row != null && row.Account != null && row.Account.ConnectionStatus == ConnectionStatus.Connected;
         }
 
         private bool IsOfflineRow(AccountCopyRow row)
