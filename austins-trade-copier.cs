@@ -550,7 +550,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
-            grid.Columns.Add(CreateComboBoxColumn("At Limit", "LimitAction", limitActionOptions, "Label", "Value", 94, "Soft lock blocks entries and allows exits. Auto close also flattens the row account immediately."));
+            grid.Columns.Add(CreateComboBoxColumn("At Limit", "LimitAction", limitActionOptions, "Label", "Value", 94, "Soft lock blocks entries and allows exits. Auto close also flattens the row's managed positions immediately."));
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
@@ -3301,13 +3301,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (dryRunMode)
             {
                 row.LastAction = reason + " - dry run auto close";
-                Log("DRY RUN " + row.AccountName + " would auto-close by " + reason + ".");
+                Log("DRY RUN " + row.AccountName + " would auto-close managed positions by " + reason + ".");
                 return;
             }
 
             row.LastAction = reason + " - auto close";
-            Log(row.AccountName + " auto-closed by " + reason + "; copied orders blocked.");
-            FlattenAccount(row.Account, reason);
+            Log(row.AccountName + " auto-closing managed positions by " + reason + "; copied orders blocked.");
+            FlattenRow(row, reason);
         }
 
         private void UpdateRowStatus(AccountCopyRow row)
