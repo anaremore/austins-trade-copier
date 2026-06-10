@@ -16,6 +16,7 @@
 - 🧩 **Account Groups**: Assign followers to groups such as funded, eval, personal, or provider-specific buckets, then enable, pause, flatten, or apply settings by group.
 - 🎯 **Instrument Filters**: Restrict any follower or group to selected symbols such as `MNQ, MES`.
 - ⚖️ **Per-Account Sizing**: Choose 1:1, multiplier, fixed quantity, balance-ratio, or disabled sizing for each follower.
+- 🧱 **Max Net Position Guard**: Cap each follower's absolute resulting position per instrument.
 - 🧯 **Risk Lockouts**: Set daily loss, drawdown, and profit-target thresholds per account with soft-lock or hard-flatten behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
 - 🧹 **Flatten Controls**: Flatten followers, all accounts, or a selected group.
@@ -61,6 +62,8 @@ Sizing is calculated from the cumulative filled quantity of the lead order. This
 Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that follower order instead of falling back to the full lead size.
 
 `Max` caps every sizing mode when greater than zero. A value of `0` means no max cap.
+
+`Max Net` caps the absolute resulting follower position per instrument. A value of `0` means no net-position cap. The guard blocks or caps exposure increases but still allows position-reducing orders.
 
 Before copying starts, enabled rows are validated. Disconnected followers, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
 

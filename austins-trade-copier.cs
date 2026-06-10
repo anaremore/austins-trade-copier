@@ -435,6 +435,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Mult", "Multiplier", 70, "{0:0.##}", false));
             grid.Columns.Add(CreateTextColumn("Fixed", "FixedQuantity", 60, null, false));
             grid.Columns.Add(CreateTextColumn("Max", "MaxQuantity", 60, null, false));
+            grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 70, null, false));
             grid.Columns.Add(CreateTextColumn("Loss", "DailyLossLimit", 75, "{0:0}", false));
             grid.Columns.Add(CreateTextColumn("DD Lim", "MaxDrawdown", 75, "{0:0}", false));
             grid.Columns.Add(CreateTextColumn("Target", "ProfitTarget", 75, "{0:0}", false));
@@ -724,6 +725,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetAttribute(rowElement, "multiplier", row.Multiplier);
                 SetAttribute(rowElement, "fixedQuantity", row.FixedQuantity);
                 SetAttribute(rowElement, "maxQuantity", row.MaxQuantity);
+                SetAttribute(rowElement, "maxNetPosition", row.MaxNetPosition);
                 SetAttribute(rowElement, "dailyLossLimit", row.DailyLossLimit);
                 SetAttribute(rowElement, "maxDrawdown", row.MaxDrawdown);
                 SetAttribute(rowElement, "profitTarget", row.ProfitTarget);
@@ -808,6 +810,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.Multiplier = GetDoubleAttribute(element, "multiplier", DefaultMultiplier);
                 row.FixedQuantity = GetIntAttribute(element, "fixedQuantity", DefaultFixedQuantity);
                 row.MaxQuantity = GetIntAttribute(element, "maxQuantity", 0);
+                row.MaxNetPosition = GetIntAttribute(element, "maxNetPosition", 0);
                 row.DailyLossLimit = GetDoubleAttribute(element, "dailyLossLimit", 0);
                 row.MaxDrawdown = GetDoubleAttribute(element, "maxDrawdown", 0);
                 row.ProfitTarget = GetDoubleAttribute(element, "profitTarget", 0);
@@ -1075,6 +1078,21 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (quantityToSubmit < originalQuantity)
                     Log(row.AccountName + " capped locked exit from " + originalQuantity + " to " + quantityToSubmit + ".");
 
+                var beforeMaxNetQuantity = quantityToSubmit;
+                quantityToSubmit = CapQuantityToMaxNetPosition(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
+                var maxNetCapped = quantityToSubmit < beforeMaxNetQuantity;
+
+                if (quantityToSubmit <= 0)
+                {
+                    mirroredTargetQuantities[targetKey] = desiredQuantity;
+                    row.LastAction = "Blocked by max net";
+                    Log(row.AccountName + " blocked " + GetInstrumentName(sourceOrder.Instrument) + " because max net position would be exceeded.");
+                    continue;
+                }
+
+                if (maxNetCapped)
+                    Log(row.AccountName + " capped " + GetInstrumentName(sourceOrder.Instrument) + " copy from " + beforeMaxNetQuantity + " to " + quantityToSubmit + " by max net position.");
+
                 try
                 {
                     if (dryRunMode)
@@ -1082,7 +1100,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         if (wasEntryLocked)
                             ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
 
-                        mirroredTargetQuantities[targetKey] = wasEntryLocked && quantityToSubmit < originalQuantity
+                        mirroredTargetQuantities[targetKey] = (wasEntryLocked && quantityToSubmit < originalQuantity) || maxNetCapped
                             ? desiredQuantity
                             : alreadyMirrored + quantityToSubmit;
                         row.LastAction = "Dry run " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
@@ -1105,7 +1123,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (wasEntryLocked)
                         ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
 
-                    mirroredTargetQuantities[targetKey] = wasEntryLocked && quantityToSubmit < originalQuantity
+                    mirroredTargetQuantities[targetKey] = (wasEntryLocked && quantityToSubmit < originalQuantity) || maxNetCapped
                         ? desiredQuantity
                         : alreadyMirrored + quantityToSubmit;
                     row.LastAction = "Sent " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
@@ -1227,6 +1245,24 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return Math.Min(requestedQuantity, Math.Abs(signedPosition));
 
             return 0;
+        }
+
+        private int CapQuantityToMaxNetPosition(AccountCopyRow row, Instrument instrument, OrderAction action, int requestedQuantity)
+        {
+            if (row.MaxNetPosition <= 0 || requestedQuantity <= 0)
+                return requestedQuantity;
+
+            var currentSigned = GetSignedPosition(row.Account, instrument);
+            var signedDelta = IsBuyAction(action) ? requestedQuantity : -requestedQuantity;
+            var requestedResult = currentSigned + signedDelta;
+
+            if (Math.Abs(requestedResult) <= row.MaxNetPosition)
+                return requestedQuantity;
+
+            if (signedDelta > 0)
+                return Math.Min(requestedQuantity, Math.Max(0, row.MaxNetPosition - currentSigned));
+
+            return Math.Min(requestedQuantity, Math.Max(0, currentSigned + row.MaxNetPosition));
         }
 
         private int GetLockedVirtualPosition(AccountCopyRow row, Instrument instrument)
@@ -1401,6 +1437,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (row.IsEntryLocked)
                     desiredSigned = CalculateLockedReconcileTarget(currentSigned, desiredSigned);
 
+                desiredSigned = CapDesiredSignedPositionToMaxNet(row, desiredSigned);
+
                 var delta = desiredSigned - currentSigned;
                 if (delta == 0)
                     continue;
@@ -1480,6 +1518,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return desiredSigned > 0 ? Math.Min(currentSigned, desiredSigned) : 0;
 
             return desiredSigned < 0 ? Math.Max(currentSigned, desiredSigned) : 0;
+        }
+
+        private int CapDesiredSignedPositionToMaxNet(AccountCopyRow row, int desiredSigned)
+        {
+            if (row.MaxNetPosition <= 0)
+                return desiredSigned;
+
+            return Math.Max(-row.MaxNetPosition, Math.Min(row.MaxNetPosition, desiredSigned));
         }
 
         private void SubmitReconcileAdjustment(AccountCopyRow row, Instrument instrument, int signedDelta)
@@ -1721,6 +1767,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.Multiplier = source.Multiplier;
                 row.FixedQuantity = source.FixedQuantity;
                 row.MaxQuantity = source.MaxQuantity;
+                row.MaxNetPosition = source.MaxNetPosition;
                 row.DailyLossLimit = source.DailyLossLimit;
                 row.MaxDrawdown = source.MaxDrawdown;
                 row.ProfitTarget = source.ProfitTarget;
@@ -2175,6 +2222,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private double multiplier = DefaultMultiplier;
             private int fixedQuantity = DefaultFixedQuantity;
             private int maxQuantity;
+            private int maxNetPosition;
             private double dailyLossLimit;
             private double maxDrawdown;
             private double profitTarget;
@@ -2287,6 +2335,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return maxQuantity; }
                 set { SetField(ref maxQuantity, Math.Max(0, value), "MaxQuantity"); }
+            }
+
+            public int MaxNetPosition
+            {
+                get { return maxNetPosition; }
+                set { SetField(ref maxNetPosition, Math.Max(0, value), "MaxNetPosition"); }
             }
 
             public double DailyLossLimit
