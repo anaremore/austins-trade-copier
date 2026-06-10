@@ -294,6 +294,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CanUserAddRows = false,
                 CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+                FrozenColumnCount = 4,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
@@ -315,6 +317,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Margin = new Thickness(0, 0, 0, 8)
             };
             AddGridColumns(accountsGrid);
+            accountsGrid.SelectionChanged += AccountsGrid_SelectionChanged;
 
             Grid.SetRow(accountsGrid, 2);
             root.Children.Add(accountsGrid);
@@ -791,6 +794,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (RowPropertyAffectsReadiness(e.PropertyName))
                 QueueRowRefresh();
+        }
+
+        private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SetStatus(BuildSummaryStatus());
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
@@ -2684,7 +2692,60 @@ namespace NinjaTrader.NinjaScript.AddOns
             var lockedCount = accountRows.Count(r => r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
             var mode = isCopying ? dryRunMode ? "Dry Run" : "Copying" : "Paused";
-            return mode + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            var summary = mode + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            var selectionSummary = BuildSelectionSummary();
+            return string.IsNullOrEmpty(selectionSummary) ? summary : summary + " | " + selectionSummary;
+        }
+
+        private string BuildSelectionSummary()
+        {
+            if (accountsGrid == null)
+                return string.Empty;
+
+            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
+            if (rows.Count == 0)
+                return string.Empty;
+
+            if (rows.Count > 1)
+                return "Selected: " + rows.Count + " rows";
+
+            var row = rows[0];
+            var lead = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "no lead" : row.LeadAccountName;
+            var sizing = DescribeSizing(row);
+            var risk = DescribeRisk(row);
+            return "Selected: " + row.AccountName + " <- " + lead + " | " + sizing + " | " + risk;
+        }
+
+        private string DescribeSizing(AccountCopyRow row)
+        {
+            switch (row.SizingMode)
+            {
+                case SizingMode.Multiplier:
+                    return "x" + row.Multiplier.ToString("0.##", CultureInfo.InvariantCulture);
+                case SizingMode.Fixed:
+                    return "fixed " + row.FixedQuantity.ToString(CultureInfo.InvariantCulture);
+                case SizingMode.BalanceRatio:
+                    return "balance ratio";
+                case SizingMode.Disabled:
+                    return "sizing disabled";
+                default:
+                    return "1:1";
+            }
+        }
+
+        private string DescribeRisk(AccountCopyRow row)
+        {
+            var parts = new List<string>();
+            if (row.DailyLossLimit > 0)
+                parts.Add("loss " + row.DailyLossLimit.ToString("0", CultureInfo.InvariantCulture));
+
+            if (row.MaxDrawdown > 0)
+                parts.Add("DD " + row.MaxDrawdown.ToString("0", CultureInfo.InvariantCulture));
+
+            if (row.ProfitTarget > 0)
+                parts.Add("target " + row.ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
+
+            return parts.Count == 0 ? "no risk limits" : string.Join(", ", parts);
         }
 
         private void SetStatus(string message)
@@ -2719,6 +2780,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             accountRows.CollectionChanged -= AccountRows_CollectionChanged;
             foreach (var row in accountRows)
                 row.PropertyChanged -= AccountRow_PropertyChanged;
+
+            if (accountsGrid != null)
+                accountsGrid.SelectionChanged -= AccountsGrid_SelectionChanged;
 
             Account.AccountStatusUpdate -= OnAccountStatusUpdate;
 
