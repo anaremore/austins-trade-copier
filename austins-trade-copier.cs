@@ -110,6 +110,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private List<Account> connectedAccounts = new List<Account>();
         private bool isCopying;
         private bool dryRunMode;
+        private bool suppressEnableValidation;
         private bool rowRefreshPending;
         private string lastGroupListSignature = string.Empty;
 
@@ -787,6 +788,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (e == null || string.IsNullOrEmpty(e.PropertyName))
                 return;
 
+            var row = sender as AccountCopyRow;
+            if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
+                ValidateEnabledRowAfterEdit(row);
+
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
                 SyncLeadAccountSubscriptions();
 
@@ -798,6 +803,48 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (RowPropertyAffectsReadiness(e.PropertyName))
                 QueueRowRefresh();
+        }
+
+        private bool RowPropertyCanInvalidateEnabledRow(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case "Enabled":
+                case "LeadAccountName":
+                case "SizingMode":
+                case "Multiplier":
+                case "FixedQuantity":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void ValidateEnabledRowAfterEdit(AccountCopyRow row)
+        {
+            if (suppressEnableValidation || row == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
+                return;
+
+            string skipReason;
+            if (CanEnableRow(row, BuildDesiredLeadNames(new[] { row }), out skipReason))
+                return;
+
+            suppressEnableValidation = true;
+            try
+            {
+                row.Enabled = false;
+                row.LastAction = "Disabled: " + skipReason;
+                ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
+            }
+            finally
+            {
+                suppressEnableValidation = false;
+            }
+
+            var message = row.AccountName + " was disabled: " + skipReason + ".";
+            SetStatus(message);
+            Log(message);
         }
 
         private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2191,12 +2238,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var desiredLeadNames = accountRows
-                .Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName))
-                .Concat(targetRows.Where(r => r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName)))
-                .Select(r => r.LeadAccountName)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var desiredLeadNames = BuildDesiredLeadNames(targetRows);
 
             var enabledCount = 0;
             var skipReasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -2220,7 +2262,41 @@ namespace NinjaTrader.NinjaScript.AddOns
             Log(message);
         }
 
+        private List<string> BuildDesiredLeadNames(IEnumerable<AccountCopyRow> targetRows)
+        {
+            return accountRows
+                .Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName))
+                .Concat(targetRows.Where(r => r != null && r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName)))
+                .Select(r => r.LeadAccountName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         private bool TryEnableRow(AccountCopyRow row, List<string> desiredLeadNames, out string skipReason)
+        {
+            if (!CanEnableRow(row, desiredLeadNames, out skipReason))
+                return false;
+
+            suppressEnableValidation = true;
+            try
+            {
+                row.Enabled = true;
+                row.ManualLock = false;
+                row.AutoLocked = false;
+                row.LockReason = string.Empty;
+                row.LastAction = "Enabled";
+                ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
+            }
+            finally
+            {
+                suppressEnableValidation = false;
+            }
+
+            return true;
+        }
+
+        private bool CanEnableRow(AccountCopyRow row, List<string> desiredLeadNames, out string skipReason)
         {
             skipReason = string.Empty;
             if (row == null || row.Account == null)
@@ -2260,6 +2336,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return false;
             }
 
+            if (IsActiveCopyAccount(rowLead.Name, row))
+            {
+                skipReason = "lead is copy row";
+                return false;
+            }
+
             if (desiredLeadNames.Any(leadName => AccountNamesEqual(leadName, row.AccountName)))
             {
                 skipReason = "used as lead";
@@ -2278,14 +2360,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return false;
             }
 
-            row.Enabled = true;
-            row.ManualLock = false;
-            row.AutoLocked = false;
-            row.LockReason = string.Empty;
-            row.LastAction = "Enabled";
-            ClearLockedVirtualPositions(row);
-            ClearMaxNetVirtualPositions(row);
             return true;
+        }
+
+        private bool IsActiveCopyAccount(string accountName, AccountCopyRow exceptRow)
+        {
+            return accountRows.Any(r =>
+                r != exceptRow
+                && r.Enabled
+                && r.SizingMode != SizingMode.Disabled
+                && AccountNamesEqual(r.AccountName, accountName));
         }
 
         private void IncrementReason(Dictionary<string, int> skipReasons, string reason)
