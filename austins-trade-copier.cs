@@ -1079,7 +1079,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var root = document.CreateElement("TradeCopierProfile");
             root.SetAttribute("version", "2");
             root.SetAttribute("savedUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-            root.SetAttribute("leadAccount", accountRows.Where(r => r.Enabled).Select(r => r.LeadAccountName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? string.Empty);
+            root.SetAttribute("leadAccount", accountRows.Where(RowShouldSaveEnabled).Select(r => r.LeadAccountName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? string.Empty);
             document.AppendChild(root);
 
             foreach (var row in accountRows)
@@ -1088,7 +1088,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetAttribute(rowElement, "account", row.AccountName);
                 SetAttribute(rowElement, "leadAccount", row.LeadAccountName);
                 SetAttribute(rowElement, "group", row.GroupName);
-                SetAttribute(rowElement, "enabled", row.Enabled);
+                SetAttribute(rowElement, "enabled", RowShouldSaveEnabled(row));
                 SetAttribute(rowElement, "copyMode", row.CopyMode.ToString());
                 SetAttribute(rowElement, "sizingMode", row.SizingMode.ToString());
                 SetAttribute(rowElement, "multiplier", row.Multiplier);
@@ -1104,6 +1104,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             document.Save(GetProfilePath(profileName));
+        }
+
+        private bool RowShouldSaveEnabled(AccountCopyRow row)
+        {
+            return row != null && row.Enabled && !row.AutoLocked;
         }
 
         private void LoadProfile(string profileName)
