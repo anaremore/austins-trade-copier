@@ -1222,7 +1222,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ApplyRiskSettingsEdit(AccountCopyRow row)
         {
-            if (suppressEnableValidation || row == null || !isCopying || !row.Enabled || row.Account == null)
+            if (suppressEnableValidation || suppressLiveSettingsPause || row == null || !isCopying || !row.Enabled || row.Account == null)
                 return;
 
             RefreshRowMetrics(row);
