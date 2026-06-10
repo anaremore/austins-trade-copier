@@ -284,9 +284,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            var applyGroupSettingsButton = CreateButton("Apply Row Settings To Group", Brushes.DimGray);
-            applyGroupSettingsButton.Click += ApplyGroupSettingsButton_Click;
-            selectionRow.Children.Add(applyGroupSettingsButton);
+            var copyGroupSettingsButton = CreateButton("Copy Sizing/Risk To Group", Brushes.DimGray);
+            copyGroupSettingsButton.ToolTip = "Copies copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to its group. Lead and group are not changed.";
+            copyGroupSettingsButton.Click += CopyGroupSettingsButton_Click;
+            selectionRow.Children.Add(copyGroupSettingsButton);
             actionPanel.Children.Add(selectionRow);
 
             var actionSection = CreateSection("Controls", actionPanel);
@@ -2517,44 +2518,45 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshAllRows();
         }
 
-        private void ApplyGroupSettingsButton_Click(object sender, RoutedEventArgs e)
+        private void CopyGroupSettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            var source = accountsGrid.SelectedItem as AccountCopyRow;
-            if (source == null)
+            var selectedRows = GetSelectedRows();
+            if (selectedRows.Count == 0)
             {
-                SetStatus("Select a row whose settings should be copied to its group.");
+                SetStatus("Select one source row before copying sizing and risk settings to a group.");
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(source.LeadAccountName))
+            if (selectedRows.Count > 1)
             {
-                SetStatus("Choose a lead on the selected row before applying it to the group.");
+                SetStatus("Select exactly one source row before copying sizing and risk settings to a group.");
                 return;
             }
 
-            if (AccountNamesEqual(source.AccountName, source.LeadAccountName))
+            var source = selectedRows[0];
+            if (source.SizingMode == SizingMode.Multiplier && source.Multiplier <= 0)
             {
-                SetStatus("The selected row cannot copy from itself.");
+                SetStatus("Set the selected row's multiplier above 0 before copying it to the group.");
                 return;
             }
 
-            var rows = accountRows.Where(r => r != source && GroupEquals(r.GroupName, source.GroupName)).ToList();
+            if (source.SizingMode == SizingMode.Fixed && source.FixedQuantity <= 0)
+            {
+                SetStatus("Set the selected row's fixed quantity above 0 before copying it to the group.");
+                return;
+            }
+
+            var groupName = NormalizeGroupName(source.GroupName);
+            var rows = accountRows.Where(r => r != source && GroupEquals(r.GroupName, groupName)).ToList();
+            if (rows.Count == 0)
+            {
+                SetStatus("No other rows are in group " + groupName + ".");
+                return;
+            }
+
             var appliedCount = 0;
-            var skippedLeadRows = 0;
             foreach (var row in rows)
             {
-                if (!string.IsNullOrWhiteSpace(source.LeadAccountName) && AccountNamesEqual(row.AccountName, source.LeadAccountName))
-                {
-                    row.LeadAccountName = string.Empty;
-                    row.Enabled = false;
-                    row.LastAction = "Lead row skipped";
-                    ClearLockedVirtualPositions(row);
-                    ClearMaxNetVirtualPositions(row);
-                    skippedLeadRows++;
-                    continue;
-                }
-
-                row.LeadAccountName = source.LeadAccountName;
                 row.SizingMode = source.SizingMode;
                 row.CopyMode = source.CopyMode;
                 row.Multiplier = source.Multiplier;
@@ -2566,7 +2568,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.ProfitTarget = source.ProfitTarget;
                 row.LimitAction = source.LimitAction;
                 row.InstrumentFilter = source.InstrumentFilter;
-                row.LastAction = "Group settings applied";
+                row.LastAction = "Copied sizing/risk from " + source.AccountName;
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
                 appliedCount++;
@@ -2574,7 +2576,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            Log("Applied " + source.AccountName + " settings to " + appliedCount + " row(s) in group " + source.GroupName + (skippedLeadRows > 0 ? "; skipped " + skippedLeadRows + " lead row(s)." : "."));
+            Log("Copied sizing/risk settings from " + source.AccountName + " to " + appliedCount + " row(s) in group " + groupName + ". Leads were left unchanged.");
             RefreshAllRows();
         }
 
