@@ -267,6 +267,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
+            var enableSelectedButton = CreateButton("Enable Selected", Brushes.DimGray);
+            enableSelectedButton.Click += EnableSelectedButton_Click;
+            selectionRow.Children.Add(enableSelectedButton);
+
             var removeSelectedButton = CreateButton("Disable Selected", Brushes.DimGray);
             removeSelectedButton.Click += RemoveSelectedButton_Click;
             selectionRow.Children.Add(removeSelectedButton);
@@ -2098,6 +2102,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             return account.CreateOrder(instrument, action, orderType, OrderEntry.Automated, timeInForce, quantity, limitPrice, stopPrice, string.Empty, name, NinjaTrader.Core.Globals.MaxDate, null);
         }
 
+        private void EnableSelectedButton_Click(object sender, RoutedEventArgs e)
+        {
+            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
+            if (rows.Count == 0)
+            {
+                SetStatus("Select one or more rows to enable.");
+                return;
+            }
+
+            EnableRows(rows, "selected");
+        }
+
         private void RemoveSelectedButton_Click(object sender, RoutedEventArgs e)
         {
             var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
@@ -2163,31 +2179,134 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var rows = accountRows.Where(r => GroupEquals(r.GroupName, groupName)).ToList();
-            var enabledCount = 0;
-            var skippedCount = 0;
-            foreach (var row in rows)
+            EnableRows(accountRows.Where(r => GroupEquals(r.GroupName, groupName)), "group " + groupName);
+        }
+
+        private void EnableRows(IEnumerable<AccountCopyRow> rows, string scopeDescription)
+        {
+            var targetRows = rows.Where(r => r != null).Distinct().ToList();
+            if (targetRows.Count == 0)
             {
-                if (row.SizingMode == SizingMode.Disabled || string.IsNullOrWhiteSpace(row.LeadAccountName) || ResolveLeadAccountForRow(row) == null || AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                SetStatus("No rows to enable.");
+                return;
+            }
+
+            var desiredLeadNames = accountRows
+                .Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName))
+                .Concat(targetRows.Where(r => r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName)))
+                .Select(r => r.LeadAccountName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var enabledCount = 0;
+            var skipReasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in targetRows)
+            {
+                string skipReason;
+                if (!TryEnableRow(row, desiredLeadNames, out skipReason))
                 {
-                    row.LastAction = "Group enable skipped";
-                    skippedCount++;
+                    row.LastAction = "Enable skipped: " + skipReason;
+                    IncrementReason(skipReasons, skipReason);
                     continue;
                 }
 
-                row.Enabled = true;
-                row.ManualLock = false;
-                row.AutoLocked = false;
-                row.LockReason = string.Empty;
-                row.LastAction = "Group enabled";
-                ClearLockedVirtualPositions(row);
-                ClearMaxNetVirtualPositions(row);
                 enabledCount++;
             }
 
             SyncLeadAccountSubscriptions();
-            Log("Enabled " + enabledCount + " row(s) in group " + groupName + (skippedCount > 0 ? "; skipped " + skippedCount + " unconfigured row(s)." : "."));
             RefreshAllRows();
+            var message = "Enabled " + enabledCount + " " + scopeDescription + " row(s)" + FormatSkipReasons(skipReasons) + ".";
+            SetStatus(message);
+            Log(message);
+        }
+
+        private bool TryEnableRow(AccountCopyRow row, List<string> desiredLeadNames, out string skipReason)
+        {
+            skipReason = string.Empty;
+            if (row == null || row.Account == null)
+            {
+                skipReason = "no account";
+                return false;
+            }
+
+            if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
+            {
+                skipReason = "disconnected";
+                return false;
+            }
+
+            if (row.SizingMode == SizingMode.Disabled)
+            {
+                skipReason = "sizing disabled";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(row.LeadAccountName))
+            {
+                skipReason = "no lead";
+                return false;
+            }
+
+            var rowLead = ResolveLeadAccountForRow(row);
+            if (rowLead == null)
+            {
+                skipReason = "lead disconnected";
+                return false;
+            }
+
+            if (AccountNamesEqual(row.AccountName, rowLead.Name))
+            {
+                skipReason = "self-copy";
+                return false;
+            }
+
+            if (desiredLeadNames.Any(leadName => AccountNamesEqual(leadName, row.AccountName)))
+            {
+                skipReason = "used as lead";
+                return false;
+            }
+
+            if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+            {
+                skipReason = "bad multiplier";
+                return false;
+            }
+
+            if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+            {
+                skipReason = "bad fixed qty";
+                return false;
+            }
+
+            row.Enabled = true;
+            row.ManualLock = false;
+            row.AutoLocked = false;
+            row.LockReason = string.Empty;
+            row.LastAction = "Enabled";
+            ClearLockedVirtualPositions(row);
+            ClearMaxNetVirtualPositions(row);
+            return true;
+        }
+
+        private void IncrementReason(Dictionary<string, int> skipReasons, string reason)
+        {
+            if (skipReasons.ContainsKey(reason))
+                skipReasons[reason]++;
+            else
+                skipReasons[reason] = 1;
+        }
+
+        private string FormatSkipReasons(Dictionary<string, int> skipReasons)
+        {
+            if (skipReasons.Count == 0)
+                return string.Empty;
+
+            var parts = skipReasons
+                .OrderBy(pair => pair.Key)
+                .Select(pair => pair.Value + " " + pair.Key)
+                .ToList();
+
+            return "; skipped " + skipReasons.Values.Sum() + " (" + string.Join(", ", parts) + ")";
         }
 
         private void PauseGroupButton_Click(object sender, RoutedEventArgs e)
