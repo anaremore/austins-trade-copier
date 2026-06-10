@@ -19,8 +19,9 @@
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
 - 🧹 **Flatten Controls**: Flatten followers, all accounts, or a selected group.
 - 🧮 **Reconcile Selected**: Deliberately align selected followers to the lead using each row's sizing rules.
+- 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
 - 💾 **Profiles**: Save, load, and delete copier profiles so groups, sizing, and risk rules survive restarts.
-- 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors.
+- 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors, with export and clear controls.
 
 ---
 
@@ -46,7 +47,7 @@
    - **Disabled**: keeps the row visible but does not copy entries.
 4. **Set Risk Rules** – Optional loss, drawdown, and profit-target values lock an account when hit.
 5. **Save a Profile** – Store the current dashboard as a profile if you want to reuse the setup.
-6. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states.
+6. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 7. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
 8. **Flatten or Reconcile Deliberately** – Use selected, follower, group, or all-account flatten buttons when you intend to close positions. Use **Reconcile Selected** only when you want selected followers adjusted back toward the lead.
 
@@ -78,6 +79,8 @@ Risk actions:
 - **HardFlatten** immediately requests a flatten for the account, then blocks new or increasing entries.
 
 Reconciliation is selected-row only and requires confirmation. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
+
+Dry run mode is selected before starting a copy session and stays locked for that session. In dry run, copied orders and reconcile adjustments are logged as simulated actions instead of being submitted. Manual flatten buttons remain real emergency controls.
 
 ---
 

@@ -99,6 +99,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private Account leadAccount;
         private List<Account> connectedAccounts = new List<Account>();
         private bool isCopying;
+        private bool dryRunMode;
         private string lastGroupListSignature = string.Empty;
 
         private ComboBox leadAccountComboBox;
@@ -109,6 +110,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private ComboBox groupComboBox;
         private DataGrid accountsGrid;
         private Button startPauseButton;
+        private CheckBox dryRunCheckBox;
         private TextBlock statusTextBlock;
         private TextBox eventLogTextBox;
 
@@ -240,6 +242,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             startPauseButton.Click += StartPauseButton_Click;
             actionPanel.Children.Add(startPauseButton);
 
+            dryRunCheckBox = new CheckBox
+            {
+                Content = "Dry Run",
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            actionPanel.Children.Add(dryRunCheckBox);
+
             var flattenFollowersButton = CreateButton("Flatten Followers", Brushes.Firebrick);
             flattenFollowersButton.Click += FlattenFollowersButton_Click;
             actionPanel.Children.Add(flattenFollowersButton);
@@ -329,6 +340,28 @@ namespace NinjaTrader.NinjaScript.AddOns
             Grid.SetRow(statusTextBlock, 4);
             root.Children.Add(statusTextBlock);
 
+            var logPanel = new Grid();
+            logPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            logPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            var logButtonPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var exportLogButton = CreateButton("Export Log", Brushes.DimGray);
+            exportLogButton.Click += ExportLogButton_Click;
+            logButtonPanel.Children.Add(exportLogButton);
+
+            var clearLogButton = CreateButton("Clear Log", Brushes.DimGray);
+            clearLogButton.Click += ClearLogButton_Click;
+            logButtonPanel.Children.Add(clearLogButton);
+
+            Grid.SetRow(logButtonPanel, 0);
+            logPanel.Children.Add(logButtonPanel);
+
             eventLogTextBox = new TextBox
             {
                 IsReadOnly = true,
@@ -339,8 +372,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 BorderBrush = new SolidColorBrush(Color.FromRgb(76, 76, 80)),
                 TextWrapping = TextWrapping.NoWrap
             };
-            Grid.SetRow(eventLogTextBox, 5);
-            root.Children.Add(eventLogTextBox);
+            Grid.SetRow(eventLogTextBox, 1);
+            logPanel.Children.Add(eventLogTextBox);
+
+            Grid.SetRow(logPanel, 5);
+            root.Children.Add(logPanel);
 
             Content = root;
         }
@@ -637,6 +673,35 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
         }
 
+        private void ExportLogButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var logDirectory = GetLogDirectoryPath();
+                Directory.CreateDirectory(logDirectory);
+
+                var fileName = "trade-copier-log-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".txt";
+                var path = Path.Combine(logDirectory, fileName);
+                File.WriteAllLines(path, eventLogLines.ToArray());
+                SetStatus("Exported event log.");
+                Log("Exported event log to " + path + ".");
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Event log export failed.");
+                Log("ERROR event log export failed: " + ex.Message);
+            }
+        }
+
+        private void ClearLogButton_Click(object sender, RoutedEventArgs e)
+        {
+            eventLogLines.Clear();
+            if (eventLogTextBox != null)
+                eventLogTextBox.Clear();
+
+            SetStatus("Event log cleared.");
+        }
+
         private void SaveProfile(string profileName)
         {
             Directory.CreateDirectory(GetProfileDirectoryPath());
@@ -806,6 +871,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 ProfileFolderName);
         }
 
+        private string GetLogDirectoryPath()
+        {
+            return Path.Combine(GetProfileDirectoryPath(), "Logs");
+        }
+
         private string GetProfilePath(string profileName)
         {
             return Path.Combine(GetProfileDirectoryPath(), NormalizeProfileName(profileName) + ProfileFileExtension);
@@ -909,19 +979,27 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             lockedVirtualPositions.Clear();
+            dryRunMode = dryRunCheckBox != null && dryRunCheckBox.IsChecked == true;
             isCopying = true;
             startPauseButton.Content = "Pause Copying";
             startPauseButton.Background = Brushes.DarkOrange;
-            SetStatus("Copying active. Locked rows allow exits only.");
-            Log("Copying started.");
+            if (dryRunCheckBox != null)
+                dryRunCheckBox.IsEnabled = false;
+
+            SetStatus(dryRunMode ? "Dry run active. Orders are simulated only." : "Copying active. Locked rows allow exits only.");
+            Log(dryRunMode ? "Dry run started. No copied orders will be submitted." : "Copying started.");
             RefreshAllRows();
         }
 
         private void PauseCopyingTrades()
         {
             isCopying = false;
+            dryRunMode = false;
             startPauseButton.Content = "Start Copying";
             startPauseButton.Background = Brushes.SeaGreen;
+            if (dryRunCheckBox != null)
+                dryRunCheckBox.IsEnabled = true;
+
             SetStatus("Copying paused. Positions were left untouched.");
             Log("Copying paused.");
             RefreshAllRows();
@@ -989,6 +1067,19 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 try
                 {
+                    if (dryRunMode)
+                    {
+                        if (wasEntryLocked)
+                            ApplyLockedVirtualFill(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
+
+                        mirroredTargetQuantities[targetKey] = wasEntryLocked && quantityToSubmit < originalQuantity
+                            ? desiredQuantity
+                            : alreadyMirrored + quantityToSubmit;
+                        row.LastAction = "Dry run " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
+                        Log("DRY RUN " + row.AccountName + " would send " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument) + ".");
+                        continue;
+                    }
+
                     var copiedOrder = CreateAccountOrder(
                         row.Account,
                         sourceOrder.Instrument,
@@ -1308,8 +1399,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 submitted++;
             }
 
-            row.LastAction = submitted > 0 ? "Reconcile sent " + submitted + " order(s)" : "Already reconciled";
-            Log(row.AccountName + " reconcile complete; orders sent: " + submitted + ".");
+            if (IsDryRunSelected())
+            {
+                row.LastAction = submitted > 0 ? "Dry run reconcile " + submitted + " order(s)" : "Already reconciled";
+                Log(row.AccountName + " dry-run reconcile complete; orders simulated: " + submitted + ".");
+            }
+            else
+            {
+                row.LastAction = submitted > 0 ? "Reconcile sent " + submitted + " order(s)" : "Already reconciled";
+                Log(row.AccountName + " reconcile complete; orders sent: " + submitted + ".");
+            }
         }
 
         private string ValidateRowForReconcile(AccountCopyRow row)
@@ -1377,6 +1476,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             try
             {
+                if (IsDryRunSelected())
+                {
+                    Log("DRY RUN " + row.AccountName + " would reconcile with " + DescribeOrder(action, quantity, instrument) + ".");
+                    return;
+                }
+
                 var order = CreateAccountOrder(
                     row.Account,
                     instrument,
@@ -1933,7 +2038,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             var activeCount = accountRows.Count(r => r.Enabled && r.SizingMode != SizingMode.Disabled && !r.IsEntryLocked && r.Account != null && r.Account.ConnectionStatus == ConnectionStatus.Connected);
             var lockedCount = accountRows.Count(r => r.IsEntryLocked);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
-            return (isCopying ? "Copying" : "Paused") + " | Active followers: " + activeCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            var mode = isCopying ? dryRunMode ? "Dry Run" : "Copying" : "Paused";
+            return mode + " | Active followers: " + activeCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
         }
 
         private void SetStatus(string message)
@@ -1954,6 +2060,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             eventLogTextBox.Text = string.Join(Environment.NewLine, eventLogLines.ToArray());
             eventLogTextBox.AppendText(Environment.NewLine);
             eventLogTextBox.ScrollToEnd();
+        }
+
+        private bool IsDryRunSelected()
+        {
+            return dryRunMode || (dryRunCheckBox != null && dryRunCheckBox.IsChecked == true);
         }
 
         private void TradeCopierWindow_Closing(object sender, CancelEventArgs e)
