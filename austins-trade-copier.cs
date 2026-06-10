@@ -606,7 +606,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var binding = new Binding(propertyName)
             {
                 Mode = readOnly ? BindingMode.OneWay : BindingMode.TwoWay,
-                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+                UpdateSourceTrigger = readOnly ? UpdateSourceTrigger.PropertyChanged : UpdateSourceTrigger.LostFocus
             };
 
             if (!string.IsNullOrEmpty(stringFormat))
