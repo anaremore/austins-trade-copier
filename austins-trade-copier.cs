@@ -866,6 +866,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 RefreshGroupList();
             }
 
+            if (RowPropertyPausesLiveRow(e.PropertyName))
+                PauseLiveRowAfterSettingsEdit(row);
+
             if (RowPropertyAffectsReadiness(e.PropertyName))
                 QueueRowRefresh();
         }
@@ -969,6 +972,45 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var message = row.AccountName + " was disabled: " + skipReason + ".";
+            SetStatus(message);
+            Log(message);
+        }
+
+        private bool RowPropertyPausesLiveRow(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case "LeadAccountName":
+                case "CopyMode":
+                case "SizingMode":
+                case "Multiplier":
+                case "FixedQuantity":
+                case "MaxQuantity":
+                case "MaxNetPosition":
+                case "DailyLossLimit":
+                case "MaxDrawdown":
+                case "ProfitTarget":
+                case "LimitAction":
+                case "InstrumentFilter":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void PauseLiveRowAfterSettingsEdit(AccountCopyRow row)
+        {
+            if (suppressEnableValidation || !isCopying || row == null || !row.Enabled || row.Account == null)
+                return;
+
+            var wasManualLocked = row.ManualLock;
+            row.ResetBaseline(ReadAccountPnl(row.Account), false);
+            row.ManualLock = true;
+            row.LastAction = wasManualLocked ? "Live settings edited - baseline reset" : "Live settings edited - row paused";
+            ClearLockedVirtualPositions(row);
+            ClearMaxNetVirtualPositions(row);
+
+            var message = row.AccountName + " was paused after a live settings edit; unlock the row when ready.";
             SetStatus(message);
             Log(message);
         }
