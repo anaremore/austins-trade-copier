@@ -1347,8 +1347,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             foreach (var row in rows)
             {
-                row.ResetBaseline(ReadAccountPnl(row.Account));
-                row.LastAction = "Session baseline reset";
+                row.ResetBaseline(ReadAccountPnl(row.Account), false);
+                row.LastAction = row.AutoLocked ? "Session baseline reset - still locked" : "Session baseline reset";
             }
 
             if (rows.Count > 0)
@@ -3275,12 +3275,21 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             public void ResetBaseline(double baselinePnl)
             {
+                ResetBaseline(baselinePnl, true);
+            }
+
+            public void ResetBaseline(double baselinePnl, bool clearAutoLock)
+            {
                 BaselinePnl = baselinePnl;
                 PeakPnl = 0;
                 SessionPnl = 0;
                 Drawdown = 0;
-                AutoLocked = false;
-                LockReason = string.Empty;
+                if (clearAutoLock)
+                {
+                    AutoLocked = false;
+                    LockReason = string.Empty;
+                }
+
                 OnPropertyChanged("BaselinePnl");
             }
 
