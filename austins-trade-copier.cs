@@ -3376,13 +3376,32 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.Account == null)
                 return;
 
+            var previousConnectionStatus = row.ConnectionStatus;
             row.ConnectionStatus = row.Account.ConnectionStatus.ToString();
+            HandleRowConnectionStatusChange(row, previousConnectionStatus);
             var currentPnl = ReadAccountPnl(row.Account);
             row.SessionPnl = currentPnl - row.BaselinePnl;
             row.PeakPnl = Math.Max(row.PeakPnl, row.SessionPnl);
             row.Drawdown = Math.Max(0, row.PeakPnl - row.SessionPnl);
             row.NetPosition = GetNetPosition(row.Account);
             row.PositionSummary = GetPositionSummary(row.Account);
+        }
+
+        private void HandleRowConnectionStatusChange(AccountCopyRow row, string previousConnectionStatus)
+        {
+            if (row == null || !IsConfiguredCopyRow(row))
+                return;
+
+            if (!string.Equals(previousConnectionStatus, "Connected", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (row.Account != null && row.Account.ConnectionStatus == ConnectionStatus.Connected)
+                return;
+
+            row.LastAction = "Account disconnected";
+            ClearLockedVirtualPositions(row);
+            ClearMaxNetVirtualPositions(row);
+            Log(row.AccountName + " disconnected; copied orders blocked until reconnect.");
         }
 
         private void EvaluateRisk(AccountCopyRow row)
