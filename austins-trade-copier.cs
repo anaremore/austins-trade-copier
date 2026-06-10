@@ -592,6 +592,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (checkBox == null || row == null || !checkBox.IsEnabled)
                 return;
 
+            CommitGridEdits();
             SelectRowForDirectCellAction(row);
             checkBox.IsChecked = checkBox.IsChecked != true;
 
