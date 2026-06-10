@@ -3435,20 +3435,83 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!isCopying || rowLead == null || row.Account == null || RowIsReduceOnly(row) || !row.Enabled || row.SizingMode == SizingMode.Disabled)
                 return false;
 
+            var expectedSignedPositions = BuildExpectedSignedPositionsForStatus(row, rowLead);
             var leadPositions = GetOpenPositionSnapshots(rowLead);
             var targetPositions = GetOpenPositionSnapshots(row.Account);
 
-            if (leadPositions.Count == 0)
-                return targetPositions.Count > 0;
+            if (leadPositions.Count == 0 || expectedSignedPositions.Count == 0)
+                return targetPositions.Any(p => p.SignedQuantity != 0);
 
-            foreach (var leadPosition in leadPositions)
+            var instrumentNames = expectedSignedPositions.Keys
+                .Union(targetPositions.Select(p => p.InstrumentName), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var instrumentName in instrumentNames)
             {
-                var targetPosition = targetPositions.FirstOrDefault(p => p.InstrumentName == leadPosition.InstrumentName);
-                if (targetPosition == null || targetPosition.MarketPosition != leadPosition.MarketPosition)
+                var expectedSigned = expectedSignedPositions.ContainsKey(instrumentName) ? expectedSignedPositions[instrumentName] : 0;
+                var targetPosition = targetPositions.FirstOrDefault(p => string.Equals(p.InstrumentName, instrumentName, StringComparison.OrdinalIgnoreCase));
+                var currentSigned = targetPosition != null ? targetPosition.SignedQuantity : 0;
+                if (currentSigned != expectedSigned)
                     return true;
             }
 
             return false;
+        }
+
+        private Dictionary<string, int> BuildExpectedSignedPositionsForStatus(AccountCopyRow row, Account rowLead)
+        {
+            var expectedPositions = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var leadPosition in GetOpenPositionSnapshots(rowLead))
+            {
+                if (!RowAllowsInstrument(row, leadPosition.Instrument))
+                    continue;
+
+                int desiredQuantity;
+                if (!TryCalculateDesiredQuantityForStatus(row, leadPosition.Quantity, out desiredQuantity) || desiredQuantity <= 0)
+                    continue;
+
+                var desiredSigned = leadPosition.MarketPosition == MarketPosition.Short ? -desiredQuantity : desiredQuantity;
+                desiredSigned = CapDesiredSignedPositionToMaxNet(row, desiredSigned);
+                if (desiredSigned != 0)
+                    expectedPositions[leadPosition.InstrumentName] = desiredSigned;
+            }
+
+            return expectedPositions;
+        }
+
+        private bool TryCalculateDesiredQuantityForStatus(AccountCopyRow row, int baseQuantity, out int desiredQuantity)
+        {
+            desiredQuantity = 0;
+            switch (row.SizingMode)
+            {
+                case SizingMode.OneToOne:
+                    desiredQuantity = baseQuantity;
+                    break;
+                case SizingMode.Multiplier:
+                    desiredQuantity = row.Multiplier > 0 ? (int)Math.Floor(baseQuantity * row.Multiplier) : 0;
+                    break;
+                case SizingMode.Fixed:
+                    desiredQuantity = baseQuantity > 0 ? Math.Max(0, row.FixedQuantity) : 0;
+                    break;
+                case SizingMode.BalanceRatio:
+                    double leadBalance;
+                    double followerBalance;
+                    var rowLead = ResolveLeadAccountForRow(row);
+                    if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0 || !TryGetSizingBalance(row.Account, out followerBalance) || followerBalance <= 0)
+                        return false;
+
+                    desiredQuantity = (int)Math.Floor(baseQuantity * followerBalance / leadBalance);
+                    break;
+                default:
+                    desiredQuantity = 0;
+                    break;
+            }
+
+            if (row.MaxQuantity > 0)
+                desiredQuantity = Math.Min(desiredQuantity, row.MaxQuantity);
+
+            desiredQuantity = Math.Max(0, desiredQuantity);
+            return true;
         }
 
         private int GetNetPosition(Account account)
