@@ -2976,7 +2976,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
-            Log("Disabled " + rows.Count + " row(s).");
+            var message = "Disabled " + rows.Count + " selected row(s).";
+            SetStatus(message);
+            Log(message);
         }
 
         private void UnlockSelectedButton_Click(object sender, RoutedEventArgs e)
@@ -3008,7 +3010,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 ClearMaxNetVirtualPositions(row);
             }
 
-            Log("Unlocked " + rows.Count + " row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)." : "."));
+            var message = "Unlocked " + rows.Count + " selected row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)" : string.Empty) + ".";
+            SetStatus(message);
+            Log(message);
             RefreshAllRows();
         }
 
@@ -3029,7 +3033,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LastAction = "Baseline reset";
             }
 
-            Log("Reset risk baselines for " + rows.Count + " row(s).");
+            var message = "Reset risk baselines for " + rows.Count + " selected row(s).";
+            SetStatus(message);
+            Log(message);
             RefreshAllRows();
         }
 
