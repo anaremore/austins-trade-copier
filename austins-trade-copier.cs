@@ -3348,9 +3348,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (IsNearRiskLimit(row))
+            var nearRiskStatus = GetNearRiskLimitStatusText(row);
+            if (!string.IsNullOrEmpty(nearRiskStatus))
             {
-                row.SetStatus("Warning", "Near risk limit");
+                row.SetStatus("Warning", nearRiskStatus);
                 return;
             }
 
@@ -3438,11 +3439,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             row.RoleSummary = usedAsLead ? "Lead" : "Available";
         }
 
-        private bool IsNearRiskLimit(AccountCopyRow row)
+        private string GetNearRiskLimitStatusText(AccountCopyRow row)
         {
-            return (row.DailyLossLimit > 0 && row.SessionPnl <= -Math.Abs(row.DailyLossLimit) * 0.9)
-                || (row.MaxDrawdown > 0 && row.Drawdown >= Math.Abs(row.MaxDrawdown) * 0.9)
-                || (row.ProfitTarget > 0 && row.SessionPnl >= Math.Abs(row.ProfitTarget) * 0.9);
+            if (row.DailyLossLimit > 0 && row.SessionPnl <= -Math.Abs(row.DailyLossLimit) * 0.9)
+                return "Near max loss";
+
+            if (row.MaxDrawdown > 0 && row.Drawdown >= Math.Abs(row.MaxDrawdown) * 0.9)
+                return "Near max DD";
+
+            if (row.ProfitTarget > 0 && row.SessionPnl >= Math.Abs(row.ProfitTarget) * 0.9)
+                return "Near target";
+
+            return string.Empty;
         }
 
         private string GetDesyncStatusText(AccountCopyRow row)
