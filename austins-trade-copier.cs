@@ -626,6 +626,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 factory.SetValue(FrameworkElement.TagProperty, allowDecimal ? "decimal" : "integer");
                 factory.AddHandler(UIElement.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
                 factory.AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
+                factory.AddHandler(UIElement.LostFocusEvent, new RoutedEventHandler(NumericTextBox_LostFocus));
             }
 
             var binding = new Binding(propertyName)
@@ -668,6 +669,27 @@ namespace NinjaTrader.NinjaScript.AddOns
             var pastedText = e.DataObject.GetData(DataFormats.Text) as string;
             if (!IsValidNumericText(GetProposedText(textBox, pastedText ?? string.Empty), NumericTextBoxAllowsDecimal(textBox)))
                 e.CancelCommand();
+        }
+
+        private void NumericTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null)
+                return;
+
+            NormalizeNumericTextBox(textBox);
+            var binding = textBox.GetBindingExpression(TextBox.TextProperty);
+            if (binding != null)
+                binding.UpdateSource();
+        }
+
+        private void NormalizeNumericTextBox(TextBox textBox)
+        {
+            if (textBox == null || textBox.Tag == null)
+                return;
+
+            if (string.IsNullOrEmpty(textBox.Text))
+                textBox.Text = "0";
         }
 
         private string GetProposedText(TextBox textBox, string insertedText)
@@ -1185,6 +1207,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var focusedTextBox = Keyboard.FocusedElement as TextBox;
             if (focusedTextBox != null)
             {
+                NormalizeNumericTextBox(focusedTextBox);
                 var binding = focusedTextBox.GetBindingExpression(TextBox.TextProperty);
                 if (binding != null)
                     binding.UpdateSource();
