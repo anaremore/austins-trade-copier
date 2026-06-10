@@ -3099,6 +3099,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var groups = accountRows
                 .Select(r => NormalizeGroupName(r.GroupName))
+                .Concat(new[] { DefaultGroupName })
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => g)
                 .ToList();
