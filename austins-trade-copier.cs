@@ -122,7 +122,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         };
         private readonly List<EnumOption> limitActionOptions = new List<EnumOption>
         {
-            new EnumOption(RiskAction.SoftLock, "Soft lock"),
+            new EnumOption(RiskAction.SoftLock, "Lock entries"),
             new EnumOption(RiskAction.HardFlatten, "Auto close")
         };
         private readonly DispatcherTimer telemetryTimer;
@@ -548,10 +548,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
 
             grid.Columns.Add(CreateTextBoxColumn("Max Pos", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
-            grid.Columns.Add(CreateComboBoxColumn("At Limit", "LimitAction", limitActionOptions, "Label", "Value", 94, "Soft lock blocks entries and allows exits. Auto close also flattens the row's managed positions immediately."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers Limit Action when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers Limit Action when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers Limit Action after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 104, "Lock entries blocks new copied entries and allows reducing exits. Auto close immediately flattens this row's managed positions and blocks copied orders."));
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
@@ -1330,7 +1330,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.AutoLocked)
             {
                 if (row.LimitAction == RiskAction.HardFlatten)
-                    AutoCloseRiskLockedRow(row, string.IsNullOrEmpty(row.LockReason) ? "Risk limit" : row.LockReason);
+                    RequestRiskAutoClose(row, string.IsNullOrEmpty(row.LockReason) ? "Risk limit" : row.LockReason);
 
                 return;
             }
@@ -3036,6 +3036,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetManualLockWithoutAction(row, false);
                 row.AutoLocked = false;
                 row.LockReason = string.Empty;
+                row.AutoCloseRequested = false;
                 row.LastAction = wasAutoLocked
                     ? baselineReset ? "Unlocked - baseline reset" : "Unlocked - baseline unchanged"
                     : "Unlocked";
@@ -3501,12 +3502,27 @@ namespace NinjaTrader.NinjaScript.AddOns
             row.LockReason = reason;
 
             if (row.LimitAction == RiskAction.HardFlatten)
-                AutoCloseRiskLockedRow(row, reason);
+                RequestRiskAutoClose(row, reason);
             else
             {
-                row.LastAction = reason + " - soft lock";
-                Log(row.AccountName + " soft locked by " + reason + ". Entries blocked; exits allowed.");
+                row.LastAction = reason + " - entries locked";
+                Log(row.AccountName + " locked entries by " + reason + ". New copied entries are blocked; reducing exits are allowed.");
             }
+        }
+
+        private void RequestRiskAutoClose(AccountCopyRow row, string reason)
+        {
+            if (row == null || row.Account == null)
+                return;
+
+            if (row.AutoCloseRequested)
+            {
+                row.LastAction = reason + " - auto close already requested";
+                return;
+            }
+
+            row.AutoCloseRequested = true;
+            AutoCloseRiskLockedRow(row, reason);
         }
 
         private void AutoCloseRiskLockedRow(AccountCopyRow row, string reason)
@@ -3517,12 +3533,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (dryRunMode)
             {
                 row.LastAction = reason + " - dry run auto close";
-                Log("DRY RUN " + row.AccountName + " would auto-close managed positions by " + reason + ".");
+                Log("DRY RUN " + row.AccountName + " would auto-close managed positions by " + reason + ". New copied orders are blocked.");
                 return;
             }
 
             row.LastAction = reason + " - auto close";
-            Log(row.AccountName + " auto-closing managed positions by " + reason + "; copied orders blocked.");
+            Log(row.AccountName + " auto-closing managed positions by " + reason + ". New copied orders are blocked.");
             FlattenRow(row, reason);
         }
 
@@ -3602,7 +3618,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string GetRiskLockStatusText(AccountCopyRow row)
         {
-            var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto close" : "Soft lock";
+            var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto close" : "Entries locked";
             var reason = row == null ? string.Empty : FormatRiskReasonForStatus(row.LockReason);
             return string.IsNullOrEmpty(reason) ? action : action + " - " + reason;
         }
@@ -4068,7 +4084,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (parts.Count == 0)
                 return "no risk limits";
 
-            var action = row.LimitAction == RiskAction.HardFlatten ? "auto close" : "soft lock";
+            var action = row.LimitAction == RiskAction.HardFlatten ? "auto close" : "lock entries";
             return string.Join(", ", parts) + "; " + action;
         }
 
@@ -4195,6 +4211,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private RiskAction limitAction = RiskAction.SoftLock;
             private bool manualLock;
             private bool autoLocked;
+            private bool autoCloseRequested;
             private string lockReason = string.Empty;
             private string lastAction = "Ready";
 
@@ -4391,6 +4408,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
             }
 
+            public bool AutoCloseRequested
+            {
+                get { return autoCloseRequested; }
+                set { SetField(ref autoCloseRequested, value, "AutoCloseRequested"); }
+            }
+
             public string LockReason
             {
                 get { return lockReason; }
@@ -4422,6 +4445,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (clearAutoLock)
                 {
                     AutoLocked = false;
+                    AutoCloseRequested = false;
                     LockReason = string.Empty;
                 }
 
@@ -4532,7 +4556,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (limits.Count == 0)
                     return "no limits";
 
-                var action = LimitAction == RiskAction.HardFlatten ? "auto close" : "soft lock";
+                var action = LimitAction == RiskAction.HardFlatten ? "auto close" : "lock entries";
                 return action + " " + string.Join(", ", limits);
             }
 
