@@ -107,6 +107,24 @@ namespace NinjaTrader.NinjaScript.AddOns
         private readonly Dictionary<string, Account> subscribedLeadAccounts = new Dictionary<string, Account>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<AccountCopyRow> observedAccountRows = new HashSet<AccountCopyRow>();
         private readonly Queue<string> eventLogLines = new Queue<string>();
+        private readonly List<EnumOption> copyModeOptions = new List<EnumOption>
+        {
+            new EnumOption(TradeCopyMode.All, "All"),
+            new EnumOption(TradeCopyMode.ExitsOnly, "Exits only")
+        };
+        private readonly List<EnumOption> sizingModeOptions = new List<EnumOption>
+        {
+            new EnumOption(SizingMode.OneToOne, "1:1"),
+            new EnumOption(SizingMode.Multiplier, "Multiplier"),
+            new EnumOption(SizingMode.Fixed, "Fixed qty"),
+            new EnumOption(SizingMode.BalanceRatio, "Balance ratio"),
+            new EnumOption(SizingMode.Disabled, "Off")
+        };
+        private readonly List<EnumOption> limitActionOptions = new List<EnumOption>
+        {
+            new EnumOption(RiskAction.SoftLock, "Soft lock"),
+            new EnumOption(RiskAction.HardFlatten, "Flatten")
+        };
         private readonly DispatcherTimer telemetryTimer;
 
         private List<Account> connectedAccounts = new List<Account>();
@@ -546,17 +564,21 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(new DataGridComboBoxColumn
             {
                 Header = CreateColumnHeader("Copy", "All copies entries and exits. ExitsOnly blocks new entries while allowing exits."),
-                ItemsSource = Enum.GetValues(typeof(TradeCopyMode)),
-                SelectedItemBinding = new Binding("CopyMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(70)
+                ItemsSource = copyModeOptions,
+                DisplayMemberPath = "Label",
+                SelectedValuePath = "Value",
+                SelectedValueBinding = new Binding("CopyMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+                Width = new DataGridLength(78)
             });
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
                 Header = CreateColumnHeader("Sizing", "OneToOne uses lead quantity. Multiplier scales it. Fixed uses Fixed Qty. BalanceRatio scales by account value."),
-                ItemsSource = Enum.GetValues(typeof(SizingMode)),
-                SelectedItemBinding = new Binding("SizingMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
-                Width = new DataGridLength(92)
+                ItemsSource = sizingModeOptions,
+                DisplayMemberPath = "Label",
+                SelectedValuePath = "Value",
+                SelectedValueBinding = new Binding("SizingMode") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+                Width = new DataGridLength(98)
             });
 
             grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 70, "{0:0.##}", false, "Used only when Sizing is Multiplier. 2 copies twice the lead quantity."));
@@ -582,8 +604,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(new DataGridComboBoxColumn
             {
                 Header = CreateColumnHeader("Limit Action", "SoftLock blocks entries and allows exits. HardFlatten also flattens the row account."),
-                ItemsSource = Enum.GetValues(typeof(RiskAction)),
-                SelectedItemBinding = new Binding("LimitAction") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+                ItemsSource = limitActionOptions,
+                DisplayMemberPath = "Label",
+                SelectedValuePath = "Value",
+                SelectedValueBinding = new Binding("LimitAction") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(100)
             });
 
@@ -3301,6 +3325,18 @@ namespace NinjaTrader.NinjaScript.AddOns
                     return 0;
                 }
             }
+        }
+
+        private class EnumOption
+        {
+            public EnumOption(object value, string label)
+            {
+                Value = value;
+                Label = label;
+            }
+
+            public object Value { get; private set; }
+            public string Label { get; private set; }
         }
 
         private class AccountCopyRow : INotifyPropertyChanged
