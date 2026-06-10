@@ -2875,7 +2875,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            if (isCopying)
+            {
+                var prompt = "Copy sizing/risk settings from " + source.AccountName + " to " + rows.Count + " row(s) in group " + groupName + " while copying is active? Active target row baselines will be reset. Leads and groups will not change.";
+                if (MessageBox.Show(prompt, "Confirm Live Settings Copy", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+            }
+
             var appliedCount = 0;
+            var liveBaselineResetCount = 0;
             foreach (var row in rows)
             {
                 row.SizingMode = source.SizingMode;
@@ -2890,6 +2898,13 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LimitAction = source.LimitAction;
                 row.InstrumentFilter = source.InstrumentFilter;
                 row.LastAction = "Copied sizing/risk from " + source.AccountName;
+                if (isCopying && row.Enabled && row.SizingMode != SizingMode.Disabled && row.Account != null)
+                {
+                    row.ResetBaseline(ReadAccountPnl(row.Account), false);
+                    row.LastAction = "Copied live sizing/risk from " + source.AccountName;
+                    liveBaselineResetCount++;
+                }
+
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
                 appliedCount++;
@@ -2897,7 +2912,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            Log("Copied sizing/risk settings from " + source.AccountName + " to " + appliedCount + " row(s) in group " + groupName + ". Leads were left unchanged.");
+            var message = "Copied sizing/risk settings from " + source.AccountName + " to " + appliedCount + " row(s) in group " + groupName;
+            if (liveBaselineResetCount > 0)
+                message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
+
+            message += ". Leads were left unchanged.";
+            SetStatus(message);
+            Log(message);
             RefreshAllRows();
         }
 
