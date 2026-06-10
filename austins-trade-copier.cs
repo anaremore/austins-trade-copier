@@ -2114,7 +2114,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var desiredPositions = BuildDesiredPositions(row);
+            int zeroSizingCount;
+            var desiredPositions = BuildDesiredPositions(row, out zeroSizingCount);
             var targetPositions = GetOpenPositionSnapshots(row.Account);
             var instrumentNames = desiredPositions.Keys
                 .Union(targetPositions.Select(p => p.InstrumentName))
@@ -2148,14 +2149,17 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (IsDryRunSelected())
             {
-                row.LastAction = submitted > 0 ? "Dry run reconcile " + submitted + " order(s)" : "Already reconciled";
+                row.LastAction = submitted > 0 ? "Dry run reconcile " + submitted + " order(s)" : zeroSizingCount > 0 ? "Reconcile sizing 0" : "Already reconciled";
                 Log(row.AccountName + " dry-run reconcile complete; orders simulated: " + submitted + ".");
             }
             else
             {
-                row.LastAction = submitted > 0 ? "Reconcile sent " + submitted + " order(s)" : "Already reconciled";
+                row.LastAction = submitted > 0 ? "Reconcile sent " + submitted + " order(s)" : zeroSizingCount > 0 ? "Reconcile sizing 0" : "Already reconciled";
                 Log(row.AccountName + " reconcile complete; orders sent: " + submitted + ".");
             }
+
+            if (zeroSizingCount > 0)
+                Log(row.AccountName + " reconcile skipped " + zeroSizingCount + " lead position(s) because sizing produced 0 contracts.");
         }
 
         private string ValidateRowForReconcile(AccountCopyRow row)
@@ -2190,8 +2194,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             return string.Empty;
         }
 
-        private Dictionary<string, PositionSnapshot> BuildDesiredPositions(AccountCopyRow row)
+        private Dictionary<string, PositionSnapshot> BuildDesiredPositions(AccountCopyRow row, out int zeroSizingCount)
         {
+            zeroSizingCount = 0;
             var desiredPositions = new Dictionary<string, PositionSnapshot>(StringComparer.OrdinalIgnoreCase);
             var rowLead = ResolveLeadAccountForRow(row);
             if (rowLead == null)
@@ -2204,7 +2209,10 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 var quantity = CalculateDesiredQuantityFromBase(row, leadPosition.Quantity);
                 if (quantity <= 0)
+                {
+                    zeroSizingCount++;
                     continue;
+                }
 
                 desiredPositions[leadPosition.InstrumentName] = new PositionSnapshot
                 {
