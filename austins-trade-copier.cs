@@ -822,7 +822,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ValidateEnabledRowAfterEdit(AccountCopyRow row)
         {
-            if (suppressEnableValidation || row == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
+            if (suppressEnableValidation || row == null || !row.Enabled)
                 return;
 
             string skipReason;
