@@ -2405,7 +2405,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (MessageBox.Show("Flatten all enabled account rows?", "Confirm Flatten Enabled", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(BuildFlattenRowsPrompt("enabled", rows), "Confirm Flatten Enabled", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
             LockRowsForManualFlatten(rows, "Manual enabled flatten");
@@ -2426,7 +2426,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (MessageBox.Show("Flatten selected account rows?", "Confirm Flatten Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(BuildFlattenRowsPrompt("selected", rows), "Confirm Flatten Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
             LockRowsForManualFlatten(rows, "Manual selected flatten");
@@ -2440,18 +2440,26 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             CommitGridEdits();
 
-            if (MessageBox.Show("Flatten every table account and every lead used by enabled rows?", "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                return;
-
             var wasCopying = isCopying;
-            mirroredTargetQuantities.Clear();
-
-            var accounts = GetConfiguredLeadAccounts()
+            var leadAccounts = GetConfiguredLeadAccounts();
+            var leadCount = leadAccounts.Count;
+            var accounts = leadAccounts
                 .Concat(accountRows.Select(r => r.Account))
                 .Where(a => a != null)
                 .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList();
+
+            if (accounts.Count == 0)
+            {
+                SetStatus("No connected table or lead accounts to flatten.");
+                return;
+            }
+
+            if (MessageBox.Show(BuildFlattenAllPrompt(accounts, leadCount, wasCopying), "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            mirroredTargetQuantities.Clear();
 
             foreach (var account in accounts)
                 FlattenAccount(account, "Manual flatten all");
@@ -2473,6 +2481,38 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             Log("Locked " + rows.Count(r => r != null) + " row(s) after flatten request. Entries are blocked; exits remain allowed.");
+        }
+
+        private string BuildFlattenRowsPrompt(string scope, IList<AccountCopyRow> rows)
+        {
+            var rowCount = rows == null ? 0 : rows.Count(r => r != null);
+            var filteredCount = rows == null ? 0 : rows.Count(HasInstrumentFilter);
+            var prompt = "Flatten " + rowCount + " " + scope + " row(s)?\n\n"
+                + "This cancels active orders and closes managed positions for those rows.";
+
+            if (filteredCount > 0)
+                prompt += "\n" + filteredCount + " row(s) will only flatten matching Symbols filters.";
+            else
+                prompt += "\nNo row symbol filters are set.";
+
+            prompt += "\nRows will be manual-locked afterward so new entries stay blocked.";
+            if (isCopying)
+                prompt += "\nCopying remains active.";
+
+            return prompt;
+        }
+
+        private string BuildFlattenAllPrompt(IList<Account> accounts, int leadCount, bool copyingActive)
+        {
+            var accountCount = accounts == null ? 0 : accounts.Count(a => a != null);
+            var prompt = "Flatten all " + accountCount + " account(s), including " + leadCount + " active lead account(s)?\n\n"
+                + "This cancels active orders and closes open positions across each account.\n"
+                + "Row symbol filters are not applied to Flatten All.";
+
+            if (copyingActive)
+                prompt += "\nCopying remains active after the request.";
+
+            return prompt;
         }
 
         private void ReconcileSelectedButton_Click(object sender, RoutedEventArgs e)
