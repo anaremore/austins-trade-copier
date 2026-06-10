@@ -139,7 +139,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private ComboBox profileComboBox;
         private TextBox profileNameTextBox;
-        private ComboBox groupComboBox;
         private DataGrid accountsGrid;
         private Button startPauseButton;
         private CheckBox dryRunCheckBox;
@@ -208,7 +207,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             profilePanel.Children.Add(profileNameTextBox);
 
-            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, leads, groups, sizing, and risk settings.");
+            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, leads, sizing, and risk settings.");
             saveProfileButton.Click += SaveProfileButton_Click;
             profilePanel.Children.Add(saveProfileButton);
 
@@ -261,30 +260,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
 
-            var groupRow = CreateToolbarRow();
-            groupRow.Children.Add(CreateToolbarLabel("Group"));
-            groupComboBox = new ComboBox
-            {
-                Width = 140,
-                Height = 28,
-                Margin = new Thickness(0, 0, 8, 0),
-                Padding = new Thickness(4)
-            };
-            groupRow.Children.Add(groupComboBox);
-
-            var enableGroupButton = CreateButton("Enable Group", Brushes.DimGray, "Enable all valid rows in the selected group. Invalid rows are skipped with reasons.");
-            enableGroupButton.Click += EnableGroupButton_Click;
-            groupRow.Children.Add(enableGroupButton);
-
-            var pauseGroupButton = CreateButton("Pause Group", Brushes.DimGray, "Manual-lock all enabled rows in the selected group. Exits remain allowed.");
-            pauseGroupButton.Click += PauseGroupButton_Click;
-            groupRow.Children.Add(pauseGroupButton);
-
-            var flattenGroupButton = CreateButton("Flatten Group", Brushes.Firebrick, "Flatten enabled rows in the selected group and manual-lock entries afterward.");
-            flattenGroupButton.Click += FlattenGroupButton_Click;
-            groupRow.Children.Add(flattenGroupButton);
-            actionPanel.Children.Add(groupRow);
-
             var selectionRow = CreateToolbarRow();
             selectionRow.Children.Add(CreateToolbarLabel("Selection"));
             var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
@@ -307,7 +282,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            var copyGroupSettingsButton = CreateButton("Copy Sizing/Risk To Group", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to its group. Lead and group are not changed.");
+            var copyGroupSettingsButton = CreateButton("Copy Sizing/Risk To Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to other rows with the same lead.");
             copyGroupSettingsButton.Click += CopyGroupSettingsButton_Click;
             selectionRow.Children.Add(copyGroupSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -323,7 +298,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
-                FrozenColumnCount = 5,
+                FrozenColumnCount = 4,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
@@ -356,7 +331,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 8),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Text = "Ready. Enable accounts, choose each row's lead/group/sizing/risk, then start copying."
+                Text = "Ready. Enable accounts, choose each row's lead, sizing, and risk, then start copying."
             };
             Grid.SetRow(statusTextBlock, 3);
             root.Children.Add(statusTextBlock);
@@ -556,7 +531,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SelectedItemBinding = new Binding("LeadAccountName") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
                 Width = new DataGridLength(112)
             });
-            grid.Columns.Add(CreateTextColumn("Group", "GroupName", 80, null, false, "Free-form group name used by group actions."));
             grid.Columns.Add(new DataGridComboBoxColumn
             {
                 Header = CreateColumnHeader("Copy", "All copies entries and exits. Exits only blocks new entries while allowing exits."),
@@ -2755,46 +2729,52 @@ namespace NinjaTrader.NinjaScript.AddOns
             var selectedRows = GetSelectedRows();
             if (selectedRows.Count == 0)
             {
-                SetStatus("Select one source row before copying sizing and risk settings to a group.");
+                SetStatus("Select one source row before copying sizing and risk settings to matching lead rows.");
                 return;
             }
 
             if (selectedRows.Count > 1)
             {
-                SetStatus("Select exactly one source row before copying sizing and risk settings to a group.");
+                SetStatus("Select exactly one source row before copying sizing and risk settings to matching lead rows.");
                 return;
             }
 
             var source = selectedRows[0];
             if (source.SizingMode == SizingMode.Disabled)
             {
-                SetStatus("Choose a source row with active sizing before copying sizing/risk to a group.");
+                SetStatus("Choose a source row with active sizing before copying sizing/risk to matching lead rows.");
                 return;
             }
 
             if (source.SizingMode == SizingMode.Multiplier && source.Multiplier <= 0)
             {
-                SetStatus("Set the selected row's multiplier above 0 before copying it to the group.");
+                SetStatus("Set the selected row's multiplier above 0 before copying it to matching lead rows.");
                 return;
             }
 
             if (source.SizingMode == SizingMode.Fixed && source.FixedQuantity <= 0)
             {
-                SetStatus("Set the selected row's fixed quantity above 0 before copying it to the group.");
+                SetStatus("Set the selected row's fixed quantity above 0 before copying it to matching lead rows.");
                 return;
             }
 
-            var groupName = NormalizeGroupName(source.GroupName);
-            var rows = accountRows.Where(r => r != source && GroupEquals(r.GroupName, groupName)).ToList();
+            var leadName = source.LeadAccountName;
+            if (string.IsNullOrWhiteSpace(leadName))
+            {
+                SetStatus("Select a copy row with a lead before copying sizing/risk to matching rows.");
+                return;
+            }
+
+            var rows = accountRows.Where(r => r != source && AccountNamesEqual(r.LeadAccountName, leadName)).ToList();
             if (rows.Count == 0)
             {
-                SetStatus("No other rows are in group " + groupName + ".");
+                SetStatus("No other rows use lead " + leadName + ".");
                 return;
             }
 
             if (isCopying)
             {
-                var prompt = "Copy sizing/risk settings from " + source.AccountName + " to " + rows.Count + " row(s) in group " + groupName + " while copying is active? Active target row baselines will be reset. Leads and groups will not change.";
+                var prompt = "Copy sizing/risk settings from " + source.AccountName + " to " + rows.Count + " row(s) using lead " + leadName + " while copying is active? Active target row baselines will be reset. Leads will not change.";
                 if (MessageBox.Show(prompt, "Confirm Live Settings Copy", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
@@ -2837,7 +2817,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            var message = "Copied sizing/risk settings from " + source.AccountName + " to " + appliedCount + " row(s) in group " + groupName;
+            var message = "Copied sizing/risk settings from " + source.AccountName + " to " + appliedCount + " row(s) using lead " + leadName;
             if (liveBaselineResetCount > 0)
                 message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
 
@@ -3253,7 +3233,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string GetSelectedGroupName()
         {
-            return groupComboBox.SelectedItem as string;
+            return DefaultGroupName;
         }
 
         private bool GroupEquals(string left, string right)
@@ -3263,25 +3243,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RefreshGroupList()
         {
-            var groups = accountRows
-                .Select(r => NormalizeGroupName(r.GroupName))
-                .Concat(new[] { DefaultGroupName })
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(g => g)
-                .ToList();
-
-            var signature = string.Join("|", groups);
-            if (signature == lastGroupListSignature)
-                return;
-
-            var selected = GetSelectedGroupName();
-            groupComboBox.ItemsSource = groups;
-            if (!string.IsNullOrEmpty(selected) && groups.Any(g => GroupEquals(g, selected)))
-                groupComboBox.SelectedItem = groups.First(g => GroupEquals(g, selected));
-            else if (groups.Count > 0)
-                groupComboBox.SelectedIndex = 0;
-
-            lastGroupListSignature = signature;
+            lastGroupListSignature = string.Empty;
         }
 
         private string BuildSummaryStatus()
