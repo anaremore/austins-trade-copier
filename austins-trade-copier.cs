@@ -2716,6 +2716,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var source = selectedRows[0];
+            if (source.SizingMode == SizingMode.Disabled)
+            {
+                SetStatus("Choose a source row with active sizing before copying sizing/risk to a group.");
+                return;
+            }
+
             if (source.SizingMode == SizingMode.Multiplier && source.Multiplier <= 0)
             {
                 SetStatus("Set the selected row's multiplier above 0 before copying it to the group.");
