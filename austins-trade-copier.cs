@@ -1270,6 +1270,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetAttribute(rowElement, "account", row.AccountName);
                 SetAttribute(rowElement, "leadAccount", row.LeadAccountName);
                 SetAttribute(rowElement, "enabled", row.Enabled);
+                SetAttribute(rowElement, "manualLocked", row.ManualLock);
                 SetAttribute(rowElement, "autoLocked", row.AutoLocked);
                 SetAttribute(rowElement, "copyMode", row.CopyMode.ToString());
                 SetAttribute(rowElement, "sizingMode", row.SizingMode.ToString());
@@ -1341,6 +1342,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 var rowLeadName = GetOptionalStringAttribute(element, "leadAccount", leadAccountName);
                 var rowEnabled = GetBoolAttribute(element, "enabled", true);
+                var rowWasManualLocked = GetBoolAttribute(element, "manualLocked", false);
                 var rowWasAutoLocked = GetBoolAttribute(element, "autoLocked", false);
                 Account rowLead = null;
 
@@ -1383,8 +1385,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.ProfitTarget = GetDoubleAttribute(element, "profitTarget", 0);
                 row.LimitAction = GetEnumAttribute(element, "limitAction", RiskAction.SoftLock);
                 row.InstrumentFilter = GetStringAttribute(element, "instrumentFilter", string.Empty);
+                row.ManualLock = rowEnabled && rowWasManualLocked;
                 NormalizeLegacySizingMode(row);
-                row.LastAction = row.Enabled ? "Loaded profile" : "Loaded disabled";
+                row.LastAction = row.Enabled ? row.ManualLock ? "Loaded manual lock" : "Loaded profile" : "Loaded disabled";
 
                 accountRows.Add(row);
                 seenAccounts.Add(accountName);
