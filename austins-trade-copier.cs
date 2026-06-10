@@ -2526,13 +2526,39 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (MessageBox.Show("Reconcile selected account rows to each row's lead using its sizing rules?", "Confirm Reconcile Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(BuildReconcileRowsPrompt(rows), "Confirm Reconcile Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
             foreach (var row in rows)
                 ReconcileAccountToLead(row);
 
+            SetStatus("Reconcile requested for " + rows.Count + " selected row(s).");
             RefreshAllRows();
+        }
+
+        private string BuildReconcileRowsPrompt(IList<AccountCopyRow> rows)
+        {
+            var rowCount = rows == null ? 0 : rows.Count(r => r != null);
+            var filteredCount = rows == null ? 0 : rows.Count(HasInstrumentFilter);
+            var lockedCount = rows == null ? 0 : rows.Count(r => r != null && RowIsReduceOnly(r));
+            var cappedCount = rows == null ? 0 : rows.Count(r => r != null && r.MaxNetPosition > 0);
+
+            var prompt = "Reconcile " + rowCount + " selected row(s) to their lead positions?\n\n"
+                + "This may submit market orders using each row's lead, sizing, copy mode, and max position settings.";
+
+            if (filteredCount > 0)
+                prompt += "\n" + filteredCount + " row(s) will only reconcile matching Symbols filters.";
+
+            if (lockedCount > 0)
+                prompt += "\n" + lockedCount + " locked or exits-only row(s) will only reduce current exposure.";
+
+            if (cappedCount > 0)
+                prompt += "\n" + cappedCount + " row(s) have Max Pos caps.";
+
+            if (IsDryRunSelected())
+                prompt += "\nDry Run is on, so reconcile orders will be simulated.";
+
+            return prompt;
         }
 
         private void ReconcileAccountToLead(AccountCopyRow row)
