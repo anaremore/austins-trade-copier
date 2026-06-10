@@ -1081,6 +1081,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             });
         }
 
+        private void CommitGridEdits()
+        {
+            if (accountsGrid == null)
+                return;
+
+            accountsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+            accountsGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        }
+
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var profileName = profileComboBox.SelectedItem as string;
@@ -1090,6 +1099,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void SaveProfileButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var profileName = NormalizeProfileName(profileNameTextBox.Text);
             if (string.IsNullOrEmpty(profileName))
             {
@@ -1485,6 +1496,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void StartPauseButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             if (!isCopying)
                 StartCopyingTrades();
             else
@@ -2084,6 +2097,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ReconcileSelectedButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
@@ -2415,6 +2430,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void EnableSelectedButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
             if (rows.Count == 0)
             {
@@ -2692,6 +2709,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void CopyLeadSettingsButton_Click(object sender, RoutedEventArgs e)
         {
+            CommitGridEdits();
+
             var selectedRows = GetSelectedRows();
             if (selectedRows.Count == 0)
             {
