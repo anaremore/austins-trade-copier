@@ -131,6 +131,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool isCopying;
         private bool dryRunMode;
         private bool suppressEnableValidation;
+        private bool suppressLiveSettingsPause;
         private bool rowRefreshPending;
         private string lastGroupListSignature = string.Empty;
         private string heldStatusMessage = string.Empty;
@@ -1000,7 +1001,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void PauseLiveRowAfterSettingsEdit(AccountCopyRow row)
         {
-            if (suppressEnableValidation || !isCopying || row == null || !row.Enabled || row.Account == null)
+            if (suppressEnableValidation || suppressLiveSettingsPause || !isCopying || row == null || !row.Enabled || row.Account == null)
                 return;
 
             var wasManualLocked = row.ManualLock;
@@ -2744,30 +2745,38 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var appliedCount = 0;
             var liveBaselineResetCount = 0;
-            foreach (var row in rows)
+            suppressLiveSettingsPause = true;
+            try
             {
-                row.SizingMode = source.SizingMode;
-                row.CopyMode = source.CopyMode;
-                row.Multiplier = source.Multiplier;
-                row.FixedQuantity = source.FixedQuantity;
-                row.MaxQuantity = source.MaxQuantity;
-                row.MaxNetPosition = source.MaxNetPosition;
-                row.DailyLossLimit = source.DailyLossLimit;
-                row.MaxDrawdown = source.MaxDrawdown;
-                row.ProfitTarget = source.ProfitTarget;
-                row.LimitAction = source.LimitAction;
-                row.InstrumentFilter = source.InstrumentFilter;
-                row.LastAction = "Copied sizing/risk from " + source.AccountName;
-                if (isCopying && row.Enabled && row.SizingMode != SizingMode.Disabled && row.Account != null)
+                foreach (var row in rows)
                 {
-                    row.ResetBaseline(ReadAccountPnl(row.Account), false);
-                    row.LastAction = "Copied live sizing/risk from " + source.AccountName;
-                    liveBaselineResetCount++;
-                }
+                    row.SizingMode = source.SizingMode;
+                    row.CopyMode = source.CopyMode;
+                    row.Multiplier = source.Multiplier;
+                    row.FixedQuantity = source.FixedQuantity;
+                    row.MaxQuantity = source.MaxQuantity;
+                    row.MaxNetPosition = source.MaxNetPosition;
+                    row.DailyLossLimit = source.DailyLossLimit;
+                    row.MaxDrawdown = source.MaxDrawdown;
+                    row.ProfitTarget = source.ProfitTarget;
+                    row.LimitAction = source.LimitAction;
+                    row.InstrumentFilter = source.InstrumentFilter;
+                    row.LastAction = "Copied sizing/risk from " + source.AccountName;
+                    if (isCopying && row.Enabled && row.SizingMode != SizingMode.Disabled && row.Account != null)
+                    {
+                        row.ResetBaseline(ReadAccountPnl(row.Account), false);
+                        row.LastAction = "Copied live sizing/risk from " + source.AccountName;
+                        liveBaselineResetCount++;
+                    }
 
-                ClearLockedVirtualPositions(row);
-                ClearMaxNetVirtualPositions(row);
-                appliedCount++;
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                    appliedCount++;
+                }
+            }
+            finally
+            {
+                suppressLiveSettingsPause = false;
             }
 
             mirroredTargetQuantities.Clear();
