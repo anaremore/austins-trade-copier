@@ -539,6 +539,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available, Lead, Copy row, or Conflict based on the enabled rows."));
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Account whose filled orders this row mirrors."));
+            grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."));
 
@@ -4037,6 +4038,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 set { SetField(ref selectionMarker, value ?? string.Empty, "SelectionMarker"); }
             }
 
+            public string PlanSummary
+            {
+                get { return BuildPlanSummary(); }
+            }
+
             public string PositionSummary
             {
                 get { return positionSummary; }
@@ -4197,7 +4203,102 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 field = value;
                 OnPropertyChanged(propertyName);
+                NotifyDerivedProperties(propertyName);
                 return true;
+            }
+
+            private string BuildPlanSummary()
+            {
+                var parts = new List<string>
+                {
+                    string.IsNullOrWhiteSpace(LeadAccountName) ? "No lead" : "Lead " + LeadAccountName,
+                    BuildSizingSummary(),
+                    BuildRiskSummary()
+                };
+
+                if (CopyMode == TradeCopyMode.ExitsOnly)
+                    parts.Add("exits only");
+
+                if (ManualLock)
+                    parts.Add("manual lock");
+
+                if (AutoLocked)
+                    parts.Add("risk locked");
+
+                return string.Join(" | ", parts);
+            }
+
+            private string BuildSizingSummary()
+            {
+                string sizing;
+                switch (SizingMode)
+                {
+                    case SizingMode.Multiplier:
+                        sizing = "x" + Multiplier.ToString("0.##", CultureInfo.InvariantCulture);
+                        break;
+                    case SizingMode.Fixed:
+                        sizing = "fixed " + FixedQuantity.ToString(CultureInfo.InvariantCulture);
+                        break;
+                    case SizingMode.BalanceRatio:
+                        sizing = "balance ratio";
+                        break;
+                    case SizingMode.Disabled:
+                        sizing = "off";
+                        break;
+                    default:
+                        sizing = "1:1";
+                        break;
+                }
+
+                var caps = new List<string>();
+                if (MaxQuantity > 0)
+                    caps.Add("order max " + MaxQuantity.ToString(CultureInfo.InvariantCulture));
+
+                if (MaxNetPosition > 0)
+                    caps.Add("pos max " + MaxNetPosition.ToString(CultureInfo.InvariantCulture));
+
+                return caps.Count == 0 ? sizing : sizing + " (" + string.Join(", ", caps) + ")";
+            }
+
+            private string BuildRiskSummary()
+            {
+                var limits = new List<string>();
+                if (DailyLossLimit > 0)
+                    limits.Add("loss " + DailyLossLimit.ToString("0", CultureInfo.InvariantCulture));
+
+                if (MaxDrawdown > 0)
+                    limits.Add("DD " + MaxDrawdown.ToString("0", CultureInfo.InvariantCulture));
+
+                if (ProfitTarget > 0)
+                    limits.Add("target " + ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
+
+                if (limits.Count == 0)
+                    return "no limits";
+
+                var action = LimitAction == RiskAction.HardFlatten ? "auto close" : "soft lock";
+                return action + " " + string.Join(", ", limits);
+            }
+
+            private void NotifyDerivedProperties(string propertyName)
+            {
+                switch (propertyName)
+                {
+                    case "LeadAccountName":
+                    case "CopyMode":
+                    case "SizingMode":
+                    case "Multiplier":
+                    case "FixedQuantity":
+                    case "MaxQuantity":
+                    case "MaxNetPosition":
+                    case "DailyLossLimit":
+                    case "MaxDrawdown":
+                    case "ProfitTarget":
+                    case "LimitAction":
+                    case "ManualLock":
+                    case "AutoLocked":
+                        OnPropertyChanged("PlanSummary");
+                        break;
+                }
             }
 
             private void OnPropertyChanged(string propertyName)
