@@ -260,7 +260,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             actionPanel.Children.Add(sessionRiskRow);
 
             var selectionRow = CreateToolbarRow();
-            selectionRow.Children.Add(CreateToolbarLabel("Selection"));
+            selectionRow.Children.Add(CreateToolbarLabel("Selected Rows"));
             var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
@@ -297,7 +297,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
-                FrozenColumnCount = 4,
+                FrozenColumnCount = 5,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
@@ -514,11 +514,24 @@ namespace NinjaTrader.NinjaScript.AddOns
             style.Setters.Add(new Setter(DataGridCell.ForegroundProperty, Brushes.White));
             style.Setters.Add(new Setter(DataGridCell.BorderThicknessProperty, new Thickness(0)));
             style.Setters.Add(new Setter(DataGridCell.PaddingProperty, new Thickness(6, 0, 6, 0)));
+
+            var selectedTrigger = new Trigger
+            {
+                Property = DataGridCell.IsSelectedProperty,
+                Value = true
+            };
+            selectedTrigger.Setters.Add(new Setter(DataGridCell.BackgroundProperty, BrushRgb(64, 88, 118)));
+            selectedTrigger.Setters.Add(new Setter(DataGridCell.ForegroundProperty, Brushes.White));
+            selectedTrigger.Setters.Add(new Setter(DataGridCell.BorderBrushProperty, BrushRgb(111, 165, 226)));
+            selectedTrigger.Setters.Add(new Setter(DataGridCell.BorderThicknessProperty, new Thickness(0, 1, 0, 1)));
+            style.Triggers.Add(selectedTrigger);
+
             return style;
         }
 
         private void AddGridColumns(DataGrid grid)
         {
+            grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 34, null, true, "Rows marked > are selected for the Selected Rows buttons."));
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Enable this account row. Disabled rows stay visible but do not receive copied orders."));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
@@ -769,6 +782,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             AddRowTrigger(style, "Error", Color.FromRgb(92, 38, 42));
             AddRowTrigger(style, "Disabled", Color.FromRgb(54, 54, 58));
             AddRowTrigger(style, "Desynced", Color.FromRgb(92, 38, 42));
+            AddSelectedRowTrigger(style);
 
             return style;
         }
@@ -781,6 +795,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Value = level
             };
             trigger.Setters.Add(new Setter(DataGridRow.BackgroundProperty, new SolidColorBrush(color)));
+            style.Triggers.Add(trigger);
+        }
+
+        private void AddSelectedRowTrigger(Style style)
+        {
+            var trigger = new Trigger
+            {
+                Property = DataGridRow.IsSelectedProperty,
+                Value = true
+            };
+            trigger.Setters.Add(new Setter(DataGridRow.BackgroundProperty, BrushRgb(64, 88, 118)));
+            trigger.Setters.Add(new Setter(DataGridRow.ForegroundProperty, Brushes.White));
+            trigger.Setters.Add(new Setter(DataGridRow.BorderBrushProperty, BrushRgb(111, 165, 226)));
+            trigger.Setters.Add(new Setter(DataGridRow.BorderThicknessProperty, new Thickness(0, 1, 0, 1)));
             style.Triggers.Add(trigger);
         }
 
@@ -1159,7 +1187,18 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            UpdateSelectionMarkers();
             RefreshStatusSummary();
+        }
+
+        private void UpdateSelectionMarkers()
+        {
+            if (accountsGrid == null)
+                return;
+
+            var selectedRows = new HashSet<AccountCopyRow>(accountsGrid.SelectedItems.OfType<AccountCopyRow>());
+            foreach (var row in accountRows)
+                row.SelectionMarker = selectedRows.Contains(row) ? ">" : string.Empty;
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
@@ -3518,6 +3557,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string status = "Ready";
             private string statusLevel = "Ready";
             private string roleSummary = "Available";
+            private string selectionMarker = string.Empty;
             private string positionSummary = "Flat";
             private string instrumentFilter = string.Empty;
             private double sessionPnl;
@@ -3599,6 +3639,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return roleSummary; }
                 set { SetField(ref roleSummary, value, "RoleSummary"); }
+            }
+
+            public string SelectionMarker
+            {
+                get { return selectionMarker; }
+                set { SetField(ref selectionMarker, value ?? string.Empty, "SelectionMarker"); }
             }
 
             public string PositionSummary
