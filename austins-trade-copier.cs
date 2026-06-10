@@ -2830,7 +2830,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (!row.Enabled || row.SizingMode == SizingMode.Disabled)
             {
-                row.SetStatus("Disabled", "Disabled");
+                row.SetStatus("Disabled", GetDisabledRowStatusText(row));
                 return;
             }
 
@@ -2872,6 +2872,33 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             row.SetStatus(isCopying ? "Active" : "Ready", isCopying ? "Copying" : "Ready");
+        }
+
+        private string GetDisabledRowStatusText(AccountCopyRow row)
+        {
+            if (row.SizingMode == SizingMode.Disabled)
+                return "Sizing off";
+
+            if (IsConfiguredLeadAccount(row.AccountName))
+                return "Lead account";
+
+            if (string.IsNullOrWhiteSpace(row.LeadAccountName))
+                return "Needs lead";
+
+            var rowLead = ResolveLeadAccountForRow(row);
+            if (rowLead == null)
+                return "Lead missing";
+
+            if (AccountNamesEqual(row.AccountName, rowLead.Name))
+                return "Self-copy";
+
+            if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+                return "Bad multiplier";
+
+            if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+                return "Bad fixed qty";
+
+            return "Ready disabled";
         }
 
         private void UpdateRowRole(AccountCopyRow row)
