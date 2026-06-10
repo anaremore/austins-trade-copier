@@ -123,7 +123,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private readonly List<EnumOption> limitActionOptions = new List<EnumOption>
         {
             new EnumOption(RiskAction.SoftLock, "Soft lock"),
-            new EnumOption(RiskAction.HardFlatten, "Flatten")
+            new EnumOption(RiskAction.HardFlatten, "Auto close")
         };
         private readonly DispatcherTimer telemetryTimer;
 
@@ -555,7 +555,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
             grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 72, null, TextAlignment.Right, true, false, "Caps the row's net position size. 0 disables the cap."));
 
-            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 100, "Soft lock blocks entries and allows exits. Flatten also flattens the row account."));
+            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 100, "Soft lock blocks entries and allows exits. Auto close also flattens the row account immediately."));
 
             grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
@@ -1824,6 +1824,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                     continue;
                 }
 
+                RefreshRowMetrics(row);
+                var riskLockedBeforeCopy = TryTriggerRiskLock(row);
+                if (riskLockedBeforeCopy && row.LimitAction == RiskAction.HardFlatten)
+                    continue;
+
+                if (row.AutoLocked && row.LimitAction == RiskAction.HardFlatten)
+                {
+                    row.LastAction = "Auto close active";
+                    continue;
+                }
+
                 var targetKey = GetTargetMirrorKey(sourceOrder, row);
                 var alreadyMirrored = mirroredTargetQuantities.ContainsKey(targetKey) ? mirroredTargetQuantities[targetKey] : 0;
                 var desiredQuantity = CalculateDesiredTargetQuantity(row, sourceOrder);
@@ -1851,8 +1862,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (quantityToSubmit <= 0)
                 {
                     mirroredTargetQuantities[targetKey] = desiredQuantity;
-                    row.LastAction = "Blocked entry";
-                    Log(row.AccountName + " blocked copied entry while in reduce-only mode.");
+                    var reduceOnlyReason = GetReduceOnlyReason(row);
+                    row.LastAction = "Blocked entry - " + reduceOnlyReason;
+                    Log(row.AccountName + " blocked copied entry because " + reduceOnlyReason + ". Entries are blocked; exits remain allowed.");
                     continue;
                 }
 
@@ -2084,6 +2096,23 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool RowIsReduceOnly(AccountCopyRow row)
         {
             return row.IsEntryLocked || row.CopyMode == TradeCopyMode.ExitsOnly;
+        }
+
+        private string GetReduceOnlyReason(AccountCopyRow row)
+        {
+            if (row == null)
+                return "reduce-only mode";
+
+            if (row.AutoLocked)
+                return string.IsNullOrEmpty(row.LockReason) ? "risk limit is locked" : row.LockReason + " is locked";
+
+            if (row.ManualLock)
+                return "manual lock is on";
+
+            if (row.CopyMode == TradeCopyMode.ExitsOnly)
+                return "copy mode is exits only";
+
+            return "reduce-only mode";
         }
 
         private int CapQuantityToMaxNetPosition(AccountCopyRow row, Instrument instrument, OrderAction action, int requestedQuantity)
@@ -3044,23 +3073,34 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void EvaluateRisk(AccountCopyRow row)
         {
-            if (!isCopying || row.AutoLocked || row.Account == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
-                return;
+            TryTriggerRiskLock(row);
+        }
 
+        private bool TryTriggerRiskLock(AccountCopyRow row)
+        {
+            if (!isCopying || row.AutoLocked || row.Account == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
+                return false;
+
+            var reason = GetRiskLimitReason(row);
+            if (string.IsNullOrEmpty(reason))
+                return false;
+
+            TriggerRiskLock(row, reason);
+            return true;
+        }
+
+        private string GetRiskLimitReason(AccountCopyRow row)
+        {
             if (row.DailyLossLimit > 0 && row.SessionPnl <= -Math.Abs(row.DailyLossLimit))
-            {
-                TriggerRiskLock(row, "Daily loss limit");
-                return;
-            }
+                return "Daily loss limit";
 
             if (row.MaxDrawdown > 0 && row.Drawdown >= Math.Abs(row.MaxDrawdown))
-            {
-                TriggerRiskLock(row, "Drawdown limit");
-                return;
-            }
+                return "Drawdown limit";
 
             if (row.ProfitTarget > 0 && row.SessionPnl >= Math.Abs(row.ProfitTarget))
-                TriggerRiskLock(row, "Profit target");
+                return "Profit target";
+
+            return string.Empty;
         }
 
         private void TriggerRiskLock(AccountCopyRow row, string reason)
@@ -3073,13 +3113,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 if (dryRunMode)
                 {
-                    row.LastAction = reason + " - dry run hard flatten";
-                    Log("DRY RUN " + row.AccountName + " would hard flatten by " + reason + ".");
+                    row.LastAction = reason + " - dry run auto close";
+                    Log("DRY RUN " + row.AccountName + " would auto-close by " + reason + ".");
                     return;
                 }
 
-                row.LastAction = reason + " - hard flatten";
-                Log(row.AccountName + " hard locked by " + reason + "; flatten requested.");
+                row.LastAction = reason + " - auto close";
+                Log(row.AccountName + " auto-closed by " + reason + "; entries blocked.");
                 FlattenAccount(row.Account, reason);
             }
             else
