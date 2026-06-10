@@ -125,9 +125,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private Button startPauseButton;
         private CheckBox dryRunCheckBox;
         private TextBlock statusTextBlock;
-        private TextBlock selectedRowNameTextBlock;
         private TextBox eventLogTextBox;
-        private readonly List<Control> selectedRowEditorControls = new List<Control>();
 
         public TradeCopierWindow()
         {
@@ -157,7 +155,6 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void CreateUI()
         {
             var root = new Grid { Margin = new Thickness(12) };
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -332,11 +329,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             AddGridColumns(accountsGrid);
             accountsGrid.SelectionChanged += AccountsGrid_SelectionChanged;
 
-            var selectedRowSection = CreateSection("Selected Row", CreateSelectedRowEditorPanel());
-            Grid.SetRow(selectedRowSection, 2);
-            root.Children.Add(selectedRowSection);
-
-            Grid.SetRow(accountsGrid, 3);
+            Grid.SetRow(accountsGrid, 2);
             root.Children.Add(accountsGrid);
 
             statusTextBlock = new TextBlock
@@ -347,7 +340,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Text = "Ready. Enable accounts, choose each row's lead/group/sizing/risk, then start copying."
             };
-            Grid.SetRow(statusTextBlock, 4);
+            Grid.SetRow(statusTextBlock, 3);
             root.Children.Add(statusTextBlock);
 
             var logPanel = new Grid();
@@ -417,11 +410,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Margin = new Thickness(0),
                 Child = logPanel
             };
-            Grid.SetRow(logSection, 5);
+            Grid.SetRow(logSection, 4);
             root.Children.Add(logSection);
 
             Content = root;
-            UpdateSelectedRowEditor();
         }
 
         private Brush BrushRgb(byte red, byte green, byte blue)
@@ -466,183 +458,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 0, 2)
-            };
-        }
-
-        private WrapPanel CreateSelectedRowEditorPanel()
-        {
-            var panel = new WrapPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0)
-            };
-
-            var identityPanel = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Width = 170,
-                Margin = new Thickness(0, 0, 12, 6)
-            };
-            identityPanel.Children.Add(new TextBlock
-            {
-                Text = "ACCOUNT",
-                Foreground = BrushRgb(177, 184, 194),
-                FontSize = 10,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 3)
-            });
-            selectedRowNameTextBlock = new TextBlock
-            {
-                Text = "Select one row",
-                Foreground = BrushRgb(236, 238, 241),
-                FontWeight = FontWeights.Bold,
-                TextTrimming = TextTrimming.CharacterEllipsis
-            };
-            identityPanel.Children.Add(selectedRowNameTextBlock);
-            panel.Children.Add(identityPanel);
-
-            panel.Children.Add(CreateEditorCheckField("On", "Enabled", "Enabled", 72, "Enable this account row. Disabled rows stay visible but do not receive copied orders."));
-            panel.Children.Add(CreateEditorReadOnlyField("Role", "RoleSummary", 80, "Available, Lead, Copy row, or Conflict based on enabled rows."));
-            panel.Children.Add(CreateEditorReadOnlyField("Status", "Status", 140, "Current copier state for this row."));
-            panel.Children.Add(CreateEditorComboField("Lead", connectedAccountNames, "LeadAccountName", 130, "Account whose filled orders this row mirrors."));
-            panel.Children.Add(CreateEditorTextField("Group", "GroupName", 90, "Free-form group name used by group actions."));
-            panel.Children.Add(CreateEditorComboField("Copy", Enum.GetValues(typeof(TradeCopyMode)), "CopyMode", 90, "All copies entries and exits. ExitsOnly blocks new entries while allowing exits."));
-            panel.Children.Add(CreateEditorComboField("Sizing", Enum.GetValues(typeof(SizingMode)), "SizingMode", 105, "OneToOne uses lead quantity. Multiplier scales it. Fixed uses Fixed Qty. BalanceRatio scales by account value."));
-            panel.Children.Add(CreateEditorTextField("Multiplier", "Multiplier", 70, "Used only when Sizing is Multiplier. 2 copies twice the lead quantity."));
-            panel.Children.Add(CreateEditorTextField("Fixed Qty", "FixedQuantity", 64, "Used only when Sizing is Fixed."));
-            panel.Children.Add(CreateEditorTextField("Max Qty", "MaxQuantity", 64, "Caps each copied order. 0 disables the cap."));
-            panel.Children.Add(CreateEditorTextField("Max Net", "MaxNetPosition", 64, "Caps the row's net position size. 0 disables the cap."));
-            panel.Children.Add(CreateEditorTextField("Loss Limit", "DailyLossLimit", 78, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
-            panel.Children.Add(CreateEditorTextField("Max DD", "MaxDrawdown", 70, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            panel.Children.Add(CreateEditorTextField("Profit Target", "ProfitTarget", 88, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
-            panel.Children.Add(CreateEditorComboField("Limit Action", Enum.GetValues(typeof(RiskAction)), "LimitAction", 105, "SoftLock blocks entries and allows exits. HardFlatten also flattens the row account."));
-            panel.Children.Add(CreateEditorTextField("Symbols", "InstrumentFilter", 116, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
-            panel.Children.Add(CreateEditorCheckField("Manual Lock", "ManualLock", "Locked", 86, "Blocks entries for this row while still allowing exits."));
-
-            return panel;
-        }
-
-        private FrameworkElement CreateEditorTextField(string label, string propertyName, double width, string tooltip)
-        {
-            var textBox = new TextBox
-            {
-                Width = width,
-                Height = 26,
-                Margin = new Thickness(0),
-                Padding = new Thickness(4),
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Background = BrushRgb(67, 68, 75),
-                Foreground = Brushes.White,
-                BorderBrush = BrushRgb(92, 96, 104),
-                ToolTip = tooltip
-            };
-            textBox.SetBinding(TextBox.TextProperty, CreateSelectedRowBinding(propertyName, UpdateSourceTrigger.LostFocus));
-            selectedRowEditorControls.Add(textBox);
-            return CreateEditorField(label, textBox, width, tooltip);
-        }
-
-        private FrameworkElement CreateEditorComboField(string label, System.Collections.IEnumerable itemsSource, string propertyName, double width, string tooltip)
-        {
-            var comboBox = new ComboBox
-            {
-                ItemsSource = itemsSource,
-                Width = width,
-                Height = 26,
-                Margin = new Thickness(0),
-                Padding = new Thickness(4),
-                Background = BrushRgb(67, 68, 75),
-                Foreground = Brushes.White,
-                BorderBrush = BrushRgb(92, 96, 104),
-                ToolTip = tooltip
-            };
-            comboBox.SetBinding(ComboBox.SelectedItemProperty, CreateSelectedRowBinding(propertyName, UpdateSourceTrigger.PropertyChanged));
-            selectedRowEditorControls.Add(comboBox);
-            return CreateEditorField(label, comboBox, width, tooltip);
-        }
-
-        private FrameworkElement CreateEditorCheckField(string label, string propertyName, string content, double width, string tooltip)
-        {
-            var checkBox = new CheckBox
-            {
-                Content = content,
-                Foreground = Brushes.White,
-                Height = 26,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                ToolTip = tooltip
-            };
-            checkBox.SetBinding(CheckBox.IsCheckedProperty, CreateSelectedRowBinding(propertyName, UpdateSourceTrigger.PropertyChanged));
-            selectedRowEditorControls.Add(checkBox);
-            return CreateEditorField(label, checkBox, width, tooltip);
-        }
-
-        private FrameworkElement CreateEditorReadOnlyField(string label, string propertyName, double width, string tooltip)
-        {
-            var textBlock = new TextBlock
-            {
-                Height = 26,
-                Padding = new Thickness(5, 4, 5, 0),
-                Background = BrushRgb(45, 46, 51),
-                Foreground = BrushRgb(236, 238, 241),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = tooltip
-            };
-            var binding = new Binding("SelectedItem." + propertyName)
-            {
-                Source = accountsGrid,
-                Mode = BindingMode.OneWay,
-                TargetNullValue = "-"
-            };
-            textBlock.SetBinding(TextBlock.TextProperty, binding);
-
-            var fieldPanel = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Width = width,
-                Margin = new Thickness(0, 0, 8, 6)
-            };
-            fieldPanel.Children.Add(new TextBlock
-            {
-                Text = label.ToUpperInvariant(),
-                Foreground = BrushRgb(177, 184, 194),
-                FontSize = 10,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 3),
-                ToolTip = tooltip
-            });
-            fieldPanel.Children.Add(textBlock);
-            return fieldPanel;
-        }
-
-        private FrameworkElement CreateEditorField(string label, Control editor, double width, string tooltip)
-        {
-            var fieldPanel = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Width = width,
-                Margin = new Thickness(0, 0, 8, 6)
-            };
-            fieldPanel.Children.Add(new TextBlock
-            {
-                Text = label.ToUpperInvariant(),
-                Foreground = BrushRgb(177, 184, 194),
-                FontSize = 10,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 3),
-                ToolTip = tooltip
-            });
-            fieldPanel.Children.Add(editor);
-            return fieldPanel;
-        }
-
-        private Binding CreateSelectedRowBinding(string propertyName, UpdateSourceTrigger updateSourceTrigger)
-        {
-            return new Binding("SelectedItem." + propertyName)
-            {
-                Source = accountsGrid,
-                Mode = BindingMode.TwoWay,
-                UpdateSourceTrigger = updateSourceTrigger,
-                ValidatesOnExceptions = true,
-                NotifyOnValidationError = true
             };
         }
 
@@ -1130,36 +945,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateSelectedRowEditor();
             RefreshStatusSummary();
-        }
-
-        private void UpdateSelectedRowEditor()
-        {
-            if (accountsGrid == null || selectedRowNameTextBlock == null)
-                return;
-
-            var rows = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
-            var canEdit = rows.Count == 1;
-
-            foreach (var control in selectedRowEditorControls)
-                control.IsEnabled = canEdit;
-
-            if (canEdit)
-            {
-                selectedRowNameTextBlock.Text = rows[0].AccountName;
-                selectedRowNameTextBlock.ToolTip = "Editing " + rows[0].AccountName + ".";
-            }
-            else if (rows.Count > 1)
-            {
-                selectedRowNameTextBlock.Text = rows.Count + " rows selected";
-                selectedRowNameTextBlock.ToolTip = "Select one row to edit settings here, or use the selection buttons for bulk actions.";
-            }
-            else
-            {
-                selectedRowNameTextBlock.Text = "Select one row";
-                selectedRowNameTextBlock.ToolTip = "Select one account row to edit lead, group, sizing, and risk settings.";
-            }
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
