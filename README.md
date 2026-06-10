@@ -18,6 +18,7 @@
 - 🧯 **Risk Lockouts**: Set daily loss, drawdown, and profit-target thresholds per account with soft-lock or hard-flatten behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
 - 🧹 **Flatten Controls**: Flatten followers, all accounts, or a selected group.
+- 🧮 **Reconcile Selected**: Deliberately align selected followers to the lead using each row's sizing rules.
 - 💾 **Profiles**: Save, load, and delete copier profiles so groups, sizing, and risk rules survive restarts.
 - 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors.
 
@@ -47,7 +48,7 @@
 5. **Save a Profile** – Store the current dashboard as a profile if you want to reuse the setup.
 6. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states.
 7. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-8. **Flatten Deliberately** – Use follower, group, or all-account flatten buttons when you intend to close positions.
+8. **Flatten or Reconcile Deliberately** – Use selected, follower, group, or all-account flatten buttons when you intend to close positions. Use **Reconcile Selected** only when you want selected followers adjusted back toward the lead.
 
 ---
 
@@ -75,6 +76,8 @@ Risk actions:
 
 - **SoftLock** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
 - **HardFlatten** immediately requests a flatten for the account, then blocks new or increasing entries.
+
+Reconciliation is selected-row only and requires confirmation. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
 
 ---
 

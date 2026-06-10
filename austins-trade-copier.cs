@@ -145,7 +145,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(120) });
 
-            var leadPanel = new StackPanel
+            var leadPanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 0, 8)
@@ -189,7 +189,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             Grid.SetRow(leadPanel, 0);
             root.Children.Add(leadPanel);
 
-            var profilePanel = new StackPanel
+            var profilePanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 0, 8)
@@ -229,7 +229,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             Grid.SetRow(profilePanel, 1);
             root.Children.Add(profilePanel);
 
-            var actionPanel = new StackPanel
+            var actionPanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 0, 8)
@@ -244,9 +244,17 @@ namespace NinjaTrader.NinjaScript.AddOns
             flattenFollowersButton.Click += FlattenFollowersButton_Click;
             actionPanel.Children.Add(flattenFollowersButton);
 
+            var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick);
+            flattenSelectedButton.Click += FlattenSelectedButton_Click;
+            actionPanel.Children.Add(flattenSelectedButton);
+
             var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed);
             flattenAllButton.Click += FlattenAllButton_Click;
             actionPanel.Children.Add(flattenAllButton);
+
+            var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray);
+            reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
+            actionPanel.Children.Add(reconcileSelectedButton);
 
             var removeSelectedButton = CreateButton("Remove Selected", Brushes.DimGray);
             removeSelectedButton.Click += RemoveSelectedButton_Click;
@@ -1015,23 +1023,28 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private int CalculateDesiredTargetQuantity(AccountCopyRow row, Order sourceOrder)
         {
+            return CalculateDesiredQuantityFromBase(row, sourceOrder.Filled);
+        }
+
+        private int CalculateDesiredQuantityFromBase(AccountCopyRow row, int baseQuantity)
+        {
             int desiredQuantity = 0;
 
             switch (row.SizingMode)
             {
                 case SizingMode.OneToOne:
-                    desiredQuantity = sourceOrder.Filled;
+                    desiredQuantity = baseQuantity;
                     break;
                 case SizingMode.Multiplier:
                     desiredQuantity = row.Multiplier > 0
-                        ? (int)Math.Floor(sourceOrder.Filled * row.Multiplier)
+                        ? (int)Math.Floor(baseQuantity * row.Multiplier)
                         : 0;
                     break;
                 case SizingMode.Fixed:
-                    desiredQuantity = sourceOrder.Filled > 0 ? Math.Max(0, row.FixedQuantity) : 0;
+                    desiredQuantity = baseQuantity > 0 ? Math.Max(0, row.FixedQuantity) : 0;
                     break;
                 case SizingMode.BalanceRatio:
-                    desiredQuantity = CalculateBalanceRatioQuantity(row, sourceOrder.Filled);
+                    desiredQuantity = CalculateBalanceRatioQuantity(row, baseQuantity);
                     break;
                 case SizingMode.Disabled:
                     desiredQuantity = 0;
@@ -1171,6 +1184,22 @@ namespace NinjaTrader.NinjaScript.AddOns
                 FlattenAccount(row.Account, "Manual follower flatten");
         }
 
+        private void FlattenSelectedButton_Click(object sender, RoutedEventArgs e)
+        {
+            var rows = GetSelectedRows();
+            if (rows.Count == 0)
+            {
+                SetStatus("Select one or more rows to flatten.");
+                return;
+            }
+
+            if (MessageBox.Show("Flatten selected follower accounts?", "Confirm Flatten Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            foreach (var row in rows)
+                FlattenAccount(row.Account, "Manual selected flatten");
+        }
+
         private void FlattenAllButton_Click(object sender, RoutedEventArgs e)
         {
             if (MessageBox.Show("Flatten the lead and every follower account?", "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
@@ -1201,6 +1230,172 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.ManualLock = true;
                 FlattenAccount(row.Account, "Manual group flatten");
+            }
+        }
+
+        private void ReconcileSelectedButton_Click(object sender, RoutedEventArgs e)
+        {
+            var rows = GetSelectedRows();
+            if (rows.Count == 0)
+            {
+                SetStatus("Select one or more rows to reconcile.");
+                return;
+            }
+
+            if (leadAccount == null)
+            {
+                SetStatus("Select a lead account before reconciling.");
+                return;
+            }
+
+            if (MessageBox.Show("Reconcile selected followers to the lead account using each row's sizing rules?", "Confirm Reconcile Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            foreach (var row in rows)
+                ReconcileAccountToLead(row);
+
+            RefreshAllRows();
+        }
+
+        private void ReconcileAccountToLead(AccountCopyRow row)
+        {
+            if (row == null || row.Account == null)
+                return;
+
+            if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
+            {
+                row.SetStatus("Error", "Disconnected");
+                row.LastAction = "Reconcile skipped";
+                Log(row.AccountName + " reconcile skipped because account is disconnected.");
+                return;
+            }
+
+            var validationMessage = ValidateRowForReconcile(row);
+            if (!string.IsNullOrEmpty(validationMessage))
+            {
+                row.LastAction = "Reconcile skipped";
+                Log(row.AccountName + " reconcile skipped: " + validationMessage);
+                return;
+            }
+
+            var desiredPositions = BuildDesiredPositions(row);
+            var targetPositions = GetOpenPositionSnapshots(row.Account);
+            var instrumentNames = desiredPositions.Keys
+                .Union(targetPositions.Select(p => p.InstrumentName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var submitted = 0;
+            foreach (var instrumentName in instrumentNames)
+            {
+                var desired = desiredPositions.ContainsKey(instrumentName) ? desiredPositions[instrumentName] : null;
+                var target = targetPositions.FirstOrDefault(p => string.Equals(p.InstrumentName, instrumentName, StringComparison.OrdinalIgnoreCase));
+                var instrument = desired != null ? desired.Instrument : target != null ? target.Instrument : null;
+                if (instrument == null)
+                    continue;
+
+                var currentSigned = target != null ? target.SignedQuantity : 0;
+                var desiredSigned = desired != null ? desired.SignedQuantity : 0;
+
+                if (row.IsEntryLocked)
+                    desiredSigned = CalculateLockedReconcileTarget(currentSigned, desiredSigned);
+
+                var delta = desiredSigned - currentSigned;
+                if (delta == 0)
+                    continue;
+
+                SubmitReconcileAdjustment(row, instrument, delta);
+                submitted++;
+            }
+
+            row.LastAction = submitted > 0 ? "Reconcile sent " + submitted + " order(s)" : "Already reconciled";
+            Log(row.AccountName + " reconcile complete; orders sent: " + submitted + ".");
+        }
+
+        private string ValidateRowForReconcile(AccountCopyRow row)
+        {
+            if (!row.Enabled || row.SizingMode == SizingMode.Disabled)
+                return "row is disabled";
+
+            if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+                return "multiplier must be greater than 0";
+
+            if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+                return "fixed quantity must be greater than 0";
+
+            if (row.SizingMode == SizingMode.BalanceRatio)
+            {
+                double leadBalance;
+                double followerBalance;
+                if (!TryGetSizingBalance(leadAccount, out leadBalance) || leadBalance <= 0)
+                    return "lead balance data is unavailable";
+
+                if (!TryGetSizingBalance(row.Account, out followerBalance) || followerBalance <= 0)
+                    return "follower balance data is unavailable";
+            }
+
+            return string.Empty;
+        }
+
+        private Dictionary<string, PositionSnapshot> BuildDesiredPositions(AccountCopyRow row)
+        {
+            var desiredPositions = new Dictionary<string, PositionSnapshot>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var leadPosition in GetOpenPositionSnapshots(leadAccount))
+            {
+                var quantity = CalculateDesiredQuantityFromBase(row, leadPosition.Quantity);
+                if (quantity <= 0)
+                    continue;
+
+                desiredPositions[leadPosition.InstrumentName] = new PositionSnapshot
+                {
+                    Instrument = leadPosition.Instrument,
+                    InstrumentName = leadPosition.InstrumentName,
+                    MarketPosition = leadPosition.MarketPosition,
+                    Quantity = quantity
+                };
+            }
+
+            return desiredPositions;
+        }
+
+        private int CalculateLockedReconcileTarget(int currentSigned, int desiredSigned)
+        {
+            if (currentSigned == 0)
+                return 0;
+
+            if (currentSigned > 0)
+                return desiredSigned > 0 ? Math.Min(currentSigned, desiredSigned) : 0;
+
+            return desiredSigned < 0 ? Math.Max(currentSigned, desiredSigned) : 0;
+        }
+
+        private void SubmitReconcileAdjustment(AccountCopyRow row, Instrument instrument, int signedDelta)
+        {
+            var action = signedDelta > 0 ? OrderAction.Buy : OrderAction.Sell;
+            var quantity = Math.Abs(signedDelta);
+
+            try
+            {
+                var order = CreateAccountOrder(
+                    row.Account,
+                    instrument,
+                    action,
+                    OrderType.Market,
+                    TimeInForce.Day,
+                    quantity,
+                    0,
+                    0,
+                    "ATC Reconcile");
+
+                row.Account.Submit(new[] { order });
+                Log(row.AccountName + " reconcile sent " + DescribeOrder(action, quantity, instrument) + ".");
+            }
+            catch (Exception ex)
+            {
+                row.SetStatus("Error", "Reconcile failed");
+                row.LastAction = "Reconcile failed";
+                Log("ERROR " + row.AccountName + " reconcile failed: " + ex.Message);
             }
         }
 
@@ -1417,6 +1612,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             Log("Applied " + source.AccountName + " settings to " + rows.Count + " row(s) in group " + source.GroupName + ".");
             RefreshAllRows();
+        }
+
+        private List<AccountCopyRow> GetSelectedRows()
+        {
+            return accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
         }
 
         private List<AccountCopyRow> GetSelectedRowsOrAll()
