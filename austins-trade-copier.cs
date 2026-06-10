@@ -557,9 +557,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 72, null, false, "Used only when Sizing is Fixed."));
             grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 72, null, false, "Caps the quantity for each copied order. 0 disables the cap."));
             grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 76, null, false, "Caps the row's net position size. 0 disables the cap."));
-            grid.Columns.Add(CreateTextColumn("Loss Limit", "DailyLossLimit", 82, "{0:0}", false, "Locks this row when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 78, "{0:0}", false, "Locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextColumn("Profit Target", "ProfitTarget", 96, "{0:0}", false, "Locks this row after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateTextColumn("Loss Limit", "DailyLossLimit", 82, "{0:0}", false, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 78, "{0:0}", false, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextColumn("Profit Target", "ProfitTarget", 96, "{0:0}", false, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
 
             grid.Columns.Add(new DataGridComboBoxColumn
             {
@@ -2556,7 +2556,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void EvaluateRisk(AccountCopyRow row)
         {
-            if (row.AutoLocked || row.Account == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
+            if (!isCopying || row.AutoLocked || row.Account == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
                 return;
 
             if (row.DailyLossLimit > 0 && row.SessionPnl <= -Math.Abs(row.DailyLossLimit))
@@ -2583,6 +2583,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.LimitAction == RiskAction.HardFlatten)
             {
+                if (dryRunMode)
+                {
+                    row.LastAction = reason + " - dry run hard flatten";
+                    Log("DRY RUN " + row.AccountName + " would hard flatten by " + reason + ".");
+                    return;
+                }
+
                 row.LastAction = reason + " - hard flatten";
                 Log(row.AccountName + " hard locked by " + reason + "; flatten requested.");
                 FlattenAccount(row.Account, reason);
