@@ -205,7 +205,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             profilePanel.Children.Add(profileNameTextBox);
 
-            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, leads, sizing, and risk settings.");
+            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, per-row leads, sizing, and risk settings.");
             saveProfileButton.Click += SaveProfileButton_Click;
             profilePanel.Children.Add(saveProfileButton);
 
@@ -280,7 +280,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            var copyLeadSettingsButton = CreateButton("Copy Sizing/Risk To Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to other rows with the same lead.");
+            var copyLeadSettingsButton = CreateButton("Copy Settings To Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -1202,7 +1202,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             var root = document.CreateElement("TradeCopierProfile");
             root.SetAttribute("version", "2");
             root.SetAttribute("savedUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-            root.SetAttribute("leadAccount", accountRows.Where(r => r.Enabled).Select(r => r.LeadAccountName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? string.Empty);
             document.AppendChild(root);
 
             foreach (var row in accountRows)
@@ -2688,32 +2687,32 @@ namespace NinjaTrader.NinjaScript.AddOns
             var selectedRows = GetSelectedRows();
             if (selectedRows.Count == 0)
             {
-                SetStatus("Select one source row before copying sizing and risk settings to matching lead rows.");
+                SetStatus("Select one source row before copying settings to rows with the same lead.");
                 return;
             }
 
             if (selectedRows.Count > 1)
             {
-                SetStatus("Select exactly one source row before copying sizing and risk settings to matching lead rows.");
+                SetStatus("Select exactly one source row before copying settings to rows with the same lead.");
                 return;
             }
 
             var source = selectedRows[0];
             if (source.SizingMode == SizingMode.Disabled)
             {
-                SetStatus("Choose a source row with active sizing before copying sizing/risk to matching lead rows.");
+                SetStatus("Choose a source row with active sizing before copying settings to rows with the same lead.");
                 return;
             }
 
             if (source.SizingMode == SizingMode.Multiplier && source.Multiplier <= 0)
             {
-                SetStatus("Set the selected row's multiplier above 0 before copying it to matching lead rows.");
+                SetStatus("Set the selected row's multiplier above 0 before copying settings.");
                 return;
             }
 
             if (source.SizingMode == SizingMode.Fixed && source.FixedQuantity <= 0)
             {
-                SetStatus("Set the selected row's fixed quantity above 0 before copying it to matching lead rows.");
+                SetStatus("Set the selected row's fixed quantity above 0 before copying settings.");
                 return;
             }
 
@@ -2733,7 +2732,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (isCopying)
             {
-                var prompt = "Copy sizing/risk settings from " + source.AccountName + " to " + rows.Count + " row(s) using lead " + leadName + " while copying is active? Active target row baselines will be reset. Leads will not change.";
+                var prompt = "Copy settings from " + source.AccountName + " to " + rows.Count + " row(s) that use lead " + leadName + " while copying is active? Active target row baselines will be reset. Lead selections stay unchanged.";
                 if (MessageBox.Show(prompt, "Confirm Live Settings Copy", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
@@ -2756,11 +2755,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                     row.ProfitTarget = source.ProfitTarget;
                     row.LimitAction = source.LimitAction;
                     row.InstrumentFilter = source.InstrumentFilter;
-                    row.LastAction = "Copied sizing/risk from " + source.AccountName;
+                    row.LastAction = "Copied settings from " + source.AccountName;
                     if (isCopying && row.Enabled && row.SizingMode != SizingMode.Disabled && row.Account != null)
                     {
                         row.ResetBaseline(ReadAccountPnl(row.Account), false);
-                        row.LastAction = "Copied live sizing/risk from " + source.AccountName;
+                        row.LastAction = "Copied live settings from " + source.AccountName;
                         liveBaselineResetCount++;
                     }
 
@@ -2776,11 +2775,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            var message = "Copied sizing/risk settings from " + source.AccountName + " to " + appliedCount + " row(s) using lead " + leadName;
+            var message = "Copied settings from " + source.AccountName + " to " + appliedCount + " row(s) that use lead " + leadName;
             if (liveBaselineResetCount > 0)
                 message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
 
-            message += ". Leads were left unchanged.";
+            message += ". Lead selections were left unchanged.";
             SetStatus(message);
             Log(message);
             RefreshAllRows();
