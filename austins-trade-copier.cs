@@ -253,7 +253,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
-            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Pause copying and flatten every table account plus configured lead accounts.");
+            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Pause copying and flatten every table account plus lead accounts used by enabled rows.");
             flattenAllButton.Click += FlattenAllButton_Click;
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
@@ -2064,7 +2064,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void FlattenAllButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MessageBox.Show("Flatten every table account and configured lead?", "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show("Flatten every table account and every lead used by enabled rows?", "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
             PauseCopyingTrades();
@@ -2746,7 +2746,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadName = source.LeadAccountName;
             if (string.IsNullOrWhiteSpace(leadName))
             {
-                SetStatus("Select a copy row with a lead before copying sizing/risk to matching rows.");
+                SetStatus("Select a copy row with a lead before copying settings to rows with the same lead.");
                 return;
             }
 
