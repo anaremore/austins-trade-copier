@@ -93,7 +93,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private const int DefaultFixedQuantity = 1;
         private const double DefaultMultiplier = 1.0;
-        private const string DefaultGroupName = "Default";
         private const string ProfileFolderName = "AustinTradeCopier";
         private const string ProfileFileExtension = ".xml";
         private const int MaxEventLogLines = 500;
@@ -133,7 +132,6 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressEnableValidation;
         private bool suppressLiveSettingsPause;
         private bool rowRefreshPending;
-        private string lastGroupListSignature = string.Empty;
         private string heldStatusMessage = string.Empty;
         private DateTime heldStatusUntil = DateTime.MinValue;
 
@@ -282,9 +280,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            var copyGroupSettingsButton = CreateButton("Copy Sizing/Risk To Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to other rows with the same lead.");
-            copyGroupSettingsButton.Click += CopyGroupSettingsButton_Click;
-            selectionRow.Children.Add(copyGroupSettingsButton);
+            var copyLeadSettingsButton = CreateButton("Copy Sizing/Risk To Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, limit action, and symbol filters from one selected row to other rows with the same lead.");
+            copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
+            selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
 
             var actionSection = CreateSection("Controls", actionPanel);
@@ -678,7 +676,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                 RefreshConnectedAccountNames();
                 SyncAccountRowsWithConnectedAccounts();
                 SyncLeadAccountSubscriptions();
-                RefreshGroupList();
                 RefreshAllRows();
             });
         }
@@ -715,7 +712,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     continue;
                 }
 
-                row = new AccountCopyRow(account, DefaultGroupName, ReadAccountPnl(account));
+                row = new AccountCopyRow(account, ReadAccountPnl(account));
                 row.Enabled = false;
                 row.LastAction = "Discovered";
                 accountRows.Add(row);
@@ -847,12 +844,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
                 SyncLeadAccountSubscriptions();
-
-            if (e.PropertyName == "GroupName")
-            {
-                lastGroupListSignature = string.Empty;
-                RefreshGroupList();
-            }
 
             if (RowPropertyPausesLiveRow(e.PropertyName))
                 PauseLiveRowAfterSettingsEdit(row);
@@ -1051,7 +1042,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 case "Enabled":
                 case "LeadAccountName":
-                case "GroupName":
                 case "CopyMode":
                 case "SizingMode":
                 case "Multiplier":
@@ -1220,7 +1210,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var rowElement = document.CreateElement("Follower");
                 SetAttribute(rowElement, "account", row.AccountName);
                 SetAttribute(rowElement, "leadAccount", row.LeadAccountName);
-                SetAttribute(rowElement, "group", row.GroupName);
                 SetAttribute(rowElement, "enabled", RowShouldSaveEnabled(row));
                 SetAttribute(rowElement, "copyMode", row.CopyMode.ToString());
                 SetAttribute(rowElement, "sizingMode", row.SizingMode.ToString());
@@ -1295,7 +1284,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                     continue;
                 }
 
-                var groupName = NormalizeGroupName(GetStringAttribute(element, "group", DefaultGroupName));
                 var rowLeadName = GetOptionalStringAttribute(element, "leadAccount", leadAccountName);
                 var rowEnabled = GetBoolAttribute(element, "enabled", true);
                 Account rowLead = null;
@@ -1319,7 +1307,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     Log("Profile disabled " + accountName + " because no lead is saved.");
                 }
 
-                var row = new AccountCopyRow(account, groupName, ReadAccountPnl(account));
+                var row = new AccountCopyRow(account, ReadAccountPnl(account));
                 row.LeadAccountName = rowLead != null ? rowLead.Name : rowLeadName;
                 row.Enabled = rowEnabled;
                 row.CopyMode = GetEnumAttribute(element, "copyMode", TradeCopyMode.All);
@@ -1338,10 +1326,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 accountRows.Add(row);
                 seenAccounts.Add(accountName);
             }
-            lastGroupListSignature = string.Empty;
             SyncAccountRowsWithConnectedAccounts();
             RefreshConnectedAccountNames();
-            RefreshGroupList();
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
         }
@@ -2046,32 +2032,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshAllRows();
         }
 
-        private void FlattenGroupButton_Click(object sender, RoutedEventArgs e)
-        {
-            var groupName = GetSelectedGroupName();
-            if (string.IsNullOrEmpty(groupName))
-            {
-                SetStatus("Select a group before flattening.");
-                return;
-            }
-
-            var rows = accountRows.Where(r => r.Enabled && GroupEquals(r.GroupName, groupName)).ToList();
-            if (rows.Count == 0)
-            {
-                SetStatus("No enabled account rows in group " + groupName + ".");
-                return;
-            }
-
-            if (MessageBox.Show("Flatten enabled account rows in group " + groupName + "?", "Confirm Flatten Group", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                return;
-
-            LockRowsForManualFlatten(rows, "Manual group flatten");
-            foreach (var row in rows)
-                FlattenAccount(row.Account, "Manual group flatten");
-
-            RefreshAllRows();
-        }
-
         private void LockRowsForManualFlatten(IEnumerable<AccountCopyRow> rows, string lastAction)
         {
             foreach (var row in rows.Where(r => r != null).Distinct().ToList())
@@ -2439,7 +2399,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             SyncLeadAccountSubscriptions();
-            RefreshGroupList();
             RefreshAllRows();
             Log("Disabled " + rows.Count + " row(s).");
         }
@@ -2492,18 +2451,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             Log("Reset risk baselines for " + rows.Count + " row(s).");
             RefreshAllRows();
-        }
-
-        private void EnableGroupButton_Click(object sender, RoutedEventArgs e)
-        {
-            var groupName = GetSelectedGroupName();
-            if (string.IsNullOrEmpty(groupName))
-            {
-                SetStatus("Select a group before enabling.");
-                return;
-            }
-
-            EnableRows(accountRows.Where(r => GroupEquals(r.GroupName, groupName)), "group " + groupName);
         }
 
         private void EnableRows(IEnumerable<AccountCopyRow> rows, string scopeDescription)
@@ -2698,33 +2645,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             return "; skipped " + skipReasons.Values.Sum() + " (" + string.Join(", ", parts) + ")";
         }
 
-        private void PauseGroupButton_Click(object sender, RoutedEventArgs e)
-        {
-            var groupName = GetSelectedGroupName();
-            if (string.IsNullOrEmpty(groupName))
-            {
-                SetStatus("Select a group before pausing.");
-                return;
-            }
-
-            var rows = accountRows.Where(r => r.Enabled && GroupEquals(r.GroupName, groupName)).ToList();
-            if (rows.Count == 0)
-            {
-                SetStatus("No enabled account rows in group " + groupName + ".");
-                return;
-            }
-
-            foreach (var row in rows)
-            {
-                row.ManualLock = true;
-                row.LastAction = "Group paused";
-            }
-
-            Log("Paused " + rows.Count + " row(s) in group " + groupName + ". Entries are blocked; exits remain allowed.");
-            RefreshAllRows();
-        }
-
-        private void CopyGroupSettingsButton_Click(object sender, RoutedEventArgs e)
+        private void CopyLeadSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             var selectedRows = GetSelectedRows();
             if (selectedRows.Count == 0)
@@ -2836,7 +2757,6 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
-            RefreshGroupList();
         }
 
         private void RefreshAllRows()
@@ -3226,26 +3146,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             return fullName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? fullName;
         }
 
-        private string NormalizeGroupName(string groupName)
-        {
-            return string.IsNullOrWhiteSpace(groupName) ? DefaultGroupName : groupName.Trim();
-        }
-
-        private string GetSelectedGroupName()
-        {
-            return DefaultGroupName;
-        }
-
-        private bool GroupEquals(string left, string right)
-        {
-            return string.Equals(NormalizeGroupName(left), NormalizeGroupName(right), StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void RefreshGroupList()
-        {
-            lastGroupListSignature = string.Empty;
-        }
-
         private string BuildSummaryStatus()
         {
             var mode = isCopying ? dryRunMode ? "Dry Run" : "Copying" : "Paused";
@@ -3412,7 +3312,6 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             private bool enabled;
             private string leadAccountName = string.Empty;
-            private string groupName;
             private TradeCopyMode copyMode = TradeCopyMode.All;
             private string connectionStatus = "Unknown";
             private string status = "Ready";
@@ -3438,11 +3337,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string lockReason = string.Empty;
             private string lastAction = "Ready";
 
-            public AccountCopyRow(Account account, string groupName, double baselinePnl)
+            public AccountCopyRow(Account account, double baselinePnl)
             {
                 Account = account;
                 AccountName = account != null ? account.Name : string.Empty;
-                this.groupName = groupName;
                 BaselinePnl = baselinePnl;
                 PeakPnl = 0;
             }
@@ -3470,12 +3368,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return leadAccountName; }
                 set { SetField(ref leadAccountName, value == null ? string.Empty : value.Trim(), "LeadAccountName"); }
-            }
-
-            public string GroupName
-            {
-                get { return groupName; }
-                set { SetField(ref groupName, string.IsNullOrWhiteSpace(value) ? DefaultGroupName : value.Trim(), "GroupName"); }
             }
 
             public TradeCopyMode CopyMode
