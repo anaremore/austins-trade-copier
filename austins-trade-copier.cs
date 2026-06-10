@@ -628,7 +628,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             Dispatcher.InvokeAsync(() =>
             {
                 var selectedLeadName = leadAccount != null ? leadAccount.Name : null;
-                var selectedAddName = addAccountComboBox.SelectedItem is Account ? ((Account)addAccountComboBox.SelectedItem).Name : null;
+                var selectedAddAccount = addAccountComboBox.SelectedItem as Account;
+                var selectedAddName = selectedAddAccount != null ? selectedAddAccount.Name : null;
 
                 leadAccountComboBox.ItemsSource = connectedAccounts;
                 addAccountComboBox.ItemsSource = connectedAccounts;
