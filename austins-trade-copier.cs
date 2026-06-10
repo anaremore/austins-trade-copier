@@ -2206,7 +2206,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void UnlockSelectedButton_Click(object sender, RoutedEventArgs e)
         {
-            var rows = GetSelectedRowsOrAll();
+            var rows = GetSelectedRows();
+            if (rows.Count == 0)
+            {
+                SetStatus("Select one or more rows to unlock.");
+                return;
+            }
+
             foreach (var row in rows)
             {
                 row.ManualLock = false;
@@ -2223,7 +2229,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ResetBaselinesButton_Click(object sender, RoutedEventArgs e)
         {
-            var rows = GetSelectedRowsOrAll();
+            var rows = GetSelectedRows();
+            if (rows.Count == 0)
+            {
+                SetStatus("Select one or more rows before resetting baselines.");
+                return;
+            }
+
             foreach (var row in rows)
             {
                 row.ResetBaseline(ReadAccountPnl(row.Account));
@@ -2500,12 +2512,6 @@ namespace NinjaTrader.NinjaScript.AddOns
         private List<AccountCopyRow> GetSelectedRows()
         {
             return accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
-        }
-
-        private List<AccountCopyRow> GetSelectedRowsOrAll()
-        {
-            var selected = accountsGrid.SelectedItems.OfType<AccountCopyRow>().ToList();
-            return selected.Count > 0 ? selected : accountRows.ToList();
         }
 
         private void TelemetryTimer_Tick(object sender, EventArgs e)
