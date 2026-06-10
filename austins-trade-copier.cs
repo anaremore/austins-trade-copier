@@ -526,12 +526,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."));
 
-            grid.Columns.Add(CreateTextColumn("Multiplier", "Multiplier", 70, "{0:0.##}", false, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
-            grid.Columns.Add(CreateTextColumn("Fixed Qty", "FixedQuantity", 64, null, false, "Editing this value switches Sizing to Fixed qty."));
-            grid.Columns.Add(CreateTextColumn("Max Qty", "MaxQuantity", 64, null, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
-            grid.Columns.Add(CreateTextColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", false, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextColumn("Max DD", "MaxDrawdown", 70, "{0:0}", false, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextColumn("Profit Target", "ProfitTarget", 86, "{0:0}", false, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
+            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, "Editing this value switches Sizing to Fixed qty."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, "Caps total copied quantity for each lead order. 0 disables the cap."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, "While copying, locks this row when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, "While copying, locks this row when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, "While copying, locks this row after this session profit target is reached. 0 disables the target."));
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
@@ -539,11 +539,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
-            grid.Columns.Add(CreateTextColumn("Max Net", "MaxNetPosition", 72, null, false, "Caps the row's net position size. 0 disables the cap."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 72, null, TextAlignment.Right, "Caps the row's net position size. 0 disables the cap."));
 
             grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 100, "Soft lock blocks entries and allows exits. Flatten also flattens the row account."));
 
-            grid.Columns.Add(CreateTextColumn("Symbols", "InstrumentFilter", 96, null, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
+            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
         }
@@ -599,6 +599,38 @@ namespace NinjaTrader.NinjaScript.AddOns
                 factory.SetValue(Selector.SelectedValuePathProperty, selectedValuePath);
                 factory.SetBinding(Selector.SelectedValueProperty, binding);
             }
+
+            return new DataGridTemplateColumn
+            {
+                Header = CreateColumnHeader(header, tooltip),
+                CellTemplate = new DataTemplate { VisualTree = factory },
+                Width = new DataGridLength(width)
+            };
+        }
+
+        private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, string tooltip)
+        {
+            var factory = new FrameworkElementFactory(typeof(TextBox));
+            factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+            factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            factory.SetValue(Control.PaddingProperty, new Thickness(3, 0, 3, 0));
+            factory.SetValue(Control.MinHeightProperty, 22.0);
+            factory.SetValue(Control.BackgroundProperty, BrushRgb(48, 49, 54));
+            factory.SetValue(Control.ForegroundProperty, Brushes.White);
+            factory.SetValue(Control.BorderBrushProperty, BrushRgb(82, 88, 96));
+            factory.SetValue(TextBox.TextAlignmentProperty, textAlignment);
+            factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+
+            var binding = new Binding(propertyName)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
+            };
+
+            if (!string.IsNullOrEmpty(stringFormat))
+                binding.StringFormat = stringFormat;
+
+            factory.SetBinding(TextBox.TextProperty, binding);
 
             return new DataGridTemplateColumn
             {
