@@ -4493,6 +4493,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (AccountNamesEqual(row.AccountName, rowLead.Name))
                 return "Self-copy";
 
+            if (IsActiveCopyAccount(rowLead.Name, row))
+                return "Lead copying";
+
             if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
                 return "Check sizing";
 
@@ -4519,6 +4522,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (AccountNamesEqual(row.AccountName, rowLead.Name))
                 return "An account cannot copy itself.";
+
+            if (IsActiveCopyAccount(rowLead.Name, row))
+                return "The selected Lead is already an active copy row. Choose a lead account that is not copying another account.";
 
             if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
                 return "Multiplier must be greater than 0.";
@@ -5246,6 +5252,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (string.Equals(Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
                         return false;
 
+                    if (string.Equals(Status, "Lead copying", StringComparison.OrdinalIgnoreCase))
+                        return false;
+
                     return true;
                 }
             }
@@ -5271,6 +5280,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     if (string.Equals(Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
                         return "The selected Lead is not connected.";
+
+                    if (string.Equals(Status, "Lead copying", StringComparison.OrdinalIgnoreCase))
+                        return "The selected Lead is already an active copy row. Choose a different Lead.";
 
                     return "Turn this copy row on.";
                 }
@@ -5554,7 +5566,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     || string.Equals(leadSummary, "Self-copy", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Needs lead", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Available", StringComparison.OrdinalIgnoreCase)
-                    || (!string.IsNullOrWhiteSpace(leadSummary) && leadSummary.StartsWith("Missing lead ", StringComparison.OrdinalIgnoreCase));
+                    || (!string.IsNullOrWhiteSpace(leadSummary) && leadSummary.StartsWith("Missing lead ", StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(leadSummary) && leadSummary.StartsWith("Lead copying ", StringComparison.OrdinalIgnoreCase));
             }
 
             private string BuildLeadSummary()
@@ -5566,6 +5579,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (!string.IsNullOrWhiteSpace(LeadAccountName)
                     && string.Equals(Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
                     return "Missing lead " + LeadAccountName;
+
+                if (!string.IsNullOrWhiteSpace(LeadAccountName)
+                    && string.Equals(Status, "Lead copying", StringComparison.OrdinalIgnoreCase))
+                    return "Lead copying " + LeadAccountName;
 
                 if (!string.IsNullOrWhiteSpace(LeadAccountName))
                     return "Lead " + LeadAccountName;

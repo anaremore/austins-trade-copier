@@ -101,7 +101,7 @@ Dry run mode is selected before starting a copy session and stays locked for tha
 ## ⚠️ Warnings & Best Practices
 
 - Only **connected accounts** are available for copying.
-- A row cannot copy itself. Lead accounts are kept off automatically; copy rows point to them from the **Lead** column.
+- A row cannot copy itself, and a copy row cannot be used as another row's active lead. Lead accounts are kept off automatically; copy rows point to them from the **Lead** column.
 - Filled and partially filled lead orders are tracked by cumulative filled quantity to avoid duplicate target orders.
 - Soft-locked and manually locked accounts still allow exits that reduce an existing position.
 - Balance-ratio sizing can skip a row if NinjaTrader does not expose usable account value data.
