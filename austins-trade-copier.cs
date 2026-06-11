@@ -4970,7 +4970,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountRows.Count == 0)
                 return mode + " | No connected accounts";
 
-            var onCount = accountRows.Count(IsConnectedCopyRow);
+            var onCount = accountRows.Count(IsConfiguredCopyRow);
             var entryActiveCount = accountRows.Count(IsEntryActiveRow);
             var exitsOnlyCount = accountRows.Count(IsExitsOnlyCopyRow);
             var leadCount = GetReferencedLeadAccountCount();
