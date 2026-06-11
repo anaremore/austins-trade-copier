@@ -104,6 +104,9 @@ namespace NinjaTrader.NinjaScript.AddOns
         private const double DefaultMultiplier = 1.0;
         private const string ProfileFolderName = "AustinTradeCopier";
         private const string ProfileFileExtension = ".xml";
+        private const string BuildVersion = "0.1.0-dev";
+        private const string BuildCommit = "0b3e4f8";
+        private const string BuildTag = "v" + BuildVersion + "+" + BuildCommit;
         private const int MaxEventLogLines = 500;
         private const int StatusMessageHoldSeconds = 6;
 
@@ -209,6 +212,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(240) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var profilePanel = new WrapPanel
             {
@@ -475,6 +479,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             Grid.SetRow(logSection, 4);
             root.Children.Add(logSection);
+
+            var buildTagBlock = new TextBlock
+            {
+                Text = BuildTag,
+                Foreground = BrushRgb(128, 136, 146),
+                FontSize = 10,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 4, 2, 0),
+                ToolTip = "Austin's Trade Copier " + BuildTag + ". Include this tag in screenshots or support notes to identify the build."
+            };
+            Grid.SetRow(buildTagBlock, 5);
+            root.Children.Add(buildTagBlock);
 
             Content = root;
             UpdateSelectedActionButtons();
@@ -6062,7 +6078,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 get
                 {
                     if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                        return "This account is a lead because another row follows it. Clear follower Lead selections before this account can copy another account.";
+                        return "This account is a lead because another row follows it. Clear copy-row Lead selections before this account can copy another account.";
 
                     if (Enabled)
                         return "Changing the Lead on an On row may pause it for review while copying is active.";

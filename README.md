@@ -19,6 +19,7 @@
 - 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
 - 💾 **Profiles**: Save, load, and delete copier profiles so On rows, lead assignments, sizing, filters, and risk rules survive restarts.
 - 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors, with export and clear controls.
+- 🏷️ **Build Tag**: A small bottom-right version tag helps identify screenshots and installed builds.
 
 ---
 
@@ -43,7 +44,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 ## 📋 How to Use
 
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. **Role** describes setup (`Lead`, `Copy`, or `Available`), while **Status** and **Conn** describe readiness and connection state. Rows with no lead can stay available as lead-only or unused accounts.
-2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. The dropdown hides the row itself and active copy rows to avoid invalid setup. As soon as another row points at an account, that account is marked **Lead** and its own Lead selection is cleared and disabled. If it was on, the copier turns it off because lead accounts drive copy rows instead of receiving copied orders. Copy setup and row risk cells are disabled on Lead rows because they apply to follower rows.
+2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. The dropdown hides the row itself and active copy rows to avoid invalid setup. As soon as another row points at an account, that account is marked **Lead** and its own Lead selection is cleared and disabled. If it was on, the copier turns it off because lead accounts drive copy rows instead of receiving copied orders. Copy setup and row risk cells are disabled on Lead rows because they apply to copy rows.
 3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The **Selection** toolbar's **Turn On/Off** button turns ready off rows on first; if none are ready, it turns highlighted on rows off.
 4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on highlighted copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
