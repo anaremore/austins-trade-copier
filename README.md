@@ -14,7 +14,7 @@
 - 🧱 **Max Net Position Guard**: Cap each row's absolute resulting position per instrument.
 - 🧯 **Risk Lockouts**: Set max loss, max drawdown, and profit-target thresholds per row with entry-lock or auto-close behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
-- 🧹 **Flatten Controls**: Flatten enabled rows, selected rows, or all connected table/lead accounts without changing the copier's running state.
+- 🧹 **Flatten Controls**: Flatten On rows, selected rows, or all connected table/lead accounts without changing the copier's running state.
 - 🧮 **Reconcile Selected**: Deliberately align selected rows to their leads using each row's sizing rules.
 - 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
 - 💾 **Profiles**: Save, load, and delete copier profiles so enabled rows, lead assignments, sizing, filters, and risk rules survive restarts.

@@ -277,7 +277,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             UpdateStartPauseButtonState();
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
-            var flattenFollowersButton = CreateButton("Flatten Enabled", Brushes.Firebrick, "Flatten enabled rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
+            var flattenFollowersButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
             flattenFollowersButton.Click += FlattenFollowersButton_Click;
             sessionRiskRow.Children.Add(flattenFollowersButton);
 
@@ -2816,14 +2816,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = accountRows.Where(r => r.Enabled).ToList();
             if (rows.Count == 0)
             {
-                SetStatus("No enabled account rows to flatten.");
+                SetStatus("No On rows to flatten.");
                 return;
             }
 
-            if (MessageBox.Show(BuildFlattenRowsPrompt("enabled", rows), "Confirm Flatten Enabled", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(BuildFlattenRowsPrompt("On", rows), "Confirm Flatten On", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            FlattenRows(rows, "Manual enabled flatten");
+            FlattenRows(rows, "Manual On-row flatten");
             RefreshAllRows();
         }
 
