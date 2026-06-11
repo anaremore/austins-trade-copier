@@ -4769,10 +4769,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.ProfitTarget > 0)
                 parts.Add("target " + row.ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
 
-            if (parts.Count == 0)
-                return "no risk limits";
-
             var action = row.LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
+            if (parts.Count == 0)
+                return "no limits, " + action + " when set";
+
             return "at " + string.Join(", ", parts) + ": " + action;
         }
 
