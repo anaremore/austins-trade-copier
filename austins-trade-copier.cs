@@ -1718,7 +1718,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 toggleSelectedButton.Content = "Turn On";
                 toggleSelectedButton.IsEnabled = false;
-                toggleSelectedButton.ToolTip = "Highlighted rows are not ready to turn on. Choose a Lead and active Sizing; lead accounts stay off.";
+                toggleSelectedButton.ToolTip = "Highlighted rows are not ready to turn on. Connect the account, choose a Lead, and use active Sizing; lead accounts stay off.";
                 return;
             }
 
@@ -1732,7 +1732,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Turn On" : "Turn On Ready";
             toggleSelectedButton.ToolTip = "Turn on " + enableableOffCount + " ready row(s).";
             if (skippedOffCount > 0)
-                toggleSelectedButton.ToolTip += " " + skippedOffCount + " highlighted row(s) stay off because they are leads, missing a Lead, self-copy, using an active copy row as Lead, or Sizing is off.";
+                toggleSelectedButton.ToolTip += " " + skippedOffCount + " highlighted row(s) stay off because they are disconnected, leads, missing a Lead, self-copy, using an active copy row as Lead, or Sizing is off.";
             if (onCount > 0)
                 toggleSelectedButton.ToolTip += " " + onCount + " highlighted row(s) already on.";
         }
@@ -5845,6 +5845,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
                         return false;
 
+                    if (Account == null || Account.ConnectionStatus != NinjaTrader.Cbi.ConnectionStatus.Connected)
+                        return false;
+
                     if (SizingMode == SizingMode.Disabled)
                         return false;
 
@@ -5873,6 +5876,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
                         return "Lead account. It stays off and can drive copy rows.";
+
+                    if (Account == null || Account.ConnectionStatus != NinjaTrader.Cbi.ConnectionStatus.Connected)
+                        return "Connect this account in NinjaTrader before turning this row on.";
 
                     if (SizingMode == SizingMode.Disabled)
                         return "Choose an active Sizing mode before turning this row on.";
