@@ -5550,7 +5550,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "unknown";
 
             if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                return "Lead";
+                return string.IsNullOrWhiteSpace(row.PlanSummary) ? "Lead" : row.PlanSummary;
 
             if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                 return "Lead/copy conflict";
@@ -5906,7 +5906,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 get
                 {
                     if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                        return "This account is a lead because another row follows it. Clear those rows' Lead selections before assigning this account to a lead.";
+                        return "This account is a lead because another row follows it. Clear follower Lead selections before this account can copy another account.";
 
                     if (Enabled)
                         return "Changing the Lead on an On row may pause it for review while copying is active.";
