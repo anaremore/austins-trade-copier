@@ -2737,8 +2737,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                         continue;
 
                     mirroredTargetQuantities[targetKey] = desiredQuantity;
-                    row.LastAction = "Sizing produced 0";
-                    Log(row.AccountName + " skipped " + GetInstrumentName(sourceOrder.Instrument) + " because sizing produced 0 contracts.");
+                    var zeroSizingReason = DescribeZeroSizingReason(row, sourceOrder.Filled);
+                    row.LastAction = "Sizing 0: " + zeroSizingReason;
+                    Log(row.AccountName + " skipped " + GetInstrumentName(sourceOrder.Instrument) + " because " + zeroSizingReason + ".");
                     continue;
                 }
 
@@ -2862,6 +2863,45 @@ namespace NinjaTrader.NinjaScript.AddOns
                 desiredQuantity = Math.Min(desiredQuantity, row.MaxQuantity);
 
             return Math.Max(0, desiredQuantity);
+        }
+
+        private string DescribeZeroSizingReason(AccountCopyRow row, int baseQuantity)
+        {
+            if (row == null)
+                return "sizing produced 0 contracts";
+
+            if (baseQuantity <= 0)
+                return "lead quantity is 0";
+
+            switch (row.SizingMode)
+            {
+                case SizingMode.Multiplier:
+                    return "floor(" + baseQuantity.ToString(CultureInfo.InvariantCulture)
+                        + " x " + row.Multiplier.ToString("0.####", CultureInfo.InvariantCulture)
+                        + ") = 0";
+                case SizingMode.Fixed:
+                    return row.FixedQuantity <= 0 ? "fixed quantity is 0" : "lead quantity is 0";
+                case SizingMode.BalanceRatio:
+                    return DescribeBalanceRatioZeroSizing(row, baseQuantity);
+                case SizingMode.Disabled:
+                    return "sizing is off";
+                default:
+                    return "sizing produced 0 contracts";
+            }
+        }
+
+        private string DescribeBalanceRatioZeroSizing(AccountCopyRow row, int baseQuantity)
+        {
+            double leadBalance;
+            double copyRowBalance;
+            var rowLead = ResolveLeadAccountForRow(row);
+            if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || !TryGetSizingBalance(row.Account, out copyRowBalance) || leadBalance <= 0 || copyRowBalance <= 0)
+                return "balance-ratio data is unavailable";
+
+            var ratio = copyRowBalance / leadBalance;
+            return "floor(" + baseQuantity.ToString(CultureInfo.InvariantCulture)
+                + " x " + ratio.ToString("0.####", CultureInfo.InvariantCulture)
+                + ") = 0";
         }
 
         private List<string> ValidateReadyToStart()
@@ -3551,7 +3591,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Log(row.AccountName + " reconcile is reduce-only because " + reduceOnlyReason + ". New exposure is blocked.");
 
             int zeroSizingCount;
-            var desiredPositions = BuildDesiredPositions(row, out zeroSizingCount);
+            string zeroSizingReason;
+            var desiredPositions = BuildDesiredPositions(row, out zeroSizingCount, out zeroSizingReason);
             var targetPositions = GetManagedPositionSnapshots(row, row.Account);
             var instrumentNames = desiredPositions.Keys
                 .Union(targetPositions.Select(p => p.InstrumentName))
@@ -3587,19 +3628,19 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.LastAction = submitted > 0
                     ? "Dry run reconcile " + submitted + " order(s)"
-                    : zeroSizingCount > 0 ? "Reconcile sizing 0" : string.IsNullOrEmpty(reduceOnlyReason) ? "Already reconciled" : "Reduce-only reconciled";
+                    : zeroSizingCount > 0 ? "Reconcile sizing 0: " + zeroSizingReason : string.IsNullOrEmpty(reduceOnlyReason) ? "Already reconciled" : "Reduce-only reconciled";
                 Log(row.AccountName + " dry-run reconcile complete; orders simulated: " + submitted + (string.IsNullOrEmpty(reduceOnlyReason) ? "." : "; reduce-only."));
             }
             else
             {
                 row.LastAction = submitted > 0
                     ? "Reconcile sent " + submitted + " order(s)"
-                    : zeroSizingCount > 0 ? "Reconcile sizing 0" : string.IsNullOrEmpty(reduceOnlyReason) ? "Already reconciled" : "Reduce-only reconciled";
+                    : zeroSizingCount > 0 ? "Reconcile sizing 0: " + zeroSizingReason : string.IsNullOrEmpty(reduceOnlyReason) ? "Already reconciled" : "Reduce-only reconciled";
                 Log(row.AccountName + " reconcile complete; orders sent: " + submitted + (string.IsNullOrEmpty(reduceOnlyReason) ? "." : "; reduce-only."));
             }
 
             if (zeroSizingCount > 0)
-                Log(row.AccountName + " reconcile skipped " + zeroSizingCount + " lead position(s) because sizing produced 0 contracts.");
+                Log(row.AccountName + " reconcile skipped " + zeroSizingCount + " lead position(s) because " + zeroSizingReason + ".");
 
             return ReconcileOutcome.Processed;
         }
@@ -3649,9 +3690,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             return string.Empty;
         }
 
-        private Dictionary<string, PositionSnapshot> BuildDesiredPositions(AccountCopyRow row, out int zeroSizingCount)
+        private Dictionary<string, PositionSnapshot> BuildDesiredPositions(AccountCopyRow row, out int zeroSizingCount, out string zeroSizingReason)
         {
             zeroSizingCount = 0;
+            zeroSizingReason = string.Empty;
             var desiredPositions = new Dictionary<string, PositionSnapshot>(StringComparer.OrdinalIgnoreCase);
             var rowLead = ResolveLeadAccountForRow(row);
             if (rowLead == null)
@@ -3666,6 +3708,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (quantity <= 0)
                 {
                     zeroSizingCount++;
+                    if (string.IsNullOrEmpty(zeroSizingReason))
+                        zeroSizingReason = DescribeZeroSizingReason(row, leadPosition.Quantity);
                     continue;
                 }
 
@@ -4892,9 +4936,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (row.LastAction == "Sizing produced 0" || row.LastAction == "Reconcile sizing 0")
+            if (LastActionShowsSizingZero(row))
             {
-                row.SetStatus("Warning", "Sizing 0");
+                row.SetStatus("Warning", "Sizing 0", row.LastAction);
                 return;
             }
 
@@ -4906,6 +4950,16 @@ namespace NinjaTrader.NinjaScript.AddOns
             var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto-close row" : "Entries locked";
             var reason = row == null ? string.Empty : FormatRiskReasonForStatus(row.LockReason);
             return string.IsNullOrEmpty(reason) ? action : action + " - " + reason;
+        }
+
+        private bool LastActionShowsSizingZero(AccountCopyRow row)
+        {
+            if (row == null || string.IsNullOrEmpty(row.LastAction))
+                return false;
+
+            return string.Equals(row.LastAction, "Sizing produced 0", StringComparison.OrdinalIgnoreCase)
+                || row.LastAction.StartsWith("Sizing 0", StringComparison.OrdinalIgnoreCase)
+                || row.LastAction.StartsWith("Reconcile sizing 0", StringComparison.OrdinalIgnoreCase);
         }
 
         private string FormatRiskReasonForStatus(string reason)
