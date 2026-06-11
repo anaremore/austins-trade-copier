@@ -3581,7 +3581,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     row.LimitAction = source.LimitAction;
                     row.InstrumentFilter = source.InstrumentFilter;
                     row.LastAction = "Copied settings from " + source.AccountName;
-                    if (isCopying && row.Enabled && row.SizingMode != SizingMode.Disabled && row.Account != null)
+                    if (isCopying && IsConnectedCopyRow(row))
                     {
                         row.ResetBaseline(ReadAccountPnl(row.Account), false);
                         row.LastAction = "Copied live settings from " + source.AccountName;
