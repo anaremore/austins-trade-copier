@@ -25,13 +25,20 @@
 
 ## 🖼️ Screenshot
 
-A current screenshot is intentionally not checked in yet. The old `images/screenshot.png` file was removed because it showed an outdated add-account/group layout instead of the current table-first workflow. Capture a fresh NinjaTrader screenshot after the next UI pass and add it back under `images/`.
+![Austin's Trade Copier table-first dashboard](images/screenshot-11jun26.png)
+
+The current workflow is table-first: every connected account appears in the grid, copy rows choose their lead from the **Lead** column, and accounts with followers are marked as **Lead** automatically.
 
 ---
 
 ## 🛠️ Installation
 
-1. From this repository in PowerShell, run `.\scripts\install-ninjascript.ps1 -Verify`.
+1. From this repository in PowerShell, run:
+
+   ```powershell
+   .\scripts\install-ninjascript.ps1 -Verify
+   ```
+
    - By default, the script installs for the current Windows user at `<Documents>\NinjaTrader 8\bin\Custom\AddOns`.
    - The installed file is stamped with the current Git short hash for the bottom-right build tag.
    - `-Verify` compile-checks the stamped file against the installed NinjaTrader assemblies.
@@ -131,6 +138,7 @@ Dry run mode is selected before starting a copy session and stays locked for tha
 ## 📁 File Overview
 
 - `austins-trade-copier.cs` – The complete NinjaScript AddOn source code.
+- `images/screenshot-11jun26.png` – Current screenshot of the table-first copier dashboard.
 - `scripts/install-ninjascript.ps1` – Installs the NinjaScript file into a resolved NinjaTrader `AddOns` folder and stamps the build tag.
 - `scripts/verify-ninjascript.ps1` – Compile-checks the source against local NinjaTrader and .NET Framework references.
 
