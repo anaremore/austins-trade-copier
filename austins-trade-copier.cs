@@ -604,7 +604,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
-            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Lead accounts are referenced by another row. Copy rows have a Lead selected. Available rows have no Lead selected yet."));
+            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Accounts followed by another row are Lead; Status and Conn show whether they are ready or disconnected."));
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders."));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
@@ -1088,13 +1088,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                 .ToList();
         }
 
-        private bool IsReferencedLeadAccount(string accountName)
+        private bool AccountHasFollower(string accountName)
         {
-            return IsReferencedLeadAccount(accountName, null);
+            return AccountHasFollower(accountName, null);
         }
 
-        private bool IsReferencedLeadAccount(string accountName, AccountCopyRow exceptRow)
+        private bool AccountHasFollower(string accountName, AccountCopyRow exceptRow)
         {
+            // Lead role is a setup relationship: if any other row follows this account, it is a lead immediately.
             return accountRows.Any(r =>
                 r != exceptRow
                 && !string.IsNullOrWhiteSpace(r.LeadAccountName)
@@ -3876,7 +3877,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return false;
             }
 
-            if (IsReferencedLeadAccount(row.AccountName, row))
+            if (AccountHasFollower(row.AccountName, row))
             {
                 skipReason = "lead account";
                 return false;
@@ -4147,7 +4148,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool CanApplyRowPresetToRow(AccountCopyRow row)
         {
-            return row != null && !IsReferencedLeadAccount(row.AccountName, row);
+            return row != null && !AccountHasFollower(row.AccountName, row);
         }
 
         private void ApplyRowPreset(AccountCopyRow row, RowPresetOption preset)
@@ -4227,7 +4228,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void EnforceLeadRowsStayOff()
         {
             var rows = accountRows
-                .Where(r => r != null && r.Enabled && IsReferencedLeadAccount(r.AccountName, r))
+                .Where(r => r != null && r.Enabled && AccountHasFollower(r.AccountName, r))
                 .ToList();
 
             if (rows.Count == 0)
@@ -4278,7 +4279,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadRows = accountRows
                 .Where(r => r != null
                     && !string.IsNullOrWhiteSpace(r.LeadAccountName)
-                    && IsReferencedLeadAccount(r.AccountName, r))
+                    && AccountHasFollower(r.AccountName, r))
                 .ToList();
 
             if (leadRows.Count == 0)
@@ -4491,7 +4492,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsReferencedLeadAccount(row.AccountName, row))
+            if (AccountNamesEqual(row.AccountName, rowLead.Name) || AccountHasFollower(row.AccountName, row))
             {
                 row.SetStatus("Error", "Lead conflict", "This account is also assigned as a lead. Lead accounts cannot receive copied entries.");
                 return;
@@ -4561,7 +4562,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Off";
 
-            if (IsReferencedLeadAccount(row.AccountName, row))
+            if (AccountHasFollower(row.AccountName, row))
                 return "Lead";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4591,7 +4592,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Sizing is off. This row will not copy entries.";
 
-            if (IsReferencedLeadAccount(row.AccountName, row))
+            if (AccountHasFollower(row.AccountName, row))
                 return "Lead account. It can drive copy rows but does not receive copied orders.";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4618,15 +4619,15 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void UpdateRowRole(AccountCopyRow row)
         {
-            if (row.Account == null || row.Account.ConnectionStatus != ConnectionStatus.Connected)
+            if (AccountHasFollower(row.AccountName, row))
             {
-                row.RoleSummary = "Offline";
+                row.RoleSummary = "Lead";
                 return;
             }
 
-            if (IsReferencedLeadAccount(row.AccountName, row))
+            if (row.Account == null || row.Account.ConnectionStatus != ConnectionStatus.Connected)
             {
-                row.RoleSummary = "Lead";
+                row.RoleSummary = "Offline";
                 return;
             }
 
