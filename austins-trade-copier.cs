@@ -5097,7 +5097,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.AutoCloseRequested)
             {
-                row.LastAction = reason + " - auto close already requested";
+                if (!row.AutoCloseNeedsReview)
+                    row.LastAction = reason + " - auto close already requested";
                 return;
             }
 
@@ -5110,6 +5111,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (dryRunMode)
             {
                 row.AutoCloseDryRunRequested = true;
+                row.AutoCloseRetryPending = false;
+                row.AutoCloseNeedsReview = false;
                 AutoCloseRiskLockedRow(row, reason);
                 return;
             }
@@ -5119,12 +5122,19 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (result.ShouldRememberAutoCloseRequest)
             {
                 row.AutoCloseRequested = true;
+                row.AutoCloseRetryPending = false;
+                row.AutoCloseNeedsReview = result.HasFailures;
+                if (row.AutoCloseNeedsReview)
+                    UpdateAutoLockedRowStatus(row);
+
                 return;
             }
 
             row.AutoCloseRequested = false;
+            row.AutoCloseRetryPending = true;
+            row.AutoCloseNeedsReview = false;
             row.LastAction = reason + " - auto close retry pending";
-            row.SetStatus("Error", "Auto-close retry", "Auto-close could not submit a close order and will retry while the risk lock remains active.");
+            UpdateAutoLockedRowStatus(row);
             Log(row.AccountName + " auto-close by " + reason + " did not submit a close order; will retry while the risk lock remains active.");
         }
 
@@ -5179,7 +5189,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.AutoLocked)
             {
-                row.SetStatus("Locked", "Locked", GetRiskLockStatusText(row));
+                UpdateAutoLockedRowStatus(row);
                 return;
             }
 
@@ -5244,6 +5254,27 @@ namespace NinjaTrader.NinjaScript.AddOns
             var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto-close row" : "Entries locked";
             var reason = row == null ? string.Empty : FormatRiskReasonForStatus(row.LockReason);
             return string.IsNullOrEmpty(reason) ? action : action + " - " + reason;
+        }
+
+        private void UpdateAutoLockedRowStatus(AccountCopyRow row)
+        {
+            var detail = GetRiskLockStatusText(row);
+            if (row != null && row.LimitAction == RiskAction.HardFlatten)
+            {
+                if (row.AutoCloseNeedsReview)
+                {
+                    row.SetStatus("Error", "Check close", detail + ". At least one close order was submitted, but a cancel or close request failed. Check the account before unlocking.");
+                    return;
+                }
+
+                if (row.AutoCloseRetryPending)
+                {
+                    row.SetStatus("Error", "Retry close", detail + ". No close order has submitted yet; the copier will retry while copying is active.");
+                    return;
+                }
+            }
+
+            row.SetStatus("Locked", "Locked", detail);
         }
 
         private bool LastActionShowsSizingZero(AccountCopyRow row)
@@ -6110,6 +6141,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             private bool autoLocked;
             private bool autoCloseRequested;
             private bool autoCloseDryRunRequested;
+            private bool autoCloseRetryPending;
+            private bool autoCloseNeedsReview;
             private string lockReason = string.Empty;
             private string lastAction = "Ready";
 
@@ -6474,6 +6507,18 @@ namespace NinjaTrader.NinjaScript.AddOns
                 set { SetField(ref autoCloseDryRunRequested, value, "AutoCloseDryRunRequested"); }
             }
 
+            public bool AutoCloseRetryPending
+            {
+                get { return autoCloseRetryPending; }
+                set { SetField(ref autoCloseRetryPending, value, "AutoCloseRetryPending"); }
+            }
+
+            public bool AutoCloseNeedsReview
+            {
+                get { return autoCloseNeedsReview; }
+                set { SetField(ref autoCloseNeedsReview, value, "AutoCloseNeedsReview"); }
+            }
+
             public string LockReason
             {
                 get { return lockReason; }
@@ -6507,6 +6552,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     AutoLocked = false;
                     AutoCloseRequested = false;
                     AutoCloseDryRunRequested = false;
+                    AutoCloseRetryPending = false;
+                    AutoCloseNeedsReview = false;
                     LockReason = string.Empty;
                 }
 
@@ -6688,7 +6735,19 @@ namespace NinjaTrader.NinjaScript.AddOns
                     return "No limits";
 
                 if (AutoLocked)
-                    return (LimitAction == RiskAction.HardFlatten ? "Auto-close: " : "Locked: ") + FormatRiskReasonForProgress(LockReason);
+                {
+                    var reason = FormatRiskReasonForProgress(LockReason);
+                    if (string.IsNullOrEmpty(reason))
+                        reason = "risk limit";
+
+                    if (LimitAction == RiskAction.HardFlatten && AutoCloseNeedsReview)
+                        return "Check close: " + reason;
+
+                    if (LimitAction == RiskAction.HardFlatten && AutoCloseRetryPending)
+                        return "Retry close: " + reason;
+
+                    return (LimitAction == RiskAction.HardFlatten ? "Auto-close: " : "Locked: ") + reason;
+                }
 
                 var parts = new List<string>();
                 if (DailyLossLimit > 0)
@@ -6768,6 +6827,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "LimitAction":
                     case "ManualLock":
                     case "AutoLocked":
+                    case "AutoCloseRetryPending":
+                    case "AutoCloseNeedsReview":
                     case "LockReason":
                     case "RoleSummary":
                     case "FollowerCount":

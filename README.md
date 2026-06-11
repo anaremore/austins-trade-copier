@@ -53,7 +53,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
    - **Fixed qty**: sends a fixed quantity once per lead order.
    - **Balance ratio**: scales by copy-row equity versus lead equity.
    - **Off**: keeps the row visible but does not copy entries.
-5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Risk Now** shows current progress, then shows `Locked` or `Auto-close` with the hit limit. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
+5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Risk Now** shows current progress, then shows `Locked`, `Auto-close`, `Retry close`, or `Check close` with the hit limit. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming, resets active-row risk baselines, and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
@@ -90,7 +90,7 @@ The **Plan** column shows the selected limit action even before risk amounts are
 Risk actions:
 
 - **Lock entries only** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
-- **Auto-close row** immediately requests a flatten for matching managed row positions, then blocks new or increasing entries.
+- **Auto-close row** immediately requests a flatten for matching managed row positions, then blocks new or increasing entries. If no close order submits, the row shows `Retry close` and keeps retrying while copying is active. If a close order submits but another cancel or close request fails, the row shows `Check close` so the account can be reviewed before unlocking.
 
 Clearing a risk lock through **Unlock** or **Reset Baselines** requires confirmation. Connected risk-locked rows reset their session PnL baselines before they can become eligible to copy again.
 
