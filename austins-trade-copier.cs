@@ -1436,10 +1436,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (copyLeadSettingsButton != null)
             {
-                copyLeadSettingsButton.IsEnabled = rows.Count == 1;
-                copyLeadSettingsButton.ToolTip = rows.Count == 1
-                    ? "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged."
-                    : "Select exactly one source row before copying settings.";
+                var sourceRow = rows.Count == 1 ? rows[0] : null;
+                var sourceHasLead = sourceRow != null && !string.IsNullOrWhiteSpace(sourceRow.LeadAccountName);
+                var sourceHasActiveSizing = sourceRow != null && sourceRow.SizingMode != SizingMode.Disabled;
+                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && sourceHasActiveSizing;
+                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceHasActiveSizing);
             }
 
             if (toggleSelectedButton == null)
@@ -1462,6 +1463,23 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             toggleSelectedButton.Content = "Enable Selected";
             toggleSelectedButton.ToolTip = "Turn on selected rows that are off. Invalid rows are skipped with reasons.";
+        }
+
+        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, bool sourceHasActiveSizing)
+        {
+            if (selectedRowCount == 0)
+                return "Select one source copy row before copying settings.";
+
+            if (selectedRowCount > 1)
+                return "Select exactly one source copy row before copying settings.";
+
+            if (!sourceHasLead)
+                return "Select a copy row with a lead before copying settings.";
+
+            if (!sourceHasActiveSizing)
+                return "Choose active sizing on the selected row before copying settings.";
+
+            return "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
