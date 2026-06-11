@@ -607,7 +607,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders."));
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
-            grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
+            grid.Columns.Add(CreateTextColumn("Status", "Status", 104, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("PnL", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
             grid.Columns.Add(CreateTextColumn("Risk Now", "RiskProgressSummary", 150, null, true, "Current progress toward this row's Max Loss, Max DD, and Profit Target limits."));
@@ -898,8 +898,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
             style.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
 
-            var tooltipBinding = new Binding(propertyName);
-            if (!string.IsNullOrEmpty(stringFormat))
+            var tooltipBinding = new Binding(propertyName == "Status" ? "StatusDetail" : propertyName);
+            if (propertyName != "Status" && !string.IsNullOrEmpty(stringFormat))
                 tooltipBinding.StringFormat = stringFormat;
 
             style.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, tooltipBinding));
@@ -4225,13 +4225,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.AutoLocked)
             {
-                row.SetStatus("Locked", GetRiskLockStatusText(row));
+                row.SetStatus("Locked", "Locked", GetRiskLockStatusText(row));
                 return;
             }
 
             if (!row.Enabled || row.SizingMode == SizingMode.Disabled)
             {
-                row.SetStatus("Disabled", GetDisabledRowStatusText(row));
+                row.SetStatus("Disabled", GetDisabledRowStatusText(row), GetDisabledRowStatusDetail(row));
                 return;
             }
 
@@ -4244,13 +4244,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsConfiguredLeadAccount(row.AccountName))
             {
-                row.SetStatus("Error", "Also used as lead");
+                row.SetStatus("Error", "Lead conflict", "This account is also assigned as a lead. Lead accounts cannot receive copied entries.");
                 return;
             }
 
             if (row.ManualLock)
             {
-                row.SetStatus("Locked", "Manual lock - exits only");
+                row.SetStatus("Locked", "Locked", "Manual lock: exits only. Unlock this row to allow new entries.");
                 return;
             }
 
@@ -4263,7 +4263,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.CopyMode == TradeCopyMode.ExitsOnly)
             {
-                row.SetStatus("ExitsOnly", isCopying ? "Exits only" : "Ready exits only");
+                row.SetStatus("ExitsOnly", "Exits only", isCopying
+                    ? "Copy mode blocks new entries and follows exits only."
+                    : "Ready to follow exits only when copying starts.");
                 return;
             }
 
@@ -4308,10 +4310,10 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string GetDisabledRowStatusText(AccountCopyRow row)
         {
             if (row.SizingMode == SizingMode.Disabled)
-                return "Sizing off";
+                return "Off";
 
             if (IsConfiguredLeadAccount(row.AccountName))
-                return "Lead account";
+                return "Lead";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
                 return "Available";
@@ -4324,12 +4326,39 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "Self-copy";
 
             if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
-                return "Bad multiplier";
+                return "Check sizing";
 
             if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
-                return "Bad fixed qty";
+                return "Check sizing";
 
-            return "Ready disabled";
+            return "Off";
+        }
+
+        private string GetDisabledRowStatusDetail(AccountCopyRow row)
+        {
+            if (row.SizingMode == SizingMode.Disabled)
+                return "Sizing is off. This row will not copy entries.";
+
+            if (IsConfiguredLeadAccount(row.AccountName))
+                return "Lead account. It can drive copy rows but does not receive copied orders.";
+
+            if (string.IsNullOrWhiteSpace(row.LeadAccountName))
+                return "No lead selected. Choose a Lead to make this a copy row.";
+
+            var rowLead = ResolveLeadAccountForRow(row);
+            if (rowLead == null)
+                return "The selected lead account is not connected.";
+
+            if (AccountNamesEqual(row.AccountName, rowLead.Name))
+                return "An account cannot copy itself.";
+
+            if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+                return "Multiplier must be greater than 0.";
+
+            if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+                return "Fixed quantity must be greater than 0.";
+
+            return "Row is off. Turn On to copy from the selected lead.";
         }
 
         private void UpdateRowRole(AccountCopyRow row)
@@ -4962,6 +4991,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private TradeCopyMode copyMode = TradeCopyMode.All;
             private string connectionStatus = "Unknown";
             private string status = "Ready";
+            private string statusDetail = "Ready";
             private string statusLevel = "Ready";
             private string roleSummary = "Available";
             private string selectionMarker = string.Empty;
@@ -5045,6 +5075,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return status; }
                 private set { SetField(ref status, value, "Status"); }
+            }
+
+            public string StatusDetail
+            {
+                get { return statusDetail; }
+                private set { SetField(ref statusDetail, value, "StatusDetail"); }
             }
 
             public string StatusLevel
@@ -5238,8 +5274,14 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             public void SetStatus(string level, string text)
             {
+                SetStatus(level, text, text);
+            }
+
+            public void SetStatus(string level, string text, string detail)
+            {
                 StatusLevel = level;
                 Status = text;
+                StatusDetail = string.IsNullOrWhiteSpace(detail) ? text : detail;
             }
 
             private bool SetField<T>(ref T field, T value, string propertyName)
