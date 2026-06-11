@@ -257,7 +257,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var sessionRiskRow = CreateToolbarRow();
             sessionRiskRow.Children.Add(CreateToolbarLabel("Session"));
-            startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen, "Start or pause copying for enabled rows after preflight validation.");
+            startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen, "Start or pause copying for On rows after preflight validation.");
             startPauseButton.Width = 130;
             startPauseButton.Click += StartPauseButton_Click;
             sessionRiskRow.Children.Add(startPauseButton);
@@ -285,7 +285,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
-            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by enabled rows while leaving the copier state unchanged.");
+            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by On rows while leaving the copier state unchanged.");
             flattenAllButton.Click += FlattenAllButton_Click;
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
@@ -323,7 +323,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 ItemsSource = rowPresetOptions,
                 DisplayMemberPath = "Label",
                 SelectedIndex = 0,
-                ToolTip = "Choose a common setup to apply to selected rows. Leads, Symbols, enabled state, and risk amounts are preserved."
+                ToolTip = "Choose a common setup to apply to selected rows. Leads, Symbols, On state, and risk amounts are preserved."
             };
             rowPresetComboBox.SelectionChanged += RowPresetComboBox_SelectionChanged;
             selectionRow.Children.Add(rowPresetComboBox);
@@ -1190,6 +1190,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             else if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
                 ValidateEnabledRowAfterEdit(row);
 
+            if (e.PropertyName == "LeadAccountName")
+                RefreshLeadRoleState();
+
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
                 SyncLeadAccountSubscriptions();
 
@@ -1596,7 +1599,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var preset = rowPresetComboBox != null ? rowPresetComboBox.SelectedItem as RowPresetOption : null;
             var description = preset != null ? preset.Description : "Choose a common setup to apply to selected rows.";
-            var preservation = "Leads, Symbols, enabled state, and risk amounts are preserved.";
+            var preservation = "Leads, Symbols, On state, and risk amounts are preserved.";
             var tooltip = description + " " + preservation;
 
             if (rowPresetComboBox != null)
@@ -1801,7 +1804,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rowCount = accountRows.Count;
             var enabledCount = accountRows.Count(IsConfiguredCopyRow);
             return "Load profile " + profileName + "?\n\n"
-                + "This replaces the current table setup, including enabled rows, leads, sizing, symbols, and risk settings.\n"
+                + "This replaces the current table setup, including On rows, leads, sizing, symbols, and risk settings.\n"
                 + "Current table: " + rowCount + " row(s), " + enabledCount + " active copy row(s).\n\n"
                 + "Open positions and working orders are not changed.";
         }
@@ -2201,14 +2204,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             startPauseButton.Background = dryRunArmed ? Brushes.SteelBlue : Brushes.SeaGreen;
             startPauseButton.ToolTip = dryRunArmed
                 ? "Start a simulation session after preflight validation. Copied and reconcile orders are logged only."
-                : "Start live copying for enabled rows after preflight validation.";
+                : "Start live copying for On rows after preflight validation.";
         }
 
         private void StartCopyingTrades()
         {
             if (!accountRows.Any(r => r.Enabled && r.SizingMode != SizingMode.Disabled))
             {
-                SetStatus("Enable at least one account row before starting.");
+                SetStatus("Turn on at least one copy row before starting.");
                 return;
             }
 
@@ -4153,6 +4156,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             var message = "Lead rows turned off: " + rows.Count + ".";
             SetStatus(message, "Lead accounts drive followers and stay off.");
             Log(message + " Lead accounts drive followers and stay off.");
+        }
+
+        private void RefreshLeadRoleState()
+        {
+            EnforceLeadRowsStayOff();
+
+            foreach (var candidate in accountRows.ToList())
+                UpdateRowRole(candidate);
         }
 
         private void RefreshRowMetrics(AccountCopyRow row)

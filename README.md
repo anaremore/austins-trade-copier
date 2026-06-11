@@ -17,7 +17,7 @@
 - 🧹 **Flatten Controls**: Flatten On rows, selected rows, or all connected table/lead accounts without changing the copier's running state.
 - 🧮 **Reconcile Selected**: Deliberately align selected rows to their leads using each row's sizing rules.
 - 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
-- 💾 **Profiles**: Save, load, and delete copier profiles so enabled rows, lead assignments, sizing, filters, and risk rules survive restarts.
+- 💾 **Profiles**: Save, load, and delete copier profiles so On rows, lead assignments, sizing, filters, and risk rules survive restarts.
 - 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors, with export and clear controls.
 
 ---
@@ -45,7 +45,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. Rows with no lead can stay available as lead-only or unused accounts.
 2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. As soon as another row points at an account, that account is marked **Lead**. If it was on, the copier turns it off because lead accounts drive followers instead of receiving copied orders.
 3. **Enable Copy Rows** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The selected-row **Enable / Disable** button enables ready off rows first; if none are ready, it disables selected on rows.
-4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets. Presets preserve Leads, Symbols, enabled state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
+4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
    - **Fixed qty**: sends a fixed quantity once per lead order.
@@ -69,7 +69,7 @@ Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. 
 
 `Max Net` caps the absolute resulting row position per instrument. A value of `0` means no net-position cap. The guard blocks or caps exposure increases but still allows position-reducing orders.
 
-Before copying starts, enabled rows are validated. Disconnected rows, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
+Before copying starts, On rows are validated. Disconnected rows, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
 
 Profiles are stored under your NinjaTrader documents templates folder:
 
