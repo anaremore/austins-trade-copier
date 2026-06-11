@@ -706,7 +706,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, BuildCopySetupColumnTooltip("All copies entries and exits. Exits only blocks new entries while allowing exits."), null, "CanEditCopySetup"));
             grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, BuildCopySetupColumnTooltip("Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, Flatten Selection, Flatten On, and auto-close row."), null, "CanEditCopySetup"));
-            grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, BuildCopySetupColumnTooltip("Choose how this row sizes copied orders. 1:1 follows the lead fill. Multiplier uses floor(lead fill x multiplier). Fixed qty sends the Fixed Qty value. Balance ratio uses account value data and skips orders if values are unavailable."), null, "CanEditCopySetup"));
+            grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, BuildCopySetupColumnTooltip("Choose how this row sizes copied orders. 1:1 follows the lead fill. Multiplier uses floor(lead fill x multiplier). Fixed qty sends the Fixed Qty value. Balance ratio requires usable account value data before the row can turn on."), null, "CanEditCopySetup"));
 
             grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, BuildCopySetupColumnTooltip("Editing this value switches Sizing to Multiplier. Uses floor(lead fill x multiplier), so small multipliers can round to 0."), null, "CanEditCopySetup"));
             grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, BuildCopySetupColumnTooltip("Editing this value switches Sizing to Fixed qty. Sends this target quantity once per copied lead order."), null, "CanEditCopySetup"));
@@ -5059,24 +5059,29 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return false;
             }
 
-            if (row.SizingMode == SizingMode.BalanceRatio)
+            var balanceRatioIssue = GetBalanceRatioSizingIssue(row, rowLead);
+            if (!string.IsNullOrEmpty(balanceRatioIssue))
             {
-                double leadBalance;
-                if (!TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0)
-                {
-                    skipReason = "bad lead balance";
-                    return false;
-                }
-
-                double rowBalance;
-                if (!TryGetSizingBalance(row.Account, out rowBalance) || rowBalance <= 0)
-                {
-                    skipReason = "bad account balance";
-                    return false;
-                }
+                skipReason = balanceRatioIssue;
+                return false;
             }
 
             return true;
+        }
+
+        private string GetBalanceRatioSizingIssue(AccountCopyRow row, Account rowLead)
+        {
+            if (row == null || row.SizingMode != SizingMode.BalanceRatio)
+                return string.Empty;
+
+            double balance;
+            if (rowLead == null || !TryGetSizingBalance(rowLead, out balance) || balance <= 0)
+                return "bad lead balance";
+
+            if (!TryGetSizingBalance(row.Account, out balance) || balance <= 0)
+                return "bad account balance";
+
+            return string.Empty;
         }
 
         private bool IsActiveCopyAccount(string accountName, AccountCopyRow exceptRow)
@@ -5833,6 +5838,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
                 return "Check sizing";
 
+            if (!string.IsNullOrEmpty(GetBalanceRatioSizingIssue(row, rowLead)))
+                return "Check sizing";
+
             return "Off";
         }
 
@@ -5862,6 +5870,10 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
                 return "Fixed quantity must be greater than 0.";
+
+            var balanceRatioIssue = GetBalanceRatioSizingIssue(row, rowLead);
+            if (!string.IsNullOrEmpty(balanceRatioIssue))
+                return DescribeReadinessSkipReason(balanceRatioIssue) + ".";
 
             return "Row is off. Turn On to copy from the selected lead.";
         }
@@ -6767,6 +6779,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (string.Equals(Status, "Lead copying", StringComparison.OrdinalIgnoreCase))
                         return false;
 
+                    if (SizingMode == SizingMode.BalanceRatio
+                        && string.Equals(Status, "Check sizing", StringComparison.OrdinalIgnoreCase))
+                        return false;
+
                     return true;
                 }
             }
@@ -6804,6 +6820,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     if (string.Equals(Status, "Lead copying", StringComparison.OrdinalIgnoreCase))
                         return "The selected Lead is already an active copy row. Choose a different Lead.";
+
+                    if (SizingMode == SizingMode.BalanceRatio
+                        && string.Equals(Status, "Check sizing", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(StatusDetail))
+                        return StatusDetail;
 
                     return "Turn this copy row on.";
                 }
@@ -7359,6 +7380,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "FixedQuantity":
                     case "RoleSummary":
                     case "Status":
+                    case "StatusDetail":
                     case "ManualLock":
                     case "AutoLocked":
                         OnPropertyChanged("CanToggleEnabled");
