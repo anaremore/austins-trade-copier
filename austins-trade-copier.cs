@@ -4665,9 +4665,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             var exitsOnlyCount = accountRows.Count(IsExitsOnlyCopyRow);
             var armedLeadCount = GetConfiguredLeadAccounts().Count;
             var lockedCount = accountRows.Count(IsLockedCopyRow);
-            var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
+            var attentionCount = accountRows.Count(IsAttentionRow);
             var offlineCount = accountRows.Count(IsOfflineRow);
-            var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
+            var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
             if (offlineCount > 0)
                 summary += " | Offline: " + offlineCount;
 
@@ -4695,6 +4695,16 @@ namespace NinjaTrader.NinjaScript.AddOns
             return row != null && (row.Account == null || row.Account.ConnectionStatus != ConnectionStatus.Connected);
         }
 
+        private bool IsAttentionRow(AccountCopyRow row)
+        {
+            if (row == null)
+                return false;
+
+            return row.StatusLevel == "Error"
+                || row.StatusLevel == "Desynced"
+                || row.StatusLevel == "Warning";
+        }
+
         private string BuildSelectionSummary()
         {
             if (accountsGrid == null)
@@ -4710,7 +4720,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var offCount = rows.Count - onCount;
                 var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
-                var attentionCount = rows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
+                var attentionCount = rows.Count(IsAttentionRow);
                 return "Selected: " + rows.Count + " rows | On: " + onCount + " | Off: " + offCount + " | Copy rows: " + copyRowCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
             }
 
