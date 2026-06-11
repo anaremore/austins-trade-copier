@@ -1759,12 +1759,28 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            selectedRowsTextBlock.Text = BuildSelectedRowsLabel(rows);
+            selectedRowsTextBlock.ToolTip = BuildSelectionSummary();
+        }
+
+        private string BuildSelectedRowsLabel(List<AccountCopyRow> rows)
+        {
+            if (rows == null || rows.Count == 0)
+                return "No rows selected";
+
+            if (rows.Count == 1)
+                return BuildSelectedRowLabel(rows[0]);
+
             var onCount = rows.Count(r => r.Enabled);
             var attentionCount = rows.Count(IsAttentionRow);
-            selectedRowsTextBlock.Text = rows.Count + " selected | On " + onCount;
-            selectedRowsTextBlock.ToolTip = BuildSelectionSummary();
+            var label = rows.Count + " selected: " + BuildAccountNamePreview(rows, 2);
+            if (onCount > 0)
+                label += " | On " + onCount;
+
             if (attentionCount > 0)
-                selectedRowsTextBlock.Text += " | Attention " + attentionCount;
+                label += " | Attention " + attentionCount;
+
+            return label;
         }
 
         private void UpdateRowPresetToolTip()
@@ -5244,6 +5260,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(IsAttentionRow);
                 var parts = new List<string> { "Selected: " + rows.Count + " rows" };
+                parts.Add("Accounts: " + BuildAccountNamePreview(rows, 8));
 
                 if (onCount > 0)
                     parts.Add("On: " + onCount);
@@ -5273,6 +5290,29 @@ namespace NinjaTrader.NinjaScript.AddOns
             var riskNow = DescribeRiskProgressForSelection(row);
             var summary = "Selected: " + relationship + " | " + row.Status + " | " + sizing + " | " + risk;
             return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
+        }
+
+        private string BuildAccountNamePreview(IList<AccountCopyRow> rows, int previewCount)
+        {
+            if (rows == null || rows.Count == 0)
+                return "none";
+
+            var safePreviewCount = Math.Max(1, previewCount);
+            var names = rows
+                .Where(r => r != null)
+                .Select(r => string.IsNullOrWhiteSpace(r.AccountName) ? "Unknown" : r.AccountName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (names.Count == 0)
+                return "none";
+
+            var preview = names.Take(safePreviewCount).ToList();
+            var label = string.Join(", ", preview);
+            if (names.Count > preview.Count)
+                label += " +" + (names.Count - preview.Count).ToString(CultureInfo.InvariantCulture);
+
+            return label;
         }
 
         private string BuildSelectedRowLabel(AccountCopyRow row)
