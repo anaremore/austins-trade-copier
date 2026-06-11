@@ -5827,7 +5827,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var action = row.LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
             if (parts.Count == 0)
-                return "no limits";
+                return row.LimitAction == RiskAction.HardFlatten
+                    ? "no limits, auto-close row when set"
+                    : "no limits";
 
             return "at " + string.Join(", ", parts) + ": " + action;
         }
@@ -6577,7 +6579,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 var action = LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
                 if (limits.Count == 0)
-                    return "no limits";
+                    return LimitAction == RiskAction.HardFlatten
+                        ? "no limits, auto-close row when set"
+                        : "no limits";
 
                 return "at " + string.Join(", ", limits) + ": " + action;
             }
