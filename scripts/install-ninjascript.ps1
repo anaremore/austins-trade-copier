@@ -93,6 +93,21 @@ function Set-ConstantValue {
     return [Regex]::Replace($Content, $pattern, $replacement, 1)
 }
 
+function Get-ConstantValue {
+    param(
+        [string] $Content,
+        [string] $Name
+    )
+
+    $pattern = 'private const string ' + [Regex]::Escape($Name) + ' = "([^"]*)";'
+    $match = [Regex]::Match($Content, $pattern)
+    if (-not $match.Success) {
+        throw "Build stamp constant not found: $Name"
+    }
+
+    return $match.Groups[1].Value
+}
+
 $source = Resolve-RequiredPath $SourcePath 'NinjaScript source'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).ProviderPath
 $commit = Get-GitShortHash $repositoryRoot $source
@@ -112,7 +127,7 @@ if ($null -ne $versionToWrite) {
 $content = Set-ConstantValue $content 'BuildCommit' $commit
 Set-Content -LiteralPath $destination -Value $content -Encoding UTF8
 
-$installedVersion = if ($null -ne $versionToWrite) { $versionToWrite } else { '0.1.0-dev' }
+$installedVersion = Get-ConstantValue $content 'BuildVersion'
 Write-Host "Installed Austin's Trade Copier to $destination"
 Write-Host "Build tag: v$installedVersion+$commit"
 
