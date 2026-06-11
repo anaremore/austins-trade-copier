@@ -200,6 +200,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressLeadRoleRefresh;
         private bool rowRefreshPending;
         private Dictionary<AccountCopyRow, string> pendingLeadSelectionSnapshot;
+        private Dictionary<AccountCopyRow, string> pendingRowRefreshLeadSnapshot;
         private string heldStatusMessage = string.Empty;
         private string heldStatusDetail = string.Empty;
         private DateTime heldStatusUntil = DateTime.MinValue;
@@ -780,6 +781,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadSnapshot = CaptureLeadSelections();
             CommitFocusedLeadComboBoxEdit(leadSnapshot);
             CommitFocusedTextBoxEdit();
+            PreserveLeadSelectionsForQueuedRefresh(leadSnapshot);
             SetDirectCheckBoxValue(row, checkBox.Tag as string, checkBox.IsChecked != true);
 
             var binding = checkBox.GetBindingExpression(ToggleButton.IsCheckedProperty);
@@ -860,7 +862,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 foreach (var pair in leadSnapshot)
                 {
                     var row = pair.Key;
-                    if (row == null || SnapshotHadFollowers(leadSnapshot, row))
+                    if (row == null || SnapshotHadFollowers(leadSnapshot, row) || AccountHasCopyRows(row.AccountName, row))
                         continue;
 
                     var savedLead = pair.Value ?? string.Empty;
@@ -883,6 +885,30 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             return restoredAny;
+        }
+
+        private void PreserveLeadSelectionsForQueuedRefresh(Dictionary<AccountCopyRow, string> leadSnapshot)
+        {
+            if (leadSnapshot == null || leadSnapshot.Count == 0)
+                return;
+
+            if (pendingRowRefreshLeadSnapshot == null)
+                pendingRowRefreshLeadSnapshot = new Dictionary<AccountCopyRow, string>();
+
+            foreach (var pair in leadSnapshot)
+            {
+                if (pair.Key == null)
+                    continue;
+
+                pendingRowRefreshLeadSnapshot[pair.Key] = pair.Value ?? string.Empty;
+            }
+        }
+
+        private Dictionary<AccountCopyRow, string> ConsumePendingRowRefreshLeadSnapshot()
+        {
+            var snapshot = pendingRowRefreshLeadSnapshot;
+            pendingRowRefreshLeadSnapshot = null;
+            return snapshot;
         }
 
         private bool SnapshotHadFollowers(Dictionary<AccountCopyRow, string> leadSnapshot, AccountCopyRow row)
@@ -2387,14 +2413,18 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void QueueRowRefresh()
         {
+            PreserveLeadSelectionsForQueuedRefresh(CaptureLeadSelections());
+
             if (rowRefreshPending)
                 return;
 
             rowRefreshPending = true;
             Dispatcher.InvokeAsync(() =>
             {
+                var leadSnapshot = ConsumePendingRowRefreshLeadSnapshot();
                 rowRefreshPending = false;
                 RefreshAllRows();
+                RepairLeadSelectionsAfterUiCommit(leadSnapshot);
             });
         }
 
