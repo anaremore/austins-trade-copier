@@ -150,6 +150,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressEnableValidation;
         private bool suppressLiveSettingsPause;
         private bool suppressManualLockHandling;
+        private bool suppressSizingModeAutoSwitch;
         private bool rowRefreshPending;
         private string heldStatusMessage = string.Empty;
         private string heldStatusDetail = string.Empty;
@@ -1201,7 +1202,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ApplySizingModeFromEditedQuantityField(AccountCopyRow row, string propertyName)
         {
-            if (suppressEnableValidation || row == null)
+            if (suppressEnableValidation || suppressSizingModeAutoSwitch || row == null)
                 return;
 
             if (propertyName == "Multiplier"
@@ -3993,20 +3994,29 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row == null || preset == null)
                 return;
 
-            if (preset.Multiplier.HasValue)
-                row.Multiplier = preset.Multiplier.Value;
+            var wasSuppressed = suppressSizingModeAutoSwitch;
+            suppressSizingModeAutoSwitch = true;
+            try
+            {
+                if (preset.Multiplier.HasValue)
+                    row.Multiplier = preset.Multiplier.Value;
 
-            if (preset.FixedQuantity.HasValue)
-                row.FixedQuantity = preset.FixedQuantity.Value;
+                if (preset.FixedQuantity.HasValue)
+                    row.FixedQuantity = preset.FixedQuantity.Value;
 
-            if (preset.CopyMode.HasValue)
-                row.CopyMode = preset.CopyMode.Value;
+                if (preset.CopyMode.HasValue)
+                    row.CopyMode = preset.CopyMode.Value;
 
-            if (preset.LimitAction.HasValue)
-                row.LimitAction = preset.LimitAction.Value;
+                if (preset.LimitAction.HasValue)
+                    row.LimitAction = preset.LimitAction.Value;
 
-            if (preset.SizingMode.HasValue)
-                row.SizingMode = preset.SizingMode.Value;
+                if (preset.SizingMode.HasValue)
+                    row.SizingMode = preset.SizingMode.Value;
+            }
+            finally
+            {
+                suppressSizingModeAutoSwitch = wasSuppressed;
+            }
         }
 
         private List<AccountCopyRow> GetSelectedRows()
