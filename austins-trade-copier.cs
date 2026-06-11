@@ -555,6 +555,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders."));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
+            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, "Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, flatten selected/enabled, and auto-close row."));
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."));
 
             grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, "Editing this value switches Sizing to Multiplier. 2 copies twice the lead quantity."));
@@ -572,7 +573,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("PnL", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
-            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional row filter. Blank copies all instruments. Enter roots or full names separated by commas, for example MES, MNQ, MES JUN26. Filtered rows only copy, reconcile, and auto-close matching instruments."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
         }
