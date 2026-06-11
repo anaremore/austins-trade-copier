@@ -92,6 +92,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             ExitsOnly
         }
 
+        private enum ReconcileOutcome
+        {
+            Processed,
+            SkippedOffline,
+            SkippedInvalid
+        }
+
         private const int DefaultFixedQuantity = 1;
         private const double DefaultMultiplier = 1.0;
         private const string ProfileFolderName = "AustinTradeCopier";
@@ -2596,10 +2603,30 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (MessageBox.Show(BuildReconcileRowsPrompt(rows), "Confirm Reconcile Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
+            var processedCount = 0;
+            var offlineCount = 0;
+            var invalidCount = 0;
             foreach (var row in rows)
-                ReconcileAccountToLead(row);
+            {
+                var outcome = ReconcileAccountToLead(row);
+                if (outcome == ReconcileOutcome.Processed)
+                    processedCount++;
+                else if (outcome == ReconcileOutcome.SkippedOffline)
+                    offlineCount++;
+                else
+                    invalidCount++;
+            }
 
-            SetStatus("Reconcile requested for " + rows.Count + " selected row(s).");
+            var message = "Reconcile processed " + processedCount + " selected row(s)";
+            if (offlineCount > 0)
+                message += "; skipped " + offlineCount + " offline row(s)";
+
+            if (invalidCount > 0)
+                message += "; skipped " + invalidCount + " invalid row(s)";
+
+            message += ".";
+            SetStatus(message);
+            Log(message);
             RefreshAllRows();
         }
 
@@ -2609,9 +2636,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             var filteredCount = rows == null ? 0 : rows.Count(HasInstrumentFilter);
             var lockedCount = rows == null ? 0 : rows.Count(r => r != null && RowIsReduceOnly(r));
             var cappedCount = rows == null ? 0 : rows.Count(r => r != null && r.MaxNetPosition > 0);
+            var offlineCount = rows == null ? 0 : rows.Count(r => r != null && !RowHasConnectedAccount(r));
 
             var prompt = "Reconcile " + rowCount + " selected row(s) to their lead positions?\n\n"
                 + "This may submit market orders using each row's lead, sizing, copy mode, and max position settings.";
+
+            if (offlineCount > 0)
+                prompt += "\n" + offlineCount + " offline row(s) will be skipped.";
 
             if (filteredCount > 0)
                 prompt += "\n" + filteredCount + " row(s) will only reconcile matching Symbols filters.";
@@ -2628,17 +2659,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             return prompt;
         }
 
-        private void ReconcileAccountToLead(AccountCopyRow row)
+        private ReconcileOutcome ReconcileAccountToLead(AccountCopyRow row)
         {
-            if (row == null || row.Account == null)
-                return;
+            if (row == null)
+                return ReconcileOutcome.SkippedInvalid;
 
-            if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
+            if (!RowHasConnectedAccount(row))
             {
-                row.SetStatus("Error", "Disconnected");
-                row.LastAction = "Reconcile skipped";
-                Log(row.AccountName + " reconcile skipped because account is disconnected.");
-                return;
+                MarkReconcileOffline(row);
+                return ReconcileOutcome.SkippedOffline;
             }
 
             var validationMessage = ValidateRowForReconcile(row);
@@ -2646,7 +2675,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.LastAction = "Reconcile skipped";
                 Log(row.AccountName + " reconcile skipped: " + validationMessage);
-                return;
+                return ReconcileOutcome.SkippedInvalid;
             }
 
             int zeroSizingCount;
@@ -2695,6 +2724,18 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (zeroSizingCount > 0)
                 Log(row.AccountName + " reconcile skipped " + zeroSizingCount + " lead position(s) because sizing produced 0 contracts.");
+
+            return ReconcileOutcome.Processed;
+        }
+
+        private void MarkReconcileOffline(AccountCopyRow row)
+        {
+            if (row == null)
+                return;
+
+            row.SetStatus("Error", row.Account == null ? "No account" : "Disconnected");
+            row.LastAction = "Reconcile skipped - offline";
+            Log(row.AccountName + " reconcile skipped because account is offline.");
         }
 
         private string ValidateRowForReconcile(AccountCopyRow row)
