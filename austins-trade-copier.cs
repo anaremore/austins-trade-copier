@@ -4104,6 +4104,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RefreshAllRows()
         {
+            EnforceLeadRowsStayOff();
+
             foreach (var row in accountRows.ToList())
             {
                 if (!RowIsReduceOnly(row))
@@ -4119,6 +4121,40 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             RefreshStatusSummary();
+        }
+
+        private void EnforceLeadRowsStayOff()
+        {
+            var rows = accountRows
+                .Where(r => r != null && r.Enabled && IsReferencedLeadAccount(r.AccountName, r))
+                .ToList();
+
+            if (rows.Count == 0)
+                return;
+
+            var wasSuppressed = suppressEnableValidation;
+            suppressEnableValidation = true;
+            try
+            {
+                foreach (var row in rows)
+                {
+                    row.Enabled = false;
+                    SetManualLockWithoutAction(row, false);
+                    row.LastAction = "Lead account - turned off";
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                    ClearMirroredTargetQuantities(row);
+                }
+            }
+            finally
+            {
+                suppressEnableValidation = wasSuppressed;
+            }
+
+            SyncLeadAccountSubscriptions();
+            var message = "Lead rows turned off: " + rows.Count + ".";
+            SetStatus(message, "Lead accounts drive followers and stay off.");
+            Log(message + " Lead accounts drive followers and stay off.");
         }
 
         private void RefreshRowMetrics(AccountCopyRow row)
