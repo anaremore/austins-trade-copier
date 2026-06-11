@@ -43,13 +43,13 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 ## 📋 How to Use
 
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. **Role** describes setup (`Lead`, `Copy row`, or `Available`), while **Status** and **Conn** describe readiness and connection state. Rows with no lead can stay available as lead-only or unused accounts.
-2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. As soon as another row points at an account, that account is marked **Lead** and its own Lead selection is cleared. If it was on, the copier turns it off because lead accounts drive followers instead of receiving copied orders.
+2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. As soon as another row points at an account, that account is marked **Lead** and its own Lead selection is cleared. If it was on, the copier turns it off because lead accounts drive copy rows instead of receiving copied orders.
 3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The selected-row **Turn On / Off** button turns ready off rows on first; if none are ready, it turns selected on rows off.
 4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
    - **Fixed qty**: sends a fixed quantity once per lead order.
-   - **Balance ratio**: scales by follower equity versus lead equity.
+   - **Balance ratio**: scales by copy-row equity versus lead equity.
    - **Off**: keeps the row visible but does not copy entries.
 5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Risk Now** shows current progress, then shows `Locked` or `Auto-close` with the hit limit. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
@@ -74,6 +74,8 @@ Before copying starts, On rows are validated. Disconnected rows, zero multiplier
 Profiles are stored under your NinjaTrader documents templates folder:
 
 `Documents\NinjaTrader 8\templates\AustinTradeCopier`
+
+Current profiles save table entries as `Row` elements. Older profiles that used `Follower` elements still load.
 
 Risk thresholds use the row baseline captured when the account row is created, loaded, or reset with **Reset Baselines**:
 

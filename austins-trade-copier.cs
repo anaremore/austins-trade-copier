@@ -1971,13 +1971,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var document = new XmlDocument();
             var root = document.CreateElement("TradeCopierProfile");
-            root.SetAttribute("version", "2");
+            root.SetAttribute("version", "3");
             root.SetAttribute("savedUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
             document.AppendChild(root);
 
             foreach (var row in accountRows)
             {
-                var rowElement = document.CreateElement("Follower");
+                var rowElement = document.CreateElement("Row");
                 SetAttribute(rowElement, "account", row.AccountName);
                 SetAttribute(rowElement, "leadAccount", row.LeadAccountName);
                 SetAttribute(rowElement, "enabled", row.Enabled);
@@ -2029,12 +2029,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             maxNetVirtualPositions.Clear();
 
             var seenAccounts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (XmlNode node in root.SelectNodes("Follower"))
+            foreach (var element in GetProfileRowElements(root))
             {
-                var element = node as XmlElement;
-                if (element == null)
-                    continue;
-
                 var accountName = element.GetAttribute("account");
                 if (string.IsNullOrWhiteSpace(accountName))
                     continue;
@@ -2120,6 +2116,26 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshConnectedAccountNames();
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
+        }
+
+        private IEnumerable<XmlElement> GetProfileRowElements(XmlElement root)
+        {
+            if (root == null)
+                yield break;
+
+            foreach (XmlNode node in root.SelectNodes("Row"))
+            {
+                var element = node as XmlElement;
+                if (element != null)
+                    yield return element;
+            }
+
+            foreach (XmlNode node in root.SelectNodes("Follower"))
+            {
+                var element = node as XmlElement;
+                if (element != null)
+                    yield return element;
+            }
         }
 
         private List<Account> GetConnectedAccountsSnapshot()
@@ -4288,8 +4304,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             SyncLeadAccountSubscriptions();
             var message = "Lead rows turned off: " + rows.Count + ".";
-            SetStatus(message, "Lead accounts drive followers and stay off.");
-            Log(message + " Lead accounts drive followers and stay off.");
+            SetStatus(message, "Lead accounts drive copy rows and stay off.");
+            Log(message + " Lead accounts drive copy rows and stay off.");
         }
 
         private void RefreshLeadRoleState()
@@ -5401,7 +5417,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         return "Turn this copy row off. The row stays visible and saved.";
 
                     if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                        return "Lead account. It stays off and can drive follower rows.";
+                        return "Lead account. It stays off and can drive copy rows.";
 
                     if (SizingMode == SizingMode.Disabled)
                         return "Choose an active Sizing mode before turning this row on.";
