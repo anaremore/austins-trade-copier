@@ -2683,9 +2683,16 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void StartCopyingTrades()
         {
-            if (!accountRows.Any(r => r.Enabled && r.SizingMode != SizingMode.Disabled))
+            var onRows = accountRows.Where(IsConfiguredCopyRow).ToList();
+            if (onRows.Count == 0)
             {
                 SetStatus("Turn on at least one copy row before starting.");
+                return;
+            }
+
+            if (!onRows.Any(RowHasConnectedAccount))
+            {
+                SetStatus("Reconnect at least one On copy row before starting.");
                 return;
             }
 
