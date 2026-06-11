@@ -750,10 +750,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.BackgroundProperty, BrushRgb(64, 65, 70));
             factory.SetValue(Control.ForegroundProperty, Brushes.White);
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(92, 96, 104));
+            factory.SetValue(FrameworkElement.TagProperty, propertyName);
             factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
             factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
             factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
+            factory.AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(ComboBoxCell_SelectionChanged));
 
             if (!string.IsNullOrWhiteSpace(tooltipPropertyName))
                 factory.SetBinding(FrameworkElement.ToolTipProperty, new Binding(tooltipPropertyName));
@@ -786,6 +788,30 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CellTemplate = new DataTemplate { VisualTree = factory },
                 Width = new DataGridLength(width)
             };
+        }
+
+        private void ComboBoxCell_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+            if (comboBox == null || !string.Equals(comboBox.Tag as string, "LeadAccountName", StringComparison.Ordinal))
+                return;
+
+            if (!comboBox.IsKeyboardFocusWithin && !comboBox.IsDropDownOpen)
+                return;
+
+            var selectedItemBinding = comboBox.GetBindingExpression(Selector.SelectedItemProperty);
+            if (selectedItemBinding != null)
+                selectedItemBinding.UpdateSource();
+
+            var selectedValueBinding = comboBox.GetBindingExpression(Selector.SelectedValueProperty);
+            if (selectedValueBinding != null)
+                selectedValueBinding.UpdateSource();
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RefreshLeadRoleState();
+                SyncLeadAccountSubscriptions();
+            }), DispatcherPriority.Background);
         }
 
         private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, bool numericOnly, bool allowDecimal, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null)
@@ -4286,11 +4312,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 suppressLiveSettingsPause = false;
             }
 
+            var autoCloseRequestedCount = ApplyPendingAutoCloseActions(rows);
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
             var message = "Copied setup from " + source.AccountName + " to " + appliedCount + " peer row(s) using lead " + leadName;
             if (liveBaselineResetCount > 0)
                 message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
+
+            if (autoCloseRequestedCount > 0)
+                message += "; auto-close requested for " + autoCloseRequestedCount + " risk-locked row(s)";
 
             message += ". Lead selections were left unchanged.";
             SetStatus(message);
@@ -4367,10 +4397,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                 suppressLiveSettingsPause = false;
             }
 
+            var autoCloseRequestedCount = ApplyPendingAutoCloseActions(targetRows);
             SyncLeadAccountSubscriptions();
             var message = "Applied row preset " + preset.Label + " to " + appliedCount + " selected row(s)";
             if (livePausedCount > 0)
                 message += "; paused " + livePausedCount + " live row(s) for review";
+
+            if (autoCloseRequestedCount > 0)
+                message += "; auto-close requested for " + autoCloseRequestedCount + " risk-locked row(s)";
 
             if (skippedLeadCount > 0)
                 message += "; skipped " + skippedLeadCount + " lead row(s)";
@@ -4414,6 +4448,35 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 suppressSizingModeAutoSwitch = wasSuppressed;
             }
+        }
+
+        private int ApplyPendingAutoCloseActions(IEnumerable<AccountCopyRow> rows)
+        {
+            if (!isCopying || rows == null)
+                return 0;
+
+            var requestedCount = 0;
+            foreach (var row in rows.Where(r => r != null).Distinct().ToList())
+            {
+                if (!ShouldRequestPendingAutoClose(row))
+                    continue;
+
+                RequestRiskAutoClose(row, string.IsNullOrEmpty(row.LockReason) ? "Risk limit" : row.LockReason);
+                requestedCount++;
+            }
+
+            return requestedCount;
+        }
+
+        private bool ShouldRequestPendingAutoClose(AccountCopyRow row)
+        {
+            return row != null
+                && row.Enabled
+                && row.AutoLocked
+                && row.LimitAction == RiskAction.HardFlatten
+                && RowHasConnectedAccount(row)
+                && !row.AutoCloseRequested
+                && (!dryRunMode || !row.AutoCloseDryRunRequested);
         }
 
         private List<AccountCopyRow> GetSelectedRows()
