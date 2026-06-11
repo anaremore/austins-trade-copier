@@ -1,6 +1,6 @@
 param(
     [string] $SourcePath = (Join-Path $PSScriptRoot '..\austins-trade-copier.cs'),
-    [string] $NinjaTraderBin = 'C:\Program Files\NinjaTrader 8\bin',
+    [string] $NinjaTraderBin = '',
     [string] $OutputPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'AustinTradeCopier.verify.dll')
 )
 
@@ -20,20 +20,72 @@ function Resolve-RequiredPath {
     return $resolved.ProviderPath
 }
 
-function Resolve-FrameworkReferenceRoot {
-    $root = Join-Path ${env:ProgramFiles(x86)} 'Reference Assemblies\Microsoft\Framework\.NETFramework'
-    foreach ($version in @('v4.8', 'v4.7.2', 'v4.0')) {
-        $candidate = Join-Path $root $version
-        if (Test-Path -LiteralPath $candidate) {
-            return (Resolve-Path -LiteralPath $candidate).ProviderPath
+function Test-NinjaTraderBin {
+    param([string] $Path)
+
+    return -not [string]::IsNullOrWhiteSpace($Path) `
+        -and (Test-Path -LiteralPath (Join-Path $Path 'NinjaTrader.Core.dll')) `
+        -and (Test-Path -LiteralPath (Join-Path $Path 'NinjaTrader.Gui.dll'))
+}
+
+function Get-CandidateNinjaTraderBins {
+    $candidates = New-Object System.Collections.Generic.List[string]
+
+    if (-not [string]::IsNullOrWhiteSpace($env:NINJATRADER_BIN)) {
+        $candidates.Add($env:NINJATRADER_BIN)
+    }
+
+    foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not [string]::IsNullOrWhiteSpace($root)) {
+            $candidates.Add((Join-Path $root 'NinjaTrader 8\bin'))
         }
     }
 
-    throw "No supported .NET Framework reference assemblies found under $root"
+    return $candidates | Select-Object -Unique
+}
+
+function Resolve-NinjaTraderBin {
+    param([string] $Path)
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        $resolved = Resolve-RequiredPath $Path 'NinjaTrader bin folder'
+        if (Test-NinjaTraderBin $resolved) {
+            return $resolved
+        }
+
+        throw "NinjaTrader bin folder does not contain required assemblies: $resolved"
+    }
+
+    foreach ($candidate in Get-CandidateNinjaTraderBins) {
+        $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction SilentlyContinue
+        if ($null -ne $resolved -and (Test-NinjaTraderBin $resolved.ProviderPath)) {
+            return $resolved.ProviderPath
+        }
+    }
+
+    throw 'NinjaTrader bin folder was not found. Set $env:NINJATRADER_BIN or pass -NinjaTraderBin with the folder containing NinjaTrader.Core.dll and NinjaTrader.Gui.dll.'
+}
+
+function Resolve-FrameworkReferenceRoot {
+    foreach ($root in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
+        if ([string]::IsNullOrWhiteSpace($root)) {
+            continue
+        }
+
+        $frameworkRoot = Join-Path $root 'Reference Assemblies\Microsoft\Framework\.NETFramework'
+        foreach ($version in @('v4.8', 'v4.7.2', 'v4.0')) {
+            $candidate = Join-Path $frameworkRoot $version
+            if (Test-Path -LiteralPath $candidate) {
+                return (Resolve-Path -LiteralPath $candidate).ProviderPath
+            }
+        }
+    }
+
+    throw 'No supported .NET Framework reference assemblies were found. Install .NET Framework developer/reference assemblies and retry.'
 }
 
 $source = Resolve-RequiredPath $SourcePath 'NinjaScript source'
-$ntBin = Resolve-RequiredPath $NinjaTraderBin 'NinjaTrader bin folder'
+$ntBin = Resolve-NinjaTraderBin $NinjaTraderBin
 $frameworkRoot = Resolve-FrameworkReferenceRoot
 
 $cscCandidates = @(

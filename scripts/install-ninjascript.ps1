@@ -1,8 +1,8 @@
 param(
     [string] $SourcePath = (Join-Path $PSScriptRoot '..\austins-trade-copier.cs'),
-    [string] $AddOnDirectory = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NinjaTrader 8\bin\Custom\AddOns'),
+    [string] $AddOnDirectory = '',
     [string] $Version = '',
-    [string] $NinjaTraderBin = 'C:\Program Files\NinjaTrader 8\bin',
+    [string] $NinjaTraderBin = '',
     [switch] $Verify
 )
 
@@ -20,6 +20,21 @@ function Resolve-RequiredPath {
     }
 
     return $resolved.ProviderPath
+}
+
+function Resolve-AddOnDirectory {
+    param([string] $Path)
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        return $Path
+    }
+
+    $documents = [Environment]::GetFolderPath('MyDocuments')
+    if ([string]::IsNullOrWhiteSpace($documents)) {
+        throw 'Unable to resolve the current user Documents folder. Pass -AddOnDirectory with your NinjaTrader AddOns folder.'
+    }
+
+    return Join-Path $documents 'NinjaTrader 8\bin\Custom\AddOns'
 }
 
 function Get-GitShortHash {
@@ -59,12 +74,13 @@ $source = Resolve-RequiredPath $SourcePath 'NinjaScript source'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).ProviderPath
 $commit = Get-GitShortHash $repositoryRoot $source
 $versionToWrite = if ([string]::IsNullOrWhiteSpace($Version)) { $null } else { $Version.Trim() }
+$resolvedAddOnDirectory = Resolve-AddOnDirectory $AddOnDirectory
 
-if (-not (Test-Path -LiteralPath $AddOnDirectory)) {
-    New-Item -ItemType Directory -Path $AddOnDirectory | Out-Null
+if (-not (Test-Path -LiteralPath $resolvedAddOnDirectory)) {
+    New-Item -ItemType Directory -Path $resolvedAddOnDirectory | Out-Null
 }
 
-$destination = Join-Path $AddOnDirectory (Split-Path -Leaf $source)
+$destination = Join-Path $resolvedAddOnDirectory (Split-Path -Leaf $source)
 $content = Get-Content -LiteralPath $source -Raw
 if ($null -ne $versionToWrite) {
     $content = Set-ConstantValue $content 'BuildVersion' $versionToWrite
