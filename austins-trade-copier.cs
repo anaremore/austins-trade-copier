@@ -4555,7 +4555,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             var lead = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "lead-only / unused" : row.LeadAccountName;
             var sizing = DescribeSizing(row);
             var risk = DescribeRisk(row);
-            return "Selected: " + row.AccountName + " <- " + lead + " | " + sizing + " | " + risk;
+            var riskNow = DescribeRiskProgressForSelection(row);
+            var summary = "Selected: " + row.AccountName + " <- " + lead + " | " + row.Status + " | " + sizing + " | " + risk;
+            return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
         }
 
         private string DescribeSizing(AccountCopyRow row)
@@ -4592,6 +4594,14 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var action = row.LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
             return "at " + string.Join(", ", parts) + ": " + action;
+        }
+
+        private string DescribeRiskProgressForSelection(AccountCopyRow row)
+        {
+            if (row == null || string.Equals(row.RiskProgressSummary, "No limits", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            return row.RiskProgressSummary;
         }
 
         private void SetStatus(string message)
