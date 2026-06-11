@@ -3830,7 +3830,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string GetRiskLockStatusText(AccountCopyRow row)
         {
-            var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto close" : "Entries locked";
+            var action = row != null && row.LimitAction == RiskAction.HardFlatten ? "Auto-close row" : "Entries locked";
             var reason = row == null ? string.Empty : FormatRiskReasonForStatus(row.LockReason);
             return string.IsNullOrEmpty(reason) ? action : action + " - " + reason;
         }
@@ -4776,8 +4776,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (limits.Count == 0)
                     return "no limits";
 
-                var action = LimitAction == RiskAction.HardFlatten ? "auto close" : "lock entries";
-                return action + " " + string.Join(", ", limits);
+                var action = LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
+                return "at " + string.Join(", ", limits) + ": " + action;
             }
 
             private void NotifyDerivedProperties(string propertyName)
