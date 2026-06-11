@@ -302,7 +302,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Text = "No rows selected",
                 Foreground = BrushRgb(210, 216, 224),
                 FontWeight = FontWeights.Bold,
-                Width = 220,
+                Width = 280,
                 Margin = new Thickness(0, 0, 12, 6),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -330,8 +330,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             copyLeadSettingsButton = CreateButton("Copy Setup to Peers", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to other rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
+            actionPanel.Children.Add(selectionRow);
 
-            selectionRow.Children.Add(CreateToolbarLabel("Row Preset"));
+            var presetRow = CreateToolbarRow();
+            presetRow.Children.Add(CreateToolbarLabel("Row Preset"));
             rowPresetComboBox = new ComboBox
             {
                 Width = 150,
@@ -344,15 +346,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 ToolTip = "Choose a common setup to apply to selected rows. Leads, Symbols, On state, and risk amounts are preserved."
             };
             rowPresetComboBox.SelectionChanged += RowPresetComboBox_SelectionChanged;
-            selectionRow.Children.Add(rowPresetComboBox);
+            presetRow.Children.Add(rowPresetComboBox);
 
             applyRowPresetButton = CreateButton("Apply", Brushes.DimGray, "Apply the selected row preset to selected rows.");
             applyRowPresetButton.Width = 72;
             applyRowPresetButton.IsEnabled = false;
             applyRowPresetButton.Click += ApplyRowPresetButton_Click;
-            selectionRow.Children.Add(applyRowPresetButton);
+            presetRow.Children.Add(applyRowPresetButton);
             UpdateRowPresetToolTip();
-            actionPanel.Children.Add(selectionRow);
+            actionPanel.Children.Add(presetRow);
 
             var actionSection = CreateSection("Controls", actionPanel);
             Grid.SetRow(actionSection, 1);
