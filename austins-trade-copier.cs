@@ -367,7 +367,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
-                FrozenColumnCount = 6,
+                FrozenColumnCount = 5,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 ItemsSource = accountRows,
@@ -605,7 +605,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AddGridColumns(DataGrid grid)
         {
-            grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 32, null, true, "Rows marked > are selected for the Selected Rows buttons."));
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
@@ -693,7 +692,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 binding.UpdateSource();
 
             e.Handled = true;
-            UpdateSelectionMarkers();
+            UpdateSelectedActionButtons();
             RefreshStatusSummary();
         }
 
@@ -735,7 +734,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             SelectRowForDirectCellAction(row);
-            UpdateSelectionMarkers();
+            UpdateSelectedActionButtons();
             RefreshStatusSummary();
         }
 
@@ -982,21 +981,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             var style = new Style(typeof(TextBlock));
             style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
             style.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
-
-            if (propertyName == "SelectionMarker")
-            {
-                style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
-
-                var selectedMarkerTrigger = new DataTrigger
-                {
-                    Binding = new Binding("SelectionMarker"),
-                    Value = ">"
-                };
-                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.BackgroundProperty, BrushRgb(70, 104, 142)));
-                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.ForegroundProperty, Brushes.White));
-                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.Bold));
-                style.Triggers.Add(selectedMarkerTrigger);
-            }
 
             var tooltipBinding = new Binding(propertyName == "Status" ? "StatusDetail" : propertyName);
             if (propertyName != "Status" && !string.IsNullOrEmpty(stringFormat))
@@ -1638,31 +1622,19 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateSelectionMarkers();
+            UpdateSelectedActionButtons();
             RefreshStatusSummary();
         }
 
         private void AccountsGrid_CurrentCellChanged(object sender, EventArgs e)
         {
-            UpdateSelectionMarkers();
+            UpdateSelectedActionButtons();
             RefreshStatusSummary();
         }
 
         private void RowPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateRowPresetToolTip();
-        }
-
-        private void UpdateSelectionMarkers()
-        {
-            if (accountsGrid == null)
-                return;
-
-            var selectedRows = new HashSet<AccountCopyRow>(GetSelectedRows());
-            foreach (var row in accountRows)
-                row.SelectionMarker = selectedRows.Contains(row) ? ">" : string.Empty;
-
-            UpdateSelectedActionButtons();
         }
 
         private void UpdateSelectedActionButtons()
@@ -5693,7 +5665,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string statusDetail = "Ready";
             private string statusLevel = "Ready";
             private string roleSummary = "Available";
-            private string selectionMarker = string.Empty;
             private string positionSummary = "Flat";
             private string instrumentFilter = string.Empty;
             private double sessionPnl;
@@ -5931,12 +5902,6 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return roleSummary; }
                 set { SetField(ref roleSummary, value, "RoleSummary"); }
-            }
-
-            public string SelectionMarker
-            {
-                get { return selectionMarker; }
-                set { SetField(ref selectionMarker, value ?? string.Empty, "SelectionMarker"); }
             }
 
             public string PlanSummary
