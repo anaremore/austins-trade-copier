@@ -610,7 +610,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Accounts followed by another row are Lead; Status and Conn show whether they are ready or disconnected."));
-            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders.", "LeadSelectionTooltip", "CanEditLeadSelection"));
+            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", null, null, null, 112, "Choose the account this row should copy. The list hides this row and active copy rows; leave blank for lead-only or unused accounts.", "LeadSelectionTooltip", "CanEditLeadSelection", "LeadAccountOptions"));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, BuildCopySetupColumnTooltip("All copies entries and exits. Exits only blocks new entries while allowing exits."), null, "CanEditCopySetup"));
             grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, BuildCopySetupColumnTooltip("Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, Flatten Selected, Flatten On, and auto-close row."), null, "CanEditCopySetup"));
@@ -739,10 +739,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshStatusSummary();
         }
 
-        private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null)
+        private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null, string itemsSourceBindingPropertyName = null)
         {
             var factory = new FrameworkElementFactory(typeof(ComboBox));
-            factory.SetValue(ItemsControl.ItemsSourceProperty, itemsSource);
+            if (string.IsNullOrWhiteSpace(itemsSourceBindingPropertyName))
+                factory.SetValue(ItemsControl.ItemsSourceProperty, itemsSource);
+            else
+                factory.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(itemsSourceBindingPropertyName));
             factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
             factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
             factory.SetValue(Control.PaddingProperty, new Thickness(2, 0, 2, 0));
@@ -797,6 +800,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             if (!comboBox.IsKeyboardFocusWithin && !comboBox.IsDropDownOpen)
+                return;
+
+            if (comboBox.SelectedItem == null && comboBox.SelectedValue == null)
                 return;
 
             var selectedItemBinding = comboBox.GetBindingExpression(Selector.SelectedItemProperty);
@@ -1059,8 +1065,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             Dispatcher.InvokeAsync(() =>
             {
-                RefreshConnectedAccountNames();
                 SyncAccountRowsWithConnectedAccounts();
+                RefreshConnectedAccountNames();
+                RefreshLeadAccountOptions();
                 SyncLeadAccountSubscriptions();
                 RefreshAllRows();
             });
@@ -1085,6 +1092,61 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             foreach (var accountName in names)
                 connectedAccountNames.Add(accountName);
+        }
+
+        private void RefreshLeadAccountOptions()
+        {
+            foreach (var row in accountRows.ToList())
+                RefreshLeadAccountOptions(row);
+        }
+
+        private void RefreshLeadAccountOptions(AccountCopyRow row)
+        {
+            if (row == null)
+                return;
+
+            var options = BuildLeadAccountOptions(row);
+            if (row.LeadAccountOptions.SequenceEqual(options, StringComparer.OrdinalIgnoreCase))
+                return;
+
+            row.LeadAccountOptions.Clear();
+            foreach (var option in options)
+                row.LeadAccountOptions.Add(option);
+        }
+
+        private List<string> BuildLeadAccountOptions(AccountCopyRow row)
+        {
+            var options = new List<string> { string.Empty };
+            if (row == null)
+                return options;
+
+            foreach (var accountName in connectedAccounts
+                .Select(a => a.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .OrderBy(name => name))
+            {
+                if (AccountNamesEqual(accountName, row.AccountName))
+                    continue;
+
+                if (IsActiveCopyAccount(accountName, row) && !AccountNamesEqual(accountName, row.LeadAccountName))
+                    continue;
+
+                AddLeadAccountOption(options, accountName);
+            }
+
+            AddLeadAccountOption(options, row.LeadAccountName);
+            return options;
+        }
+
+        private void AddLeadAccountOption(ICollection<string> options, string accountName)
+        {
+            if (options == null || string.IsNullOrWhiteSpace(accountName))
+                return;
+
+            if (options.Any(option => AccountNamesEqual(option, accountName)))
+                return;
+
+            options.Add(accountName);
         }
 
         private void SyncAccountRowsWithConnectedAccounts()
@@ -1276,7 +1338,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 RefreshLeadRoleState();
 
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
+            {
+                RefreshLeadAccountOptions();
                 SyncLeadAccountSubscriptions();
+            }
 
             if (RowPropertyAppliesRiskImmediately(e.PropertyName))
                 ApplyRiskSettingsEdit(row);
@@ -4503,6 +4568,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RefreshAllRows()
         {
+            RefreshLeadAccountOptions();
             ClearLeadSelectionsForLeadRows();
             EnforceLeadRowsStayOff();
 
@@ -4520,6 +4586,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 UpdateRowStatus(row);
             }
 
+            RefreshLeadAccountOptions();
             UpdateSelectedActionButtons();
             RefreshStatusSummary();
         }
@@ -4560,6 +4627,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RefreshLeadRoleState()
         {
+            RefreshLeadAccountOptions();
             ClearLeadSelectionsForLeadRows();
             EnforceLeadRowsStayOff();
 
@@ -4570,6 +4638,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             UpdateSelectedActionButtons();
+            RefreshLeadAccountOptions();
             RefreshStatusSummary();
         }
 
@@ -5641,6 +5710,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 AccountName = account != null ? account.Name : string.Empty;
                 BaselinePnl = baselinePnl;
                 PeakPnl = 0;
+                LeadAccountOptions = new ObservableCollection<string>();
+                LeadAccountOptions.Add(string.Empty);
             }
 
             public AccountCopyRow(string accountName, double baselinePnl)
@@ -5650,12 +5721,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 connectionStatus = "Not connected";
                 positionSummary = "No account";
                 PeakPnl = 0;
+                LeadAccountOptions = new ObservableCollection<string>();
+                LeadAccountOptions.Add(string.Empty);
             }
 
             public event PropertyChangedEventHandler PropertyChanged;
 
             public Account Account { get; private set; }
             public string AccountName { get; private set; }
+            public ObservableCollection<string> LeadAccountOptions { get; private set; }
             public double BaselinePnl { get; private set; }
 
             public void RefreshAccount(Account account)
@@ -5747,7 +5821,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (Enabled)
                         return "Changing the Lead on an On row may pause it for review while copying is active.";
 
-                    return "Choose the account this row should copy. Leave blank to keep it available.";
+                    return "Choose the account this row should copy. The list hides this account and active copy rows; leave blank to keep it available.";
                 }
             }
 
