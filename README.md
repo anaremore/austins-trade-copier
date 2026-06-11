@@ -30,7 +30,7 @@
 3. Open the copier from **Control Center > Tools > Austin's Trade Copier**.
 
 > ℹ️ The UI will appear automatically when the add-on is activated.
-> The install and verify scripts resolve paths from the current user's Documents and Program Files folders. For custom NinjaTrader locations, pass `-NinjaTraderUserDirectory`, `-AddOnDirectory`, or `-NinjaTraderBin`. You can also set `NINJATRADER_USER_DIR` to the folder that contains that user's `bin\Custom\AddOns` tree.
+> The install and verify scripts resolve paths from the current user's Documents and Program Files folders. For custom NinjaTrader locations, pass `-NinjaTraderUserDirectory`, `-AddOnDirectory`, or `-NinjaTraderBin`. You can also set `NINJATRADER_USER_DIR` to the folder that contains that user's `bin\Custom\AddOns` tree, `NINJATRADER_ADDON_DIR` to the exact AddOns folder, and `NINJATRADER_BIN` to the folder containing NinjaTrader assemblies.
 
 For a local syntax/build check outside NinjaTrader, run:
 

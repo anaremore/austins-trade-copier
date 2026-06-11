@@ -23,15 +23,33 @@ function Resolve-RequiredPath {
     return $resolved.ProviderPath
 }
 
+function Resolve-FullPath {
+    param(
+        [string] $Path,
+        [string] $Description
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "$Description path is empty."
+    }
+
+    try {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    catch {
+        throw "$Description path is invalid: $Path"
+    }
+}
+
 function Resolve-NinjaTraderUserDirectory {
     param([string] $Path)
 
     if (-not [string]::IsNullOrWhiteSpace($Path)) {
-        return $Path
+        return Resolve-FullPath $Path 'NinjaTrader user directory'
     }
 
     if (-not [string]::IsNullOrWhiteSpace($env:NINJATRADER_USER_DIR)) {
-        return $env:NINJATRADER_USER_DIR
+        return Resolve-FullPath $env:NINJATRADER_USER_DIR 'NINJATRADER_USER_DIR'
     }
 
     $documents = [Environment]::GetFolderPath('MyDocuments')
@@ -49,7 +67,11 @@ function Resolve-AddOnDirectory {
     )
 
     if (-not [string]::IsNullOrWhiteSpace($Path)) {
-        return $Path
+        return Resolve-FullPath $Path 'AddOn directory'
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:NINJATRADER_ADDON_DIR)) {
+        return Resolve-FullPath $env:NINJATRADER_ADDON_DIR 'NINJATRADER_ADDON_DIR'
     }
 
     $resolvedUserDirectory = Resolve-NinjaTraderUserDirectory $UserDirectory
@@ -115,7 +137,7 @@ $versionToWrite = if ([string]::IsNullOrWhiteSpace($Version)) { $null } else { $
 $resolvedAddOnDirectory = Resolve-AddOnDirectory $AddOnDirectory $NinjaTraderUserDirectory
 
 if (-not (Test-Path -LiteralPath $resolvedAddOnDirectory)) {
-    New-Item -ItemType Directory -Path $resolvedAddOnDirectory | Out-Null
+    [System.IO.Directory]::CreateDirectory($resolvedAddOnDirectory) | Out-Null
 }
 
 $destination = Join-Path $resolvedAddOnDirectory (Split-Path -Leaf $source)
