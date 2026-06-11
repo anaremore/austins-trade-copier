@@ -1045,9 +1045,18 @@ namespace NinjaTrader.NinjaScript.AddOns
                 .ToList();
         }
 
-        private bool IsConfiguredLeadAccount(string accountName)
+        private bool IsReferencedLeadAccount(string accountName)
         {
-            return accountRows.Any(r => r.Enabled && r.SizingMode != SizingMode.Disabled && AccountNamesEqual(r.LeadAccountName, accountName));
+            return accountRows.Any(r => !string.IsNullOrWhiteSpace(r.LeadAccountName) && AccountNamesEqual(r.LeadAccountName, accountName));
+        }
+
+        private int GetReferencedLeadAccountCount()
+        {
+            return accountRows
+                .Select(r => r.LeadAccountName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
         }
 
         private bool AccountNamesEqual(string left, string right)
@@ -4242,7 +4251,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsConfiguredLeadAccount(row.AccountName))
+            if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsReferencedLeadAccount(row.AccountName))
             {
                 row.SetStatus("Error", "Lead conflict", "This account is also assigned as a lead. Lead accounts cannot receive copied entries.");
                 return;
@@ -4312,7 +4321,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Off";
 
-            if (IsConfiguredLeadAccount(row.AccountName))
+            if (IsReferencedLeadAccount(row.AccountName))
                 return "Lead";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4339,7 +4348,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Sizing is off. This row will not copy entries.";
 
-            if (IsConfiguredLeadAccount(row.AccountName))
+            if (IsReferencedLeadAccount(row.AccountName))
                 return "Lead account. It can drive copy rows but does not receive copied orders.";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4369,7 +4378,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var usedAsLead = IsConfiguredLeadAccount(row.AccountName);
+            var usedAsLead = IsReferencedLeadAccount(row.AccountName);
             var activeCopyRow = row.Enabled && row.SizingMode != SizingMode.Disabled;
 
             if (activeCopyRow && usedAsLead)
@@ -4692,7 +4701,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var entryActiveCount = accountRows.Count(IsEntryActiveRow);
             var exitsOnlyCount = accountRows.Count(IsExitsOnlyCopyRow);
-            var armedLeadCount = GetConfiguredLeadAccounts().Count;
+            var leadCount = GetReferencedLeadAccountCount();
             var lockedCount = accountRows.Count(IsLockedCopyRow);
             var attentionCount = accountRows.Count(IsAttentionRow);
             var offlineCount = accountRows.Count(IsOfflineRow);
@@ -4700,7 +4709,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var parts = new List<string>
             {
                 mode,
-                "Leads: " + armedLeadCount,
+                "Leads: " + leadCount,
                 "Entries: " + entryActiveCount
             };
 
