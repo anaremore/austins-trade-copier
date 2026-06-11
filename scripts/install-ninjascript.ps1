@@ -41,15 +41,29 @@ function Resolve-FullPath {
     }
 }
 
+function Resolve-RequiredDirectory {
+    param(
+        [string] $Path,
+        [string] $Description
+    )
+
+    $resolved = Resolve-Path -LiteralPath $Path -ErrorAction SilentlyContinue
+    if ($null -eq $resolved -or -not (Test-Path -LiteralPath $resolved.ProviderPath -PathType Container)) {
+        throw "$Description not found: $Path"
+    }
+
+    return $resolved.ProviderPath
+}
+
 function Resolve-NinjaTraderUserDirectory {
     param([string] $Path)
 
     if (-not [string]::IsNullOrWhiteSpace($Path)) {
-        return Resolve-FullPath $Path 'NinjaTrader user directory'
+        return Resolve-RequiredDirectory $Path 'NinjaTrader user directory'
     }
 
     if (-not [string]::IsNullOrWhiteSpace($env:NINJATRADER_USER_DIR)) {
-        return Resolve-FullPath $env:NINJATRADER_USER_DIR 'NINJATRADER_USER_DIR'
+        return Resolve-RequiredDirectory $env:NINJATRADER_USER_DIR 'NINJATRADER_USER_DIR'
     }
 
     $documents = [Environment]::GetFolderPath('MyDocuments')
@@ -57,7 +71,8 @@ function Resolve-NinjaTraderUserDirectory {
         throw 'Unable to resolve the current user Documents folder. Pass -NinjaTraderUserDirectory or -AddOnDirectory.'
     }
 
-    return Join-Path $documents 'NinjaTrader 8'
+    $defaultUserDirectory = Join-Path $documents 'NinjaTrader 8'
+    return Resolve-RequiredDirectory $defaultUserDirectory 'NinjaTrader user directory'
 }
 
 function Resolve-AddOnDirectory {
@@ -75,7 +90,8 @@ function Resolve-AddOnDirectory {
     }
 
     $resolvedUserDirectory = Resolve-NinjaTraderUserDirectory $UserDirectory
-    return Join-Path $resolvedUserDirectory 'bin\Custom\AddOns'
+    $customDirectory = Resolve-RequiredDirectory (Join-Path $resolvedUserDirectory 'bin\Custom') 'NinjaTrader custom source directory'
+    return Join-Path $customDirectory 'AddOns'
 }
 
 function Get-GitShortHash {
