@@ -620,7 +620,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered after this session profit target is reached. 0 disables the target."));
             grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders."));
-            grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
+            grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits.", "ManualLockTooltip", "CanToggleManualLock"));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 104, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("PnL", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
@@ -5438,6 +5438,52 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
             }
 
+            public bool CanToggleManualLock
+            {
+                get
+                {
+                    if (ManualLock)
+                        return true;
+
+                    if (!Enabled || AutoLocked)
+                        return false;
+
+                    if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                        return false;
+
+                    if (SizingMode == SizingMode.Disabled || string.IsNullOrWhiteSpace(LeadAccountName))
+                        return false;
+
+                    return true;
+                }
+            }
+
+            public string ManualLockTooltip
+            {
+                get
+                {
+                    if (ManualLock)
+                        return "Clear manual lock so this row can take new copied entries again.";
+
+                    if (AutoLocked)
+                        return "Risk lock is active. Use Unlock Selected or Reset Baselines to clear it.";
+
+                    if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                        return "Lead accounts stay off and do not receive copied entries.";
+
+                    if (!Enabled)
+                        return "Turn this copy row On before using Manual Lock.";
+
+                    if (SizingMode == SizingMode.Disabled)
+                        return "Choose an active Sizing mode before using Manual Lock.";
+
+                    if (string.IsNullOrWhiteSpace(LeadAccountName))
+                        return "Choose a Lead before using Manual Lock.";
+
+                    return "Block new entries for this On copy row while still allowing exits.";
+                }
+            }
+
             public string LeadAccountName
             {
                 get { return leadAccountName; }
@@ -5871,8 +5917,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "SizingMode":
                     case "RoleSummary":
                     case "Status":
+                    case "ManualLock":
+                    case "AutoLocked":
                         OnPropertyChanged("CanToggleEnabled");
                         OnPropertyChanged("EnableTooltip");
+                        OnPropertyChanged("CanToggleManualLock");
+                        OnPropertyChanged("ManualLockTooltip");
                         break;
                 }
 
