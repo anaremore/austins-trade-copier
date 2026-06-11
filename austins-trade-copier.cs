@@ -1840,6 +1840,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var rowWasManualLocked = GetBoolAttribute(element, "manualLocked", false);
                 var rowWasAutoLocked = GetBoolAttribute(element, "autoLocked", false);
                 var rowLockReason = GetOptionalStringAttribute(element, "lockReason", rowWasAutoLocked ? "Risk limit" : string.Empty);
+                var rowLoadedAvailableBecauseNoLead = false;
                 Account rowLead = null;
 
                 if (account == null && rowEnabled)
@@ -1870,7 +1871,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 else if (rowEnabled)
                 {
                     rowEnabled = false;
-                    Log("Profile disabled " + accountName + " because no lead is saved.");
+                    rowLoadedAvailableBecauseNoLead = true;
+                    Log("Profile kept " + accountName + " available because no lead is saved. Choose a Lead and turn On to copy.");
                 }
 
                 var row = account != null
@@ -1893,7 +1895,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.AutoLocked = rowWasAutoLocked;
                 row.LockReason = rowWasAutoLocked ? rowLockReason : string.Empty;
                 NormalizeLegacySizingMode(row);
-                row.LastAction = rowWasAutoLocked ? "Loaded risk lock" : row.Enabled ? row.ManualLock ? "Loaded manual lock" : "Loaded profile" : "Loaded disabled";
+                row.LastAction = rowWasAutoLocked ? "Loaded risk lock" : row.Enabled ? row.ManualLock ? "Loaded manual lock" : "Loaded profile" : rowLoadedAvailableBecauseNoLead ? "Loaded available" : "Loaded disabled";
 
                 accountRows.Add(row);
                 seenAccounts.Add(accountName);
