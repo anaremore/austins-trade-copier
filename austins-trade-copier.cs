@@ -26,6 +26,8 @@ namespace NinjaTrader.NinjaScript.AddOns
     public class TradeCopier : NinjaTrader.NinjaScript.AddOnBase
     {
         private TradeCopierWindow window;
+        private NTMenuItem toolsMenuItem;
+        private NTMenuItem tradeCopierMenuItem;
 
         protected override void OnStateChange()
         {
@@ -34,20 +36,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Description = "Multi-Account Trade Copier Addon";
                 Name = "Austin's Trade Copier";
             }
-            else if (State == State.Active)
-            {
-                if (window == null || !window.IsVisible)
-                {
-                    window = new TradeCopierWindow();
-                    window.Show();
-                }
-                else
-                {
-                    window.Focus();
-                }
-            }
             else if (State == State.Terminated)
             {
+                RemoveControlCenterMenuItem();
                 if (window != null)
                 {
                     window.Close();
@@ -58,14 +49,66 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         protected override void OnWindowCreated(Window window)
         {
+            var controlCenter = window as NinjaTrader.Gui.ControlCenter;
+            if (controlCenter != null)
+                AddControlCenterMenuItem(controlCenter);
+
             if (window is TradeCopierWindow)
                 this.window = window as TradeCopierWindow;
         }
 
         protected override void OnWindowDestroyed(Window window)
         {
+            if (window is NinjaTrader.Gui.ControlCenter)
+                RemoveControlCenterMenuItem();
+
             if (window is TradeCopierWindow)
                 this.window = null;
+        }
+
+        private void AddControlCenterMenuItem(NinjaTrader.Gui.ControlCenter controlCenter)
+        {
+            if (controlCenter == null || tradeCopierMenuItem != null)
+                return;
+
+            toolsMenuItem = controlCenter.FindFirst("ControlCenterMenuItemTools") as NTMenuItem;
+            if (toolsMenuItem == null)
+                return;
+
+            tradeCopierMenuItem = new NTMenuItem
+            {
+                Header = "Austin's Trade Copier",
+                Style = Application.Current.TryFindResource("MainMenuItem") as Style
+            };
+            tradeCopierMenuItem.Click += TradeCopierMenuItem_Click;
+            toolsMenuItem.Items.Add(tradeCopierMenuItem);
+        }
+
+        private void RemoveControlCenterMenuItem()
+        {
+            if (tradeCopierMenuItem != null)
+                tradeCopierMenuItem.Click -= TradeCopierMenuItem_Click;
+
+            if (toolsMenuItem != null && tradeCopierMenuItem != null && toolsMenuItem.Items.Contains(tradeCopierMenuItem))
+                toolsMenuItem.Items.Remove(tradeCopierMenuItem);
+
+            tradeCopierMenuItem = null;
+            toolsMenuItem = null;
+        }
+
+        private void TradeCopierMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (window == null || !window.IsVisible)
+            {
+                window = new TradeCopierWindow();
+                window.Show();
+                return;
+            }
+
+            if (window.WindowState == WindowState.Minimized)
+                window.WindowState = WindowState.Normal;
+
+            window.Focus();
         }
     }
 
