@@ -12,18 +12,18 @@
 
 - 📈 **Trade Mirroring**: Automatically copies market, limit, and stop orders from a lead account to any number of target accounts.
 - 🔁 **Live Sync**: Reacts to account connection status updates in real time.
-- 🧭 **Follower Dashboard**: Manage accounts in a grid with connection status, copy state, position summary, session PnL, drawdown, sizing, risk rules, and last action.
-- 🧩 **Account Groups**: Assign followers to groups such as funded, eval, personal, or provider-specific buckets, then enable, pause, flatten, or apply settings by group.
-- 🎯 **Instrument Filters**: Restrict any follower or group to selected symbols such as `MNQ, MES`.
-- 🚪 **Exits-Only Mode**: Let a follower stop taking new entries while still following reducing/closing orders.
-- ⚖️ **Per-Account Sizing**: Choose 1:1, multiplier, fixed quantity, balance-ratio, or disabled sizing for each follower.
-- 🧱 **Max Net Position Guard**: Cap each follower's absolute resulting position per instrument.
-- 🧯 **Risk Lockouts**: Set daily loss, drawdown, and profit-target thresholds per account with soft-lock or hard-flatten behavior.
+- 🧭 **Table-First Account Setup**: Every connected account appears in one grid. Enable the rows you want copied and choose each row's lead account directly in the table.
+- 🔀 **Multiple Lead Accounts**: Different rows can copy different leads at the same time, so one copier window can manage several lead/copy-row sets.
+- 🎯 **Instrument Filters**: Restrict any row to selected symbols such as `MNQ, MES`.
+- 🚪 **Exits-Only Mode**: Let a row stop taking new entries while still following reducing/closing orders.
+- ⚖️ **Per-Account Sizing**: Choose 1:1, multiplier, fixed quantity, balance-ratio, or disabled sizing for each row.
+- 🧱 **Max Net Position Guard**: Cap each row's absolute resulting position per instrument.
+- 🧯 **Risk Lockouts**: Set max loss, max drawdown, and profit-target thresholds per row with entry-lock or auto-close behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
-- 🧹 **Flatten Controls**: Flatten followers, all accounts, or a selected group.
-- 🧮 **Reconcile Selected**: Deliberately align selected followers to the lead using each row's sizing rules.
+- 🧹 **Flatten Controls**: Flatten enabled rows, selected rows, or all connected table/lead accounts without changing the copier's running state.
+- 🧮 **Reconcile Selected**: Deliberately align selected rows to their leads using each row's sizing rules.
 - 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
-- 💾 **Profiles**: Save, load, and delete copier profiles so groups, sizing, and risk rules survive restarts.
+- 💾 **Profiles**: Save, load, and delete copier profiles so enabled rows, lead assignments, sizing, filters, and risk rules survive restarts.
 - 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors, with export and clear controls.
 
 ---
@@ -36,54 +36,63 @@
 
 > ℹ️ The UI will appear automatically when the add-on is activated.
 
+For a local syntax/build check outside NinjaTrader, run:
+
+```powershell
+.\scripts\verify-ninjascript.ps1
+```
+
+The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrader 8 assemblies and .NET Framework WPF references.
+
 ---
 
 ## 📋 How to Use
 
-1. **Choose a Lead Account** – All copied trades originate here.
-2. **Add Follower Accounts** – Choose an account, assign a group name, then click **Add Account**.
-3. **Configure Copy Mode, Symbols, and Sizing** – Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
-   - **OneToOne**: copies the lead filled quantity.
+1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. Rows with no lead can stay available as lead-only or unused accounts.
+2. **Choose Leads Per Row** – In the **Lead** column, pick the account each enabled row should copy. Leave the lead account's own row disabled or with no lead.
+3. **Enable Copy Rows** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing.
+4. **Configure Copy Mode, Symbols, and Sizing** – Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
+   - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
-   - **Fixed**: sends a fixed quantity once per lead order.
-   - **BalanceRatio**: scales by follower equity versus lead equity.
-   - **Disabled**: keeps the row visible but does not copy entries.
-4. **Set Risk Rules** – Optional loss, drawdown, and profit-target values lock an account when hit.
-5. **Save a Profile** – Store the current dashboard as a profile if you want to reuse the setup.
-6. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
-7. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-8. **Flatten or Reconcile Deliberately** – Use selected, follower, group, or all-account flatten buttons when you intend to close positions. Use **Reconcile Selected** only when you want selected followers adjusted back toward the lead.
+   - **Fixed qty**: sends a fixed quantity once per lead order.
+   - **Balance ratio**: scales by follower equity versus lead equity.
+   - **Off**: keeps the row visible but does not copy entries.
+5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. Use **At Limit** to choose whether the row only locks new entries or auto-closes matching managed positions.
+6. **Save a Profile** – Store the current dashboard as a profile if you want to reuse the setup.
+7. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
+8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
+9. **Flatten or Reconcile Deliberately** – Use enabled, selected, or all-account flatten buttons when you intend to close positions. Use **Reconcile Selected** only when you want selected rows adjusted back toward their configured leads.
 
 ---
 
 ## 🧠 Sizing and Risk Model
 
-Sizing is calculated from the cumulative filled quantity of the lead order. This avoids over-copying partial fills: if the lead order fills in pieces, each follower receives only the remaining quantity needed for its configured target size.
+Sizing is calculated from the cumulative filled quantity of the lead order. This avoids over-copying partial fills: if the lead order fills in pieces, each copy row receives only the remaining quantity needed for its configured target size.
 
-Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that follower order instead of falling back to the full lead size.
+Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that row's order instead of falling back to the full lead size.
 
 `Max` caps every sizing mode when greater than zero. A value of `0` means no max cap.
 
-`Max Net` caps the absolute resulting follower position per instrument. A value of `0` means no net-position cap. The guard blocks or caps exposure increases but still allows position-reducing orders.
+`Max Net` caps the absolute resulting row position per instrument. A value of `0` means no net-position cap. The guard blocks or caps exposure increases but still allows position-reducing orders.
 
-Before copying starts, enabled rows are validated. Disconnected followers, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
+Before copying starts, enabled rows are validated. Disconnected rows, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
 
 Profiles are stored under your NinjaTrader documents templates folder:
 
 `Documents\NinjaTrader 8\templates\AustinTradeCopier`
 
-Risk thresholds use the row baseline captured when the follower is added or when **Reset Baselines** is clicked:
+Risk thresholds use the row baseline captured when the account row is created, loaded, or reset with **Reset Baselines**:
 
-- **Loss** locks when session PnL is less than or equal to the negative loss limit.
-- **DD Lim** locks when drawdown from the row's session peak reaches the limit.
-- **Target** locks when session PnL reaches the profit target.
+- **Max Loss** locks when session PnL is less than or equal to the negative loss limit.
+- **Max DD** locks when drawdown from the row's session peak reaches the limit.
+- **Profit Target** locks when session PnL reaches the profit target.
 
 Risk actions:
 
-- **SoftLock** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
-- **HardFlatten** immediately requests a flatten for the account, then blocks new or increasing entries.
+- **Lock entries only** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
+- **Auto-close row** immediately requests a flatten for matching managed row positions, then blocks new or increasing entries.
 
-`ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the follower's current position.
+`ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the copy row's current position.
 
 Reconciliation is selected-row only and requires confirmation. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
 
@@ -94,10 +103,10 @@ Dry run mode is selected before starting a copy session and stays locked for tha
 ## ⚠️ Warnings & Best Practices
 
 - Only **connected accounts** are available for copying.
-- **Lead account cannot also be a target account**.
+- A row cannot copy itself, and an account being used as a lead should not also be enabled as a copy row.
 - Filled and partially filled lead orders are tracked by cumulative filled quantity to avoid duplicate target orders.
 - Soft-locked and manually locked accounts still allow exits that reduce an existing position.
-- Balance-ratio sizing can skip a follower if NinjaTrader does not expose usable account value data.
+- Balance-ratio sizing can skip a row if NinjaTrader does not expose usable account value data.
 - Always test new sizing and lockout rules in simulation before using live accounts.
 - **Trade responsibly**—copied trades carry the same risk as manual entries.
 
