@@ -5971,7 +5971,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             private bool ShouldUseLeadOnlyPlan(string leadSummary)
             {
-                return string.Equals(leadSummary, "Lead account", StringComparison.OrdinalIgnoreCase)
+                return string.Equals(leadSummary, "Lead", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(leadSummary, "Lead account", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Lead/copy conflict", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Self-copy", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Needs lead", StringComparison.OrdinalIgnoreCase)
@@ -5983,7 +5984,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string BuildLeadSummary()
             {
                 if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                    return "Lead account";
+                    return "Lead";
 
                 if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                     return "Lead/copy conflict";
