@@ -293,7 +293,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            copyLeadSettingsButton = CreateButton("Copy Settings", Brushes.DimGray, "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Settings", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -562,10 +562,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
 
             grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, uses At Limit when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, uses At Limit when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers At Limit after this session profit target is reached. 0 disables the target."));
-            grid.Columns.Add(CreateComboBoxColumn("At Limit", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders."));
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
@@ -1498,7 +1498,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!string.IsNullOrEmpty(sourceSizingBlockReason))
                 return sourceSizingBlockReason;
 
-            return "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
+            return "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
         }
 
         private string GetCopySettingsSizingBlockReason(AccountCopyRow row)
