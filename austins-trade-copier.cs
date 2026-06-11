@@ -2130,6 +2130,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var rowCount = accountRows.Count;
             var onCount = accountRows.Count(r => r != null && r.Enabled);
+            var offCount = Math.Max(0, rowCount - onCount);
             var leadCount = GetReferencedLeadAccountCount();
             var offlineCount = accountRows.Count(IsOfflineRow);
 
@@ -2139,6 +2140,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 onCount + " On"
             };
 
+            if (offCount > 0)
+                parts.Add(offCount + " Off");
+
             if (leadCount > 0)
                 parts.Add(leadCount + " lead(s)");
 
@@ -2146,7 +2150,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 parts.Add(offlineCount + " offline");
 
             if (loadedOffCount > 0)
-                parts.Add(loadedOffCount + " turned Off");
+                parts.Add(loadedOffCount + " kept Off for review");
 
             return string.Join(", ", parts) + ".";
         }
@@ -2293,7 +2297,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var account = accounts.FirstOrDefault(a => string.Equals(a.Name, accountName, StringComparison.OrdinalIgnoreCase));
                 if (account == null)
                 {
-                    Log("Profile row " + accountName + " is not connected; loaded disabled until it reconnects.");
+                    Log("Profile row " + accountName + " is not connected.");
                 }
 
                 var rowLeadName = GetOptionalStringAttribute(element, "leadAccount", leadAccountName);
@@ -2308,13 +2312,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (account == null && rowEnabled)
                 {
                     rowEnabled = false;
-                    Log("Profile disabled " + accountName + " until its account reconnects.");
+                    rowLoadedOffReason = "account is disconnected";
+                    loadedOffCount++;
+                    Log("Profile loaded " + accountName + " Off because the account is disconnected. Reconnect it, then turn it On.");
                 }
 
                 if (rowWasAutoLocked && rowEnabled)
                 {
                     rowEnabled = false;
-                    Log("Profile loaded " + accountName + " disabled because it was risk-locked when saved" + (string.IsNullOrWhiteSpace(rowLockReason) ? string.Empty : " by " + rowLockReason) + ".");
+                    rowLoadedOffReason = string.IsNullOrWhiteSpace(rowLockReason) ? "saved risk lock" : rowLockReason;
+                    loadedOffCount++;
+                    Log("Profile loaded " + accountName + " Off because it was risk-locked when saved" + (string.IsNullOrWhiteSpace(rowLockReason) ? string.Empty : " by " + rowLockReason) + ".");
                 }
 
                 if (!string.IsNullOrWhiteSpace(rowLeadName))
@@ -2326,7 +2334,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                         if (rowEnabled)
                         {
                             rowEnabled = false;
-                            Log("Profile disabled " + accountName + " until its lead reconnects.");
+                            rowLoadedOffReason = "lead account is disconnected";
+                            loadedOffCount++;
+                            Log("Profile loaded " + accountName + " Off because lead " + rowLeadName + " is disconnected. Reconnect the lead, then turn it On.");
                         }
                     }
                 }
@@ -2334,6 +2344,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 {
                     rowEnabled = false;
                     rowLoadedAvailableBecauseNoLead = true;
+                    rowLoadedOffReason = "choose a lead account";
+                    loadedOffCount++;
                     Log("Profile kept " + accountName + " available because no lead is saved. Choose a Lead and turn On to copy.");
                 }
 
