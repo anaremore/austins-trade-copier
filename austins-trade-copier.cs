@@ -96,6 +96,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             Processed,
             SkippedOffline,
+            SkippedRisk,
             SkippedInvalid
         }
 
@@ -2605,6 +2606,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var processedCount = 0;
             var offlineCount = 0;
+            var riskCount = 0;
             var invalidCount = 0;
             foreach (var row in rows)
             {
@@ -2613,6 +2615,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     processedCount++;
                 else if (outcome == ReconcileOutcome.SkippedOffline)
                     offlineCount++;
+                else if (outcome == ReconcileOutcome.SkippedRisk)
+                    riskCount++;
                 else
                     invalidCount++;
             }
@@ -2620,6 +2624,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             var message = "Reconcile processed " + processedCount + " selected row(s)";
             if (offlineCount > 0)
                 message += "; skipped " + offlineCount + " offline row(s)";
+
+            if (riskCount > 0)
+                message += "; skipped " + riskCount + " auto-close row(s)";
 
             if (invalidCount > 0)
                 message += "; skipped " + invalidCount + " invalid row(s)";
@@ -2634,7 +2641,8 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var rowCount = rows == null ? 0 : rows.Count(r => r != null);
             var filteredCount = rows == null ? 0 : rows.Count(HasInstrumentFilter);
-            var lockedCount = rows == null ? 0 : rows.Count(r => r != null && RowIsReduceOnly(r));
+            var autoCloseCount = rows == null ? 0 : rows.Count(r => r != null && r.AutoLocked && r.LimitAction == RiskAction.HardFlatten);
+            var lockedCount = rows == null ? 0 : rows.Count(r => r != null && RowIsReduceOnly(r) && !(r.AutoLocked && r.LimitAction == RiskAction.HardFlatten));
             var cappedCount = rows == null ? 0 : rows.Count(r => r != null && r.MaxNetPosition > 0);
             var offlineCount = rows == null ? 0 : rows.Count(r => r != null && !RowHasConnectedAccount(r));
 
@@ -2649,6 +2657,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (lockedCount > 0)
                 prompt += "\n" + lockedCount + " locked or exits-only row(s) will only reduce current exposure.";
+
+            if (autoCloseCount > 0)
+                prompt += "\n" + autoCloseCount + " auto-close risk-locked row(s) will be skipped.";
 
             if (cappedCount > 0)
                 prompt += "\n" + cappedCount + " row(s) have Max Pos caps.";
@@ -2668,6 +2679,16 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 MarkReconcileOffline(row);
                 return ReconcileOutcome.SkippedOffline;
+            }
+
+            RefreshRowMetrics(row);
+            TryTriggerRiskLock(row);
+            if (row.AutoLocked && row.LimitAction == RiskAction.HardFlatten)
+            {
+                RequestRiskAutoClose(row, string.IsNullOrEmpty(row.LockReason) ? "Risk limit" : row.LockReason);
+                row.LastAction = "Reconcile skipped - auto close active";
+                Log(row.AccountName + " reconcile skipped because auto close is active.");
+                return ReconcileOutcome.SkippedRisk;
             }
 
             var validationMessage = ValidateRowForReconcile(row);
