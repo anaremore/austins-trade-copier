@@ -5187,6 +5187,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (!string.IsNullOrWhiteSpace(LeadAccountName))
                     return "Lead " + LeadAccountName;
 
+                if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                    return "Lead account";
+
+                if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
+                    return "Lead/copy conflict";
+
                 return Enabled && SizingMode != SizingMode.Disabled
                     ? "Needs lead"
                     : "Lead-only / unused";
@@ -5324,6 +5330,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "ManualLock":
                     case "AutoLocked":
                     case "LockReason":
+                    case "RoleSummary":
                         OnPropertyChanged("PlanSummary");
                         break;
                 }
