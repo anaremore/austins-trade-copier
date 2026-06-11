@@ -130,8 +130,8 @@ namespace NinjaTrader.NinjaScript.AddOns
         };
         private readonly List<EnumOption> limitActionOptions = new List<EnumOption>
         {
-            new EnumOption(RiskAction.SoftLock, "Lock entries"),
-            new EnumOption(RiskAction.HardFlatten, "Auto close")
+            new EnumOption(RiskAction.SoftLock, "Lock entries only"),
+            new EnumOption(RiskAction.HardFlatten, "Auto-close row")
         };
         private readonly DispatcherTimer telemetryTimer;
 
@@ -556,17 +556,17 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
 
             grid.Columns.Add(CreateTextBoxColumn("Max Pos", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers Limit Action when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers Limit Action when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers Limit Action after this session profit target is reached. 0 disables the target."));
-            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 104, "Lock entries blocks new copied entries and allows reducing exits. Auto close immediately flattens this row's managed positions and blocks copied orders."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, uses At Limit when session PnL reaches this loss. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, uses At Limit when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
+            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers At Limit after this session profit target is reached. 0 disables the target."));
+            grid.Columns.Add(CreateComboBoxColumn("At Limit", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders."));
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
-            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional comma-separated instrument filters. Leave blank to copy all symbols."));
+            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional row filter. Blank copies all instruments. Enter roots or full names separated by commas, for example MES, MNQ, MES JUN26. Filtered rows only copy, reconcile, and auto-close matching instruments."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
         }
@@ -4296,8 +4296,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (parts.Count == 0)
                 return "no risk limits";
 
-            var action = row.LimitAction == RiskAction.HardFlatten ? "auto close" : "lock entries";
-            return string.Join(", ", parts) + "; " + action;
+            var action = row.LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
+            return "at " + string.Join(", ", parts) + ": " + action;
         }
 
         private void SetStatus(string message)
@@ -4758,7 +4758,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                return symbols.Count == 0 ? string.Empty : "symbols " + string.Join(",", symbols);
+                return symbols.Count == 0 ? string.Empty : "only " + string.Join(",", symbols);
             }
 
             private string BuildRiskSummary()
