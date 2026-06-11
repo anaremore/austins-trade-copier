@@ -4110,7 +4110,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "Lead account";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
-                return "Needs lead";
+                return "Available";
 
             var rowLead = ResolveLeadAccountForRow(row);
             if (rowLead == null)
@@ -4511,7 +4511,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var row = rows[0];
-            var lead = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "no lead" : row.LeadAccountName;
+            var lead = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "lead-only / unused" : row.LeadAccountName;
             var sizing = DescribeSizing(row);
             var risk = DescribeRisk(row);
             return "Selected: " + row.AccountName + " <- " + lead + " | " + sizing + " | " + risk;
@@ -4955,7 +4955,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var parts = new List<string>
                 {
-                    string.IsNullOrWhiteSpace(LeadAccountName) ? "No lead" : "Lead " + LeadAccountName,
+                    BuildLeadSummary(),
                     BuildSizingSummary(),
                     BuildRiskSummary()
                 };
@@ -4974,6 +4974,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                     parts.Add(string.IsNullOrWhiteSpace(LockReason) ? "risk locked" : "locked: " + LockReason.ToLowerInvariant());
 
                 return string.Join(" | ", parts);
+            }
+
+            private string BuildLeadSummary()
+            {
+                if (!string.IsNullOrWhiteSpace(LeadAccountName))
+                    return "Lead " + LeadAccountName;
+
+                return Enabled && SizingMode != SizingMode.Disabled
+                    ? "Needs lead"
+                    : "Lead-only / unused";
             }
 
             private string BuildSizingSummary()
