@@ -3197,7 +3197,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var desiredLeadNames = BuildDesiredLeadNames(targetRows);
+            var targetRowSet = new HashSet<AccountCopyRow>(targetRows);
+            var desiredLeadNames = accountRows
+                .Where(r => !targetRowSet.Contains(r) && r.Enabled && r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName))
+                .Select(r => r.LeadAccountName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var enabledCount = 0;
             var liveBaselineResetCount = 0;
@@ -3214,6 +3219,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
 
                 enabledCount++;
+                AddDesiredLeadName(row, desiredLeadNames);
                 if (shouldResetLiveBaseline)
                     liveBaselineResetCount++;
             }
@@ -3237,6 +3243,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                 .Select(r => r.LeadAccountName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private void AddDesiredLeadName(AccountCopyRow row, List<string> desiredLeadNames)
+        {
+            if (row == null
+                || row.SizingMode == SizingMode.Disabled
+                || string.IsNullOrWhiteSpace(row.LeadAccountName)
+                || desiredLeadNames.Any(leadName => AccountNamesEqual(leadName, row.LeadAccountName)))
+                return;
+
+            desiredLeadNames.Add(row.LeadAccountName);
         }
 
         private bool TryEnableRow(AccountCopyRow row, List<string> desiredLeadNames, out string skipReason)
