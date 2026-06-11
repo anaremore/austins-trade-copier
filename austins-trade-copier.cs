@@ -1157,7 +1157,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (propertyName == "Multiplier"
                 && row.Multiplier > 0
-                && Math.Abs(row.Multiplier - DefaultMultiplier) > 0.0000001
                 && row.SizingMode != SizingMode.Multiplier)
             {
                 SetSizingModeWithoutLivePause(row, SizingMode.Multiplier);
@@ -1166,7 +1165,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (propertyName == "FixedQuantity"
                 && row.FixedQuantity > 0
-                && row.FixedQuantity != DefaultFixedQuantity
                 && row.SizingMode != SizingMode.Fixed)
             {
                 SetSizingModeWithoutLivePause(row, SizingMode.Fixed);
