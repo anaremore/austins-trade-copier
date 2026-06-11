@@ -279,9 +279,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             UpdateStartPauseButtonState();
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
-            var flattenFollowersButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
-            flattenFollowersButton.Click += FlattenFollowersButton_Click;
-            sessionRiskRow.Children.Add(flattenFollowersButton);
+            var flattenOnButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
+            flattenOnButton.Click += FlattenOnButton_Click;
+            sessionRiskRow.Children.Add(flattenOnButton);
 
             var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick, "Flatten selected rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
@@ -1088,12 +1088,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 .ToList();
         }
 
-        private bool AccountHasFollower(string accountName)
+        private bool AccountHasCopyRows(string accountName)
         {
-            return AccountHasFollower(accountName, null);
+            return AccountHasCopyRows(accountName, null);
         }
 
-        private bool AccountHasFollower(string accountName, AccountCopyRow exceptRow)
+        private bool AccountHasCopyRows(string accountName, AccountCopyRow exceptRow)
         {
             // Lead role is a setup relationship: if any other row follows this account, it is a lead immediately.
             return accountRows.Any(r =>
@@ -2426,7 +2426,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (args.Order.OrderState != OrderState.PartFilled && args.Order.OrderState != OrderState.Filled)
                 return;
 
-            Dispatcher.InvokeAsync(() => CopyOrderToFollowerAccounts(args.Order));
+            Dispatcher.InvokeAsync(() => CopyOrderToCopyRows(args.Order));
         }
 
         private bool IsCopierGeneratedOrder(Order order)
@@ -2439,7 +2439,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 || string.Equals(order.Name, "ATC Reconcile", StringComparison.OrdinalIgnoreCase);
         }
 
-        private void CopyOrderToFollowerAccounts(Order sourceOrder)
+        private void CopyOrderToCopyRows(Order sourceOrder)
         {
             if (sourceOrder == null || sourceOrder.Account == null || sourceOrder.Filled <= 0)
                 return;
@@ -2731,10 +2731,10 @@ namespace NinjaTrader.NinjaScript.AddOns
         private int CalculateBalanceRatioQuantity(AccountCopyRow row, int sourceFilledQuantity)
         {
             double leadBalance;
-            double followerBalance;
+            double copyRowBalance;
             var rowLead = ResolveLeadAccountForRow(row);
 
-            if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || !TryGetSizingBalance(row.Account, out followerBalance))
+            if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || !TryGetSizingBalance(row.Account, out copyRowBalance))
             {
                 row.SetStatus("Error", "No balance data");
                 row.LastAction = "Balance sizing skipped";
@@ -2742,10 +2742,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return 0;
             }
 
-            if (leadBalance <= 0 || followerBalance <= 0)
+            if (leadBalance <= 0 || copyRowBalance <= 0)
                 return 0;
 
-            return (int)Math.Floor(sourceFilledQuantity * followerBalance / leadBalance);
+            return (int)Math.Floor(sourceFilledQuantity * copyRowBalance / leadBalance);
         }
 
         private int CapLockedQuantityToReducingOnly(AccountCopyRow row, Order sourceOrder, int requestedQuantity)
@@ -2931,7 +2931,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             return action == OrderAction.Sell || action == OrderAction.SellShort;
         }
 
-        private void FlattenFollowersButton_Click(object sender, RoutedEventArgs e)
+        private void FlattenOnButton_Click(object sender, RoutedEventArgs e)
         {
             CommitGridEdits();
 
@@ -3360,7 +3360,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string ValidateRowForReconcile(AccountCopyRow row)
         {
-            if (AccountHasFollower(row.AccountName, row))
+            if (AccountHasCopyRows(row.AccountName, row))
                 return "row is a lead account";
 
             if (!row.Enabled || row.SizingMode == SizingMode.Disabled)
@@ -3382,11 +3382,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.BalanceRatio)
             {
                 double leadBalance;
-                double followerBalance;
+                double copyRowBalance;
                 if (!TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0)
                     return "lead balance data is unavailable";
 
-                if (!TryGetSizingBalance(row.Account, out followerBalance) || followerBalance <= 0)
+                if (!TryGetSizingBalance(row.Account, out copyRowBalance) || copyRowBalance <= 0)
                     return "account balance data is unavailable";
             }
 
@@ -3926,7 +3926,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return false;
             }
 
-            if (AccountHasFollower(row.AccountName, row))
+            if (AccountHasCopyRows(row.AccountName, row))
             {
                 skipReason = "lead account";
                 return false;
@@ -4197,7 +4197,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool CanApplyRowPresetToRow(AccountCopyRow row)
         {
-            return row != null && !AccountHasFollower(row.AccountName, row);
+            return row != null && !AccountHasCopyRows(row.AccountName, row);
         }
 
         private void ApplyRowPreset(AccountCopyRow row, RowPresetOption preset)
@@ -4277,7 +4277,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void EnforceLeadRowsStayOff()
         {
             var rows = accountRows
-                .Where(r => r != null && r.Enabled && AccountHasFollower(r.AccountName, r))
+                .Where(r => r != null && r.Enabled && AccountHasCopyRows(r.AccountName, r))
                 .ToList();
 
             if (rows.Count == 0)
@@ -4328,7 +4328,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadRows = accountRows
                 .Where(r => r != null
                     && !string.IsNullOrWhiteSpace(r.LeadAccountName)
-                    && AccountHasFollower(r.AccountName, r))
+                    && AccountHasCopyRows(r.AccountName, r))
                 .ToList();
 
             if (leadRows.Count == 0)
@@ -4541,7 +4541,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (AccountNamesEqual(row.AccountName, rowLead.Name) || AccountHasFollower(row.AccountName, row))
+            if (AccountNamesEqual(row.AccountName, rowLead.Name) || AccountHasCopyRows(row.AccountName, row))
             {
                 row.SetStatus("Error", "Lead conflict", "This account is also assigned as a lead. Lead accounts cannot receive copied entries.");
                 return;
@@ -4611,7 +4611,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Off";
 
-            if (AccountHasFollower(row.AccountName, row))
+            if (AccountHasCopyRows(row.AccountName, row))
                 return "Lead";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4641,7 +4641,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Sizing is off. This row will not copy entries.";
 
-            if (AccountHasFollower(row.AccountName, row))
+            if (AccountHasCopyRows(row.AccountName, row))
                 return "Lead account. It can drive copy rows but does not receive copied orders.";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4668,7 +4668,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void UpdateRowRole(AccountCopyRow row)
         {
-            if (AccountHasFollower(row.AccountName, row))
+            if (AccountHasCopyRows(row.AccountName, row))
             {
                 row.RoleSummary = "Lead";
                 return;
@@ -4790,12 +4790,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                     break;
                 case SizingMode.BalanceRatio:
                     double leadBalance;
-                    double followerBalance;
+                    double copyRowBalance;
                     var rowLead = ResolveLeadAccountForRow(row);
-                    if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0 || !TryGetSizingBalance(row.Account, out followerBalance) || followerBalance <= 0)
+                    if (rowLead == null || !TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0 || !TryGetSizingBalance(row.Account, out copyRowBalance) || copyRowBalance <= 0)
                         return false;
 
-                    desiredQuantity = (int)Math.Floor(baseQuantity * followerBalance / leadBalance);
+                    desiredQuantity = (int)Math.Floor(baseQuantity * copyRowBalance / leadBalance);
                     break;
                 default:
                     desiredQuantity = 0;
