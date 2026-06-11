@@ -1109,9 +1109,49 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.LeadAccountOptions.SequenceEqual(options, StringComparer.OrdinalIgnoreCase))
                 return;
 
-            row.LeadAccountOptions.Clear();
-            foreach (var option in options)
-                row.LeadAccountOptions.Add(option);
+            SyncLeadAccountOptions(row.LeadAccountOptions, options);
+        }
+
+        private void SyncLeadAccountOptions(ObservableCollection<string> currentOptions, IList<string> desiredOptions)
+        {
+            if (currentOptions == null || desiredOptions == null)
+                return;
+
+            // Do not Clear() here. If a selected Lead disappears even briefly, WPF can write
+            // a blank SelectedItem back to LeadAccountName while another cell is being clicked.
+            foreach (var option in desiredOptions)
+            {
+                if (!currentOptions.Any(existing => AccountNamesEqual(existing, option)))
+                    currentOptions.Add(option);
+            }
+
+            for (var index = currentOptions.Count - 1; index >= 0; index--)
+            {
+                var current = currentOptions[index];
+                if (!desiredOptions.Any(option => AccountNamesEqual(option, current)))
+                    currentOptions.RemoveAt(index);
+            }
+
+            for (var desiredIndex = 0; desiredIndex < desiredOptions.Count; desiredIndex++)
+            {
+                var existingIndex = IndexOfLeadAccountOption(currentOptions, desiredOptions[desiredIndex]);
+                if (existingIndex >= 0 && existingIndex != desiredIndex)
+                    currentOptions.Move(existingIndex, desiredIndex);
+            }
+        }
+
+        private int IndexOfLeadAccountOption(IList<string> options, string accountName)
+        {
+            if (options == null)
+                return -1;
+
+            for (var index = 0; index < options.Count; index++)
+            {
+                if (AccountNamesEqual(options[index], accountName))
+                    return index;
+            }
+
+            return -1;
         }
 
         private List<string> BuildLeadAccountOptions(AccountCopyRow row)
