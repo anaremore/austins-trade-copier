@@ -607,19 +607,19 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Accounts followed by another row are Lead; Status and Conn show whether they are ready or disconnected."));
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders.", "LeadSelectionTooltip", "CanEditLeadSelection"));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
-            grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
-            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, "Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, Flatten Selected, Flatten On, and auto-close row."));
-            grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "Choose how this row sizes copied orders. 1:1 follows the lead fill. Multiplier uses floor(lead fill x multiplier). Fixed qty sends the Fixed Qty value. Balance ratio uses account value data and skips orders if values are unavailable."));
+            grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, "Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, Flatten Selected, Flatten On, and auto-close row.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "Choose how this row sizes copied orders. 1:1 follows the lead fill. Multiplier uses floor(lead fill x multiplier). Fixed qty sends the Fixed Qty value. Balance ratio uses account value data and skips orders if values are unavailable.", "CopySetupTooltip", "CanEditCopySetup"));
 
-            grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, "Editing this value switches Sizing to Multiplier. Uses floor(lead fill x multiplier), so small multipliers can round to 0."));
-            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, "Editing this value switches Sizing to Fixed qty. Sends this quantity for each copied lead fill."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps the final copied quantity after sizing. 0 disables the cap."));
+            grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, "Editing this value switches Sizing to Multiplier. Uses floor(lead fill x multiplier), so small multipliers can round to 0.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, "Editing this value switches Sizing to Fixed qty. Sends this quantity for each copied lead fill.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps the final copied quantity after sizing. 0 disables the cap.", "CopySetupTooltip", "CanEditCopySetup"));
 
-            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
-            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when session PnL reaches this loss. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
-            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered after this session profit target is reached. 0 disables the target."));
-            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when session PnL reaches this loss. 0 disables the limit.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered when drawdown from peak session PnL reaches this amount. 0 disables the limit.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, the Limit Action is triggered after this session profit target is reached. 0 disables the target.", "CopySetupTooltip", "CanEditCopySetup"));
+            grid.Columns.Add(CreateComboBoxColumn("Limit Action", "LimitAction", limitActionOptions, "Label", "Value", 118, "What to do when Max Loss, Max DD, or Profit Target is hit. Lock entries only blocks new copied entries and allows reducing exits. Auto-close row immediately flattens this row's matching managed positions and blocks copied orders.", "CopySetupTooltip", "CanEditCopySetup"));
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits.", "ManualLockTooltip", "CanToggleManualLock"));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 104, null, true, "Current copier state for this row."));
@@ -778,7 +778,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
         }
 
-        private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, bool numericOnly, bool allowDecimal, string tooltip)
+        private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, bool numericOnly, bool allowDecimal, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null)
         {
             var factory = new FrameworkElementFactory(typeof(TextBox));
             factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
@@ -790,8 +790,16 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(82, 88, 96));
             factory.SetValue(TextBox.TextAlignmentProperty, textAlignment);
             factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
             factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
+
+            if (!string.IsNullOrWhiteSpace(tooltipPropertyName))
+                factory.SetBinding(FrameworkElement.ToolTipProperty, new Binding(tooltipPropertyName));
+
+            if (!string.IsNullOrWhiteSpace(isEnabledPropertyName))
+                factory.SetBinding(UIElement.IsEnabledProperty, new Binding(isEnabledPropertyName));
+
             if (numericOnly)
             {
                 factory.SetValue(FrameworkElement.TagProperty, allowDecimal ? "decimal" : "integer");
@@ -5467,6 +5475,28 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
             }
 
+            public bool CanEditCopySetup
+            {
+                get
+                {
+                    return !string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            public string CopySetupTooltip
+            {
+                get
+                {
+                    if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                        return "Lead accounts drive copy rows. Copy mode, symbols, sizing, and row risk apply to follower rows.";
+
+                    if (Enabled)
+                        return "Editing copy setup on an On row may pause it for review while copying is active.";
+
+                    return "Edit this row's copy mode, symbols, sizing, and row risk before turning it on.";
+                }
+            }
+
             public bool CanToggleManualLock
             {
                 get
@@ -5952,6 +5982,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                         OnPropertyChanged("EnableTooltip");
                         OnPropertyChanged("CanEditLeadSelection");
                         OnPropertyChanged("LeadSelectionTooltip");
+                        OnPropertyChanged("CanEditCopySetup");
+                        OnPropertyChanged("CopySetupTooltip");
                         OnPropertyChanged("CanToggleManualLock");
                         OnPropertyChanged("ManualLockTooltip");
                         break;
