@@ -2765,20 +2765,21 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (quantityToSubmit < originalQuantity)
                     Log(row.AccountName + " capped reduce-only exit from " + originalQuantity + " to " + quantityToSubmit + ".");
 
-                var beforeMaxNetQuantity = quantityToSubmit;
-                quantityToSubmit = CapQuantityToMaxNetPosition(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
-                var maxNetCapped = quantityToSubmit < beforeMaxNetQuantity;
+                var maxNetCap = GetMaxNetCapResult(row, sourceOrder.Instrument, sourceOrder.OrderAction, quantityToSubmit);
+                var beforeMaxNetQuantity = maxNetCap.RequestedQuantity;
+                quantityToSubmit = maxNetCap.Quantity;
+                var maxNetCapped = maxNetCap.WasCapped;
 
                 if (quantityToSubmit <= 0)
                 {
                     mirroredTargetQuantities[targetKey] = desiredQuantity;
-                    row.LastAction = "Blocked by max net";
-                    Log(row.AccountName + " blocked " + GetInstrumentName(sourceOrder.Instrument) + " because max net position would be exceeded.");
+                    row.LastAction = "Max net blocked: " + BuildMaxNetCapSummary(maxNetCap);
+                    Log(row.AccountName + " blocked " + GetInstrumentName(sourceOrder.Instrument) + " because max net would be exceeded (" + BuildMaxNetCapSummary(maxNetCap) + ").");
                     continue;
                 }
 
                 if (maxNetCapped)
-                    Log(row.AccountName + " capped " + GetInstrumentName(sourceOrder.Instrument) + " copy from " + beforeMaxNetQuantity + " to " + quantityToSubmit + " by max net position.");
+                    Log(row.AccountName + " capped " + GetInstrumentName(sourceOrder.Instrument) + " copy from " + beforeMaxNetQuantity + " to " + quantityToSubmit + " by max net (" + BuildMaxNetCapSummary(maxNetCap) + ").");
 
                 try
                 {
@@ -2791,7 +2792,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         mirroredTargetQuantities[targetKey] = (reduceOnlyMode && quantityToSubmit < originalQuantity) || maxNetCapped
                             ? desiredQuantity
                             : alreadyMirrored + quantityToSubmit;
-                        row.LastAction = "Dry run " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
+                        row.LastAction = "Dry run " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument) + (maxNetCapped ? " (max net cap)" : string.Empty);
                         Log("DRY RUN " + row.AccountName + " would send " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument) + ".");
                         continue;
                     }
@@ -2815,7 +2816,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     mirroredTargetQuantities[targetKey] = (reduceOnlyMode && quantityToSubmit < originalQuantity) || maxNetCapped
                         ? desiredQuantity
                         : alreadyMirrored + quantityToSubmit;
-                    row.LastAction = "Sent " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument);
+                    row.LastAction = "Sent " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument) + (maxNetCapped ? " (max net cap)" : string.Empty);
                     Log(row.AccountName + " sent " + DescribeOrder(sourceOrder.OrderAction, quantityToSubmit, sourceOrder.Instrument) + ".");
                 }
                 catch (Exception ex)
@@ -3086,20 +3087,45 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private int CapQuantityToMaxNetPosition(AccountCopyRow row, Instrument instrument, OrderAction action, int requestedQuantity)
         {
-            if (row.MaxNetPosition <= 0 || requestedQuantity <= 0)
-                return requestedQuantity;
+            return GetMaxNetCapResult(row, instrument, action, requestedQuantity).Quantity;
+        }
 
-            var currentSigned = GetMaxNetVirtualPosition(row, instrument);
+        private MaxNetCapResult GetMaxNetCapResult(AccountCopyRow row, Instrument instrument, OrderAction action, int requestedQuantity)
+        {
+            var result = new MaxNetCapResult
+            {
+                RequestedQuantity = Math.Max(0, requestedQuantity),
+                Quantity = Math.Max(0, requestedQuantity),
+                Limit = row != null ? row.MaxNetPosition : 0,
+                CurrentSigned = 0,
+                RequestedSignedResult = 0
+            };
+
+            if (row == null || row.MaxNetPosition <= 0 || requestedQuantity <= 0)
+                return result;
+
+            result.CurrentSigned = GetMaxNetVirtualPosition(row, instrument);
             var signedDelta = IsBuyAction(action) ? requestedQuantity : -requestedQuantity;
-            var requestedResult = currentSigned + signedDelta;
+            result.RequestedSignedResult = result.CurrentSigned + signedDelta;
 
-            if (Math.Abs(requestedResult) <= row.MaxNetPosition)
-                return requestedQuantity;
+            if (Math.Abs(result.RequestedSignedResult) <= row.MaxNetPosition)
+                return result;
 
-            if (signedDelta > 0)
-                return Math.Min(requestedQuantity, Math.Max(0, row.MaxNetPosition - currentSigned));
+            result.Quantity = signedDelta > 0
+                ? Math.Min(requestedQuantity, Math.Max(0, row.MaxNetPosition - result.CurrentSigned))
+                : Math.Min(requestedQuantity, Math.Max(0, result.CurrentSigned + row.MaxNetPosition));
 
-            return Math.Min(requestedQuantity, Math.Max(0, currentSigned + row.MaxNetPosition));
+            return result;
+        }
+
+        private string BuildMaxNetCapSummary(MaxNetCapResult result)
+        {
+            if (result == null || result.Limit <= 0)
+                return "no max net cap";
+
+            return "current " + DescribeSignedQuantity(result.CurrentSigned)
+                + ", requested " + DescribeSignedQuantity(result.RequestedSignedResult)
+                + ", limit " + result.Limit.ToString(CultureInfo.InvariantCulture);
         }
 
         private int GetMaxNetVirtualPosition(AccountCopyRow row, Instrument instrument)
@@ -3748,17 +3774,18 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var action = signedDelta > 0 ? OrderAction.Buy : OrderAction.Sell;
             var requestedQuantity = Math.Abs(signedDelta);
-            var quantity = CapQuantityToMaxNetPosition(row, instrument, action, requestedQuantity);
+            var maxNetCap = GetMaxNetCapResult(row, instrument, action, requestedQuantity);
+            var quantity = maxNetCap.Quantity;
 
             if (quantity <= 0)
             {
-                row.LastAction = "Reconcile blocked by max net";
-                Log(row.AccountName + " reconcile blocked " + GetInstrumentName(instrument) + " because max net position would be exceeded.");
+                row.LastAction = "Reconcile max net blocked: " + BuildMaxNetCapSummary(maxNetCap);
+                Log(row.AccountName + " reconcile blocked " + GetInstrumentName(instrument) + " because max net would be exceeded (" + BuildMaxNetCapSummary(maxNetCap) + ").");
                 return false;
             }
 
-            if (quantity < requestedQuantity)
-                Log(row.AccountName + " capped reconcile from " + requestedQuantity + " to " + quantity + " by max net position.");
+            if (maxNetCap.WasCapped)
+                Log(row.AccountName + " capped reconcile from " + maxNetCap.RequestedQuantity + " to " + quantity + " by max net (" + BuildMaxNetCapSummary(maxNetCap) + ").");
 
             try
             {
@@ -5683,6 +5710,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                         return -Quantity;
                     return 0;
                 }
+            }
+        }
+
+        private class MaxNetCapResult
+        {
+            public int RequestedQuantity { get; set; }
+            public int Quantity { get; set; }
+            public int CurrentSigned { get; set; }
+            public int RequestedSignedResult { get; set; }
+            public int Limit { get; set; }
+
+            public bool WasCapped
+            {
+                get { return Quantity < RequestedQuantity; }
             }
         }
 
