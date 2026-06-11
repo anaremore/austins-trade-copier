@@ -1280,6 +1280,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 case "MaxDrawdown":
                 case "ProfitTarget":
                 case "LimitAction":
+                case "ManualLock":
+                case "AutoLocked":
+                case "IsEntryLocked":
                 case "RoleSummary":
                 case "Status":
                     return true;
@@ -1580,10 +1583,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (unlockSelectedButton != null)
             {
-                unlockSelectedButton.IsEnabled = hasSelection;
+                var unlockableCount = rows.Count(IsUnlockableRow);
+                unlockSelectedButton.IsEnabled = unlockableCount > 0;
                 unlockSelectedButton.ToolTip = hasSelection
-                    ? "Clear manual and risk locks on selected rows. Risk-locked rows require confirmation and reset baselines when connected."
-                    : "Select one or more rows to unlock.";
+                    ? unlockableCount > 0
+                        ? "Clear manual and risk locks on " + unlockableCount + " selected row(s). Risk-locked rows require confirmation and reset baselines when connected."
+                        : "Selected rows are not locked."
+                    : "Select one or more locked rows to unlock.";
             }
 
             if (resetBaselineButton != null)
@@ -2826,6 +2832,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             return IsConnectedCopyRow(row) && row.IsEntryLocked;
         }
 
+        private bool IsUnlockableRow(AccountCopyRow row)
+        {
+            return row != null && row.IsEntryLocked;
+        }
+
         private string GetReduceOnlyReason(AccountCopyRow row)
         {
             if (row == null)
@@ -3732,12 +3743,19 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (!ConfirmRiskLockClear(rows, "Confirm Unlock Risk Locks", "Unlock", "This clears auto risk locks. Connected risk-locked rows will also reset their session PnL baselines. On rows may become eligible to copy again."))
+            var unlockableRows = rows.Where(IsUnlockableRow).ToList();
+            if (unlockableRows.Count == 0)
+            {
+                SetStatus("Selected rows are not locked.");
+                return;
+            }
+
+            if (!ConfirmRiskLockClear(unlockableRows, "Confirm Unlock Risk Locks", "Unlock", "This clears auto risk locks. Connected risk-locked rows will also reset their session PnL baselines. On rows may become eligible to copy again."))
                 return;
 
             var autoResetCount = 0;
             var skippedBaselineCount = 0;
-            foreach (var row in rows)
+            foreach (var row in unlockableRows)
             {
                 var wasAutoLocked = row.AutoLocked;
                 var baselineReset = false;
@@ -3768,7 +3786,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 ClearMirroredTargetQuantities(row);
             }
 
-            var message = "Unlocked " + rows.Count + " selected row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)" : string.Empty) + ".";
+            var message = "Unlocked " + unlockableRows.Count + " selected row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)" : string.Empty) + ".";
             if (skippedBaselineCount > 0)
                 message = message.TrimEnd('.') + "; skipped baseline reset for " + skippedBaselineCount + " offline row(s).";
 
