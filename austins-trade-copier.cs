@@ -4928,9 +4928,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (offlineCount > 0)
                 parts.Add("Offline: " + offlineCount);
 
-            var summary = string.Join(" | ", parts);
-            var selectionSummary = BuildSelectionSummary();
-            return string.IsNullOrEmpty(selectionSummary) ? summary : summary + " | " + selectionSummary;
+            return string.Join(" | ", parts);
         }
 
         private bool IsConfiguredCopyRow(AccountCopyRow row)
