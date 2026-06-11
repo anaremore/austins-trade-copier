@@ -2105,8 +2105,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             try
             {
                 LoadProfile(profileName);
-                SetStatus("Loaded profile " + profileName + ".");
-                Log("Loaded profile " + profileName + ".");
+                var message = BuildLoadedProfileMessage(profileName);
+                SetStatus(message);
+                Log(message);
             }
             catch (Exception ex)
             {
@@ -2123,6 +2124,28 @@ namespace NinjaTrader.NinjaScript.AddOns
                 + "This replaces the current table setup, including On rows, leads, sizing, symbols, and risk settings.\n"
                 + "Current table: " + rowCount + " row(s), " + enabledCount + " active copy row(s).\n\n"
                 + "Open positions and working orders are not changed.";
+        }
+
+        private string BuildLoadedProfileMessage(string profileName)
+        {
+            var rowCount = accountRows.Count;
+            var onCount = accountRows.Count(r => r != null && r.Enabled);
+            var leadCount = GetReferencedLeadAccountCount();
+            var offlineCount = accountRows.Count(IsOfflineRow);
+
+            var parts = new List<string>
+            {
+                "Loaded profile " + profileName + ": " + rowCount + " row(s)",
+                onCount + " On"
+            };
+
+            if (leadCount > 0)
+                parts.Add(leadCount + " lead(s)");
+
+            if (offlineCount > 0)
+                parts.Add(offlineCount + " offline");
+
+            return string.Join(", ", parts) + ".";
         }
 
         private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
@@ -2275,6 +2298,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var rowWasAutoLocked = GetBoolAttribute(element, "autoLocked", false);
                 var rowLockReason = GetOptionalStringAttribute(element, "lockReason", rowWasAutoLocked ? "Risk limit" : string.Empty);
                 var rowLoadedAvailableBecauseNoLead = false;
+                var rowLoadedOffReason = string.Empty;
                 Account rowLead = null;
 
                 if (account == null && rowEnabled)
@@ -2329,7 +2353,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.AutoLocked = rowWasAutoLocked;
                 row.LockReason = rowWasAutoLocked ? rowLockReason : string.Empty;
                 NormalizeLegacySizingMode(row);
-                row.LastAction = rowWasAutoLocked ? "Loaded risk lock" : row.Enabled ? row.ManualLock ? "Loaded manual lock" : "Loaded profile" : rowLoadedAvailableBecauseNoLead ? "Loaded available" : "Loaded disabled";
+                rowLoadedOffReason = DisableLoadedRowWithInvalidSizing(row);
+                row.LastAction = GetLoadedProfileLastAction(row, rowWasAutoLocked, rowLoadedAvailableBecauseNoLead, rowLoadedOffReason);
 
                 accountRows.Add(row);
                 seenAccounts.Add(accountName);
@@ -2338,6 +2363,54 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshConnectedAccountNames();
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
+        }
+
+        private string GetLoadedProfileLastAction(AccountCopyRow row, bool wasAutoLocked, bool loadedAvailableBecauseNoLead, string loadedOffReason)
+        {
+            if (wasAutoLocked)
+                return "Loaded risk lock";
+
+            if (row != null && row.Enabled)
+                return row.ManualLock ? "Loaded manual lock" : "Loaded profile";
+
+            if (loadedAvailableBecauseNoLead)
+                return "Loaded available";
+
+            return string.IsNullOrWhiteSpace(loadedOffReason)
+                ? "Loaded disabled"
+                : "Loaded Off: " + loadedOffReason;
+        }
+
+        private string DisableLoadedRowWithInvalidSizing(AccountCopyRow row)
+        {
+            if (row == null || !row.Enabled)
+                return string.Empty;
+
+            var reason = GetInvalidSizingReason(row);
+            if (string.IsNullOrWhiteSpace(reason))
+                return string.Empty;
+
+            row.Enabled = false;
+            row.ManualLock = false;
+            Log("Profile loaded " + row.AccountName + " Off because " + reason + ".");
+            return reason;
+        }
+
+        private string GetInvalidSizingReason(AccountCopyRow row)
+        {
+            if (row == null)
+                return "row is unavailable";
+
+            if (row.SizingMode == SizingMode.Disabled)
+                return "sizing is Off";
+
+            if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+                return "multiplier must be greater than 0";
+
+            if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+                return "fixed quantity must be greater than 0";
+
+            return string.Empty;
         }
 
         private IEnumerable<XmlElement> GetProfileRowElements(XmlElement root)
