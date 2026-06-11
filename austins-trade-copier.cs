@@ -539,12 +539,12 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void AddGridColumns(DataGrid grid)
         {
             grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 42, null, true, "Rows marked SEL are selected for the Selected Rows buttons."));
-            grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Enable this account row. Disabled rows stay visible but do not receive copied orders."));
+            grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders."));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
-            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available, Lead, Copy row, or Conflict based on the enabled rows."));
-            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Account whose filled orders this row mirrors."));
-            grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, and risk limits."));
+            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available accounts can be used as leads. Lead accounts are being copied by another row. Copy rows receive orders from their selected Lead."));
+            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders."));
+            grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "1:1 uses lead quantity. Multiplier scales it. Fixed qty uses Fixed Qty. Balance ratio scales by account value."));
 
