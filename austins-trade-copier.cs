@@ -771,10 +771,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(FrameworkElement.TagProperty, propertyName);
             factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
             factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
+            var isLeadColumn = string.Equals(propertyName, "LeadAccountName", StringComparison.Ordinal);
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
             factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
-            var isLeadColumn = string.Equals(propertyName, "LeadAccountName", StringComparison.Ordinal);
             factory.AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(ComboBoxCell_SelectionChanged));
+            if (isLeadColumn)
+                factory.AddHandler(UIElement.LostKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(LeadComboBoxCell_LostKeyboardFocus));
 
             if (!string.IsNullOrWhiteSpace(tooltipPropertyName))
                 factory.SetBinding(FrameworkElement.ToolTipProperty, new Binding(tooltipPropertyName));
@@ -819,6 +821,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             CommitLeadComboBoxSelection(comboBox);
+        }
+
+        private void LeadComboBoxCell_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            CommitLeadComboBoxSelection(sender as ComboBox);
         }
 
         private void CommitLeadComboBoxSelection(ComboBox comboBox)
