@@ -14,8 +14,8 @@
 - 🧱 **Max Net Position Guard**: Cap each row's absolute resulting position per instrument.
 - 🧯 **Risk Lockouts**: Set max loss, max drawdown, and profit-target thresholds per row with entry-lock or auto-close behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
-- 🧹 **Flatten Controls**: Flatten On rows, selected rows, or all connected table/lead accounts without changing the copier's running state.
-- 🧮 **Reconcile Selected**: Deliberately align selected rows to their leads using each row's sizing rules.
+- 🧹 **Flatten Controls**: Flatten On rows, the highlighted selection, or all connected table/lead accounts without changing the copier's running state.
+- 🧮 **Reconcile**: Deliberately align highlighted rows to their leads using each row's sizing rules.
 - 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
 - 💾 **Profiles**: Save, load, and delete copier profiles so On rows, lead assignments, sizing, filters, and risk rules survive restarts.
 - 📝 **Event Log**: Non-blocking panel log for copied orders, skipped orders, lockouts, and errors, with export and clear controls.
@@ -44,8 +44,8 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. **Role** describes setup (`Lead`, `Copy`, or `Available`), while **Status** and **Conn** describe readiness and connection state. Rows with no lead can stay available as lead-only or unused accounts.
 2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. The dropdown hides the row itself and active copy rows to avoid invalid setup. As soon as another row points at an account, that account is marked **Lead** and its own Lead selection is cleared and disabled. If it was on, the copier turns it off because lead accounts drive copy rows instead of receiving copied orders. Copy setup and row risk cells are disabled on Lead rows because they apply to follower rows.
-3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The selected-row **Turn On / Off** button turns ready off rows on first; if none are ready, it turns selected on rows off.
-4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
+3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The **Selection** toolbar's **Turn On/Off** button turns ready off rows on first; if none are ready, it turns highlighted on rows off.
+4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on highlighted copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
    - **Fixed qty**: sends a fixed quantity once per lead order.
@@ -55,7 +55,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selected**, or **Flatten All** when you intend to close positions. Use **Reconcile Selected** only when you want selected rows adjusted back toward their configured leads.
+9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selection**, or **Flatten All** when you intend to close positions. Use **Reconcile** only when you want highlighted rows adjusted back toward their configured leads.
 
 ---
 
@@ -90,13 +90,13 @@ Risk actions:
 - **Lock entries only** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
 - **Auto-close row** immediately requests a flatten for matching managed row positions, then blocks new or increasing entries.
 
-Clearing a risk lock through **Unlock Selected** or **Reset Baselines** requires confirmation. Connected risk-locked rows reset their session PnL baselines before they can become eligible to copy again.
+Clearing a risk lock through **Unlock** or **Reset Baselines** requires confirmation. Connected risk-locked rows reset their session PnL baselines before they can become eligible to copy again.
 
 `ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the copy row's current position.
 
 **Manual Lock** is available on On copy rows. It blocks new copied entries while still allowing reducing exits; unavailable rows show a tooltip explaining what must be set first.
 
-Reconciliation is selected-row only and requires confirmation. It applies to selected On copy rows with a connected lead; lead, available, off, invalid, and auto-close-locked rows are skipped. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
+Reconciliation is selection-only and requires confirmation. It applies to highlighted On copy rows with a connected lead; lead, available, off, invalid, and auto-close-locked rows are skipped. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
 
 Dry run mode is selected before starting a copy session and stays locked for that session. In dry run, copied orders and reconcile adjustments are logged as simulated actions instead of being submitted. Manual flatten buttons remain real emergency controls.
 
