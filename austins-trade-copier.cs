@@ -4680,12 +4680,29 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var row = rows[0];
-            var lead = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "lead-only / unused" : row.LeadAccountName;
+            var lead = DescribeSelectedLead(row);
             var sizing = DescribeSizing(row);
             var risk = DescribeRisk(row);
             var riskNow = DescribeRiskProgressForSelection(row);
             var summary = "Selected: " + row.AccountName + " <- " + lead + " | " + row.Status + " | " + sizing + " | " + risk;
             return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
+        }
+
+        private string DescribeSelectedLead(AccountCopyRow row)
+        {
+            if (row == null)
+                return "unknown";
+
+            if (!string.IsNullOrWhiteSpace(row.LeadAccountName))
+                return row.LeadAccountName;
+
+            if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                return "Lead account";
+
+            if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
+                return "Lead/copy conflict";
+
+            return "lead-only / unused";
         }
 
         private string DescribeSizing(AccountCopyRow row)
