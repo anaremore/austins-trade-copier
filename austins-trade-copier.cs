@@ -2591,6 +2591,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             var offlineCount = rows == null ? 0 : rows.Count(r => r != null && !RowHasConnectedAccount(r));
             var prompt = "Flatten " + rowCount + " " + scope + " row(s)?\n\n"
                 + "This cancels active orders and closes managed positions for those rows.";
+            var accountSummary = BuildRowAccountPromptLine(rows);
+            if (!string.IsNullOrEmpty(accountSummary))
+                prompt += "\n" + accountSummary;
 
             if (offlineCount > 0)
                 prompt += "\n" + offlineCount + " offline row(s) will be manual-locked but cannot submit flatten orders.";
@@ -2605,6 +2608,27 @@ namespace NinjaTrader.NinjaScript.AddOns
                 prompt += "\nCopying remains active.";
 
             return prompt;
+        }
+
+        private string BuildRowAccountPromptLine(IList<AccountCopyRow> rows)
+        {
+            var accountNames = rows == null
+                ? new List<string>()
+                : rows
+                    .Where(r => r != null)
+                    .Select(r => string.IsNullOrWhiteSpace(r.AccountName) ? "Unknown" : r.AccountName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            if (accountNames.Count == 0)
+                return string.Empty;
+
+            var preview = accountNames.Take(8).ToList();
+            var message = "Accounts: " + string.Join(", ", preview);
+            if (accountNames.Count > preview.Count)
+                message += ", +" + (accountNames.Count - preview.Count).ToString(CultureInfo.InvariantCulture) + " more";
+
+            return message + ".";
         }
 
         private string BuildFlattenAllPrompt(IList<Account> accounts, int leadCount, int skippedOfflineCount, bool copyingActive)
@@ -2681,6 +2705,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var prompt = "Reconcile " + rowCount + " selected row(s) to their lead positions?\n\n"
                 + "This may submit market orders using each row's lead, sizing, copy mode, and max position settings.";
+            var accountSummary = BuildRowAccountPromptLine(rows);
+            if (!string.IsNullOrEmpty(accountSummary))
+                prompt += "\n" + accountSummary;
 
             if (offlineCount > 0)
                 prompt += "\n" + offlineCount + " offline row(s) will be skipped.";
