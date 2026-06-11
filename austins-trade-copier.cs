@@ -1786,7 +1786,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string BuildFlattenSelectedTooltip(int selectedCount, int connectedCount, int offlineCount)
         {
             if (selectedCount == 0)
-                return "Select one or more connected rows to flatten.";
+                return "Highlight one or more connected rows to flatten.";
 
             if (connectedCount == 0)
                 return selectedCount + " highlighted row(s) are offline; no flatten orders can be submitted.";
@@ -1847,7 +1847,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var onCount = rows.Count(r => r.Enabled);
             var attentionCount = rows.Count(IsAttentionRow);
-            var label = rows.Count + " selected | " + BuildAccountNamePreview(rows, 2);
+            var label = rows.Count + " highlighted | " + BuildAccountNamePreview(rows, 2);
             if (onCount > 0)
                 label += " | On " + onCount;
 
@@ -1876,7 +1876,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (rows.Count == 0)
             {
                 applyRowPresetButton.IsEnabled = false;
-                applyRowPresetButton.ToolTip = "Select one or more rows before applying a row preset. " + tooltip;
+                applyRowPresetButton.ToolTip = "Highlight one or more rows before applying a row preset. " + tooltip;
                 return;
             }
 
@@ -1895,13 +1895,13 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceBlockReason, AccountCopyRow sourceRow, int targetCount)
         {
             if (selectedRowCount == 0)
-                return "Select one source copy row before copying settings.";
+                return "Highlight one source copy row before copying settings.";
 
             if (selectedRowCount > 1)
-                return "Select exactly one source copy row before copying settings.";
+                return "Highlight exactly one source copy row before copying settings.";
 
             if (!sourceHasLead)
-                return "Select a copy row with a lead before copying settings.";
+                return "Highlight a copy row with a lead before copying settings.";
 
             if (!string.IsNullOrEmpty(sourceBlockReason))
                 return sourceBlockReason;
@@ -1920,7 +1920,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string BuildReconcileSelectedTooltip(int selectedRowCount, int eligibleCount)
         {
             if (selectedRowCount == 0)
-                return "Select On copy rows with a connected Lead to reconcile.";
+                return "Highlight On copy rows with a connected Lead to reconcile.";
 
             if (eligibleCount == 0)
                 return "Highlighted rows cannot reconcile. Use On copy rows with a connected Lead; lead, available, off, and auto-close-locked rows are skipped.";
@@ -1934,7 +1934,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string GetCopySettingsSourceBlockReason(AccountCopyRow row)
         {
             if (row == null)
-                return "Select one source copy row before copying settings.";
+                return "Highlight one source copy row before copying settings.";
 
             if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
                 return "Choose a copy row, not a lead account, before copying settings.";
@@ -3199,7 +3199,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows to flatten.");
+                SetStatus("Highlight one or more rows to flatten.");
                 return;
             }
 
@@ -3386,13 +3386,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows to reconcile.");
+                SetStatus("Highlight one or more rows to reconcile.");
                 return;
             }
 
             if (!rows.Any(CanAttemptReconcileRow))
             {
-                SetStatus("Select an On copy row with a connected Lead to reconcile.");
+                SetStatus("Highlight an On copy row with a connected Lead to reconcile.");
                 return;
             }
 
@@ -3888,21 +3888,21 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows to turn on or off.");
+                SetStatus("Highlight one or more rows to turn on or off.");
                 return;
             }
 
             var offRows = rows.Where(r => !r.Enabled).ToList();
             if (offRows.Any(r => r.CanToggleEnabled))
             {
-                EnableRows(offRows, "selected");
+                EnableRows(offRows, "highlighted");
                 return;
             }
 
             var onRows = rows.Where(r => r.Enabled).ToList();
             if (onRows.Count > 0)
             {
-                DisableRows(onRows, "selected");
+                DisableRows(onRows, "highlighted");
                 return;
             }
 
@@ -3942,7 +3942,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows to unlock.");
+                SetStatus("Highlight one or more rows to unlock.");
                 return;
             }
 
@@ -4022,7 +4022,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows before resetting baselines.");
+                SetStatus("Highlight one or more rows before resetting baselines.");
                 return;
             }
 
@@ -4290,13 +4290,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             var selectedRows = GetSelectedRows();
             if (selectedRows.Count == 0)
             {
-                SetStatus("Select one source copy row before copying setup to peers.");
+                SetStatus("Highlight one source copy row before copying setup to peers.");
                 return;
             }
 
             if (selectedRows.Count > 1)
             {
-                SetStatus("Select exactly one source copy row before copying setup to peers.");
+                SetStatus("Highlight exactly one source copy row before copying setup to peers.");
                 return;
             }
 
@@ -4311,7 +4311,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadName = source.LeadAccountName;
             if (string.IsNullOrWhiteSpace(leadName))
             {
-                SetStatus("Select a copy row with a lead before copying setup to peers.");
+                SetStatus("Highlight a copy row with a lead before copying setup to peers.");
                 return;
             }
 
@@ -4392,7 +4392,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows before applying a row preset.");
+                SetStatus("Highlight one or more rows before applying a row preset.");
                 return;
             }
 
@@ -4407,7 +4407,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var skippedLeadCount = rows.Count - targetRows.Count;
             if (targetRows.Count == 0)
             {
-                SetStatus("Row presets apply to copy or available rows; selected lead rows were skipped.");
+                SetStatus("Row presets apply to copy or available rows; highlighted lead rows were skipped.");
                 return;
             }
 
@@ -5388,7 +5388,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(IsAttentionRow);
-                var parts = new List<string> { "Selected " + rows.Count };
+                var parts = new List<string> { "Highlighted " + rows.Count };
                 parts.Add(BuildAccountNamePreview(rows, 8));
 
                 if (onCount > 0)
