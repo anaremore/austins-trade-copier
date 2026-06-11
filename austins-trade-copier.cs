@@ -220,7 +220,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             profilePanel.Children.Add(profileNameTextBox);
 
-            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, per-row leads, sizing, and risk settings.");
+            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, per-row leads, sizing, and risk settings. Existing profiles require overwrite confirmation.");
             saveProfileButton.Click += SaveProfileButton_Click;
             profilePanel.Children.Add(saveProfileButton);
 
@@ -1593,6 +1593,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            if (File.Exists(GetProfilePath(profileName))
+                && MessageBox.Show(BuildOverwriteProfilePrompt(profileName), "Confirm Save Profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
             try
             {
                 SaveProfile(profileName);
@@ -1606,6 +1612,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetStatus("Profile save failed.");
                 Log("ERROR profile save failed: " + ex.Message);
             }
+        }
+
+        private string BuildOverwriteProfilePrompt(string profileName)
+        {
+            var rowCount = accountRows.Count;
+            var enabledCount = accountRows.Count(IsConfiguredCopyRow);
+            return "Overwrite profile " + profileName + "?\n\n"
+                + "The saved profile will be replaced with the current table setup.\n"
+                + "Current table: " + rowCount + " row(s), " + enabledCount + " active copy row(s).\n\n"
+                + "Open positions and working orders are not changed.";
         }
 
         private void LoadProfileButton_Click(object sender, RoutedEventArgs e)
