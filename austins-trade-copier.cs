@@ -1866,12 +1866,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var onCount = rows.Count(r => r.Enabled);
             var attentionCount = rows.Count(IsAttentionRow);
-            var label = rows.Count + " selected: " + BuildAccountNamePreview(rows, 2);
+            var label = rows.Count + " selected | " + BuildAccountNamePreview(rows, 2);
             if (onCount > 0)
                 label += " | On " + onCount;
 
             if (attentionCount > 0)
-                label += " | Attention " + attentionCount;
+                label += " | Review " + attentionCount;
 
             return label;
         }
@@ -5339,7 +5339,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 parts.Add("Locked " + lockedCount);
 
             if (attentionCount > 0)
-                parts.Add("Attention " + attentionCount);
+                parts.Add("Review " + attentionCount);
 
             if (offlineCount > 0)
                 parts.Add("Offline " + offlineCount);
@@ -5393,36 +5393,36 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(IsAttentionRow);
-                var parts = new List<string> { "Selected: " + rows.Count + " rows" };
-                parts.Add("Accounts: " + BuildAccountNamePreview(rows, 8));
+                var parts = new List<string> { "Selected " + rows.Count };
+                parts.Add(BuildAccountNamePreview(rows, 8));
 
                 if (onCount > 0)
-                    parts.Add("On: " + onCount);
+                    parts.Add("On " + onCount);
 
                 if (offCount > 0)
-                    parts.Add("Off: " + offCount);
+                    parts.Add("Off " + offCount);
 
                 if (copyRowCount > 0)
-                    parts.Add("Copy rows: " + copyRowCount);
+                    parts.Add("Copy " + copyRowCount);
 
                 if (lockedCount > 0)
-                    parts.Add("Locked: " + lockedCount);
+                    parts.Add("Locked " + lockedCount);
 
                 if (attentionCount > 0)
-                    parts.Add("Attention: " + attentionCount);
+                    parts.Add("Review " + attentionCount);
 
                 return string.Join(" | ", parts);
             }
 
             var row = rows[0];
             if (ShouldUseSimpleSelectionSummary(row))
-                return "Selected: " + row.AccountName + " | " + DescribeSelectedLead(row);
+                return row.AccountName + " | " + DescribeSelectedLead(row);
 
             var relationship = DescribeSelectedCopyRelationship(row);
             var sizing = DescribeSizing(row);
             var risk = DescribeRisk(row);
             var riskNow = DescribeRiskProgressForSelection(row);
-            var summary = "Selected: " + relationship + " | " + row.Status + " | " + sizing + " | " + risk;
+            var summary = relationship + " | " + row.Status + " | " + sizing + " | " + risk;
             return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
         }
 
@@ -5496,7 +5496,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
                 return row.AccountName + " self-copy";
 
-            return row.AccountName + " copies " + DescribeSelectedLead(row);
+            return row.AccountName + " <- " + DescribeSelectedLead(row);
         }
 
         private string DescribeSizing(AccountCopyRow row)
