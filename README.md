@@ -51,7 +51,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
    - **Fixed qty**: sends a fixed quantity once per lead order.
    - **Balance ratio**: scales by follower equity versus lead equity.
    - **Off**: keeps the row visible but does not copy entries.
-5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
+5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Risk Now** shows current progress toward those limits. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
@@ -65,7 +65,7 @@ Sizing is calculated from the cumulative filled quantity of the lead order. This
 
 Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that row's order instead of falling back to the full lead size.
 
-`Max` caps every sizing mode when greater than zero. A value of `0` means no max cap.
+`Max Qty` caps every sizing mode when greater than zero. A value of `0` means no max cap.
 
 `Max Net` caps the absolute resulting row position per instrument. A value of `0` means no net-position cap. The guard blocks or caps exposure increases but still allows position-reducing orders.
 

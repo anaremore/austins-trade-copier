@@ -576,6 +576,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("PnL", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
+            grid.Columns.Add(CreateTextColumn("Risk Now", "RiskProgressSummary", 150, null, true, "Current progress toward this row's Max Loss, Max DD, and Profit Target limits."));
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
@@ -4781,6 +4782,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 set { SetField(ref positionSummary, value, "PositionSummary"); }
             }
 
+            public string RiskProgressSummary
+            {
+                get { return BuildRiskProgressSummary(); }
+            }
+
             public string InstrumentFilter
             {
                 get { return instrumentFilter; }
@@ -5054,6 +5060,53 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "at " + string.Join(", ", limits) + ": " + action;
             }
 
+            private string BuildRiskProgressSummary()
+            {
+                if (DailyLossLimit <= 0 && MaxDrawdown <= 0 && ProfitTarget <= 0)
+                    return "No limits";
+
+                if (AutoLocked)
+                    return "Locked: " + FormatRiskReasonForProgress(LockReason);
+
+                var parts = new List<string>();
+                if (DailyLossLimit > 0)
+                {
+                    var lossUsed = Math.Max(0, -SessionPnl);
+                    parts.Add("Loss " + FormatCurrency(lossUsed) + "/" + FormatCurrency(DailyLossLimit));
+                }
+
+                if (MaxDrawdown > 0)
+                    parts.Add("DD " + FormatCurrency(Drawdown) + "/" + FormatCurrency(MaxDrawdown));
+
+                if (ProfitTarget > 0)
+                {
+                    var profitProgress = Math.Max(0, SessionPnl);
+                    parts.Add("Target " + FormatCurrency(profitProgress) + "/" + FormatCurrency(ProfitTarget));
+                }
+
+                return string.Join(" | ", parts);
+            }
+
+            private string FormatRiskReasonForProgress(string reason)
+            {
+                switch (reason)
+                {
+                    case "Daily loss limit":
+                        return "max loss";
+                    case "Drawdown limit":
+                        return "max DD";
+                    case "Profit target":
+                        return "target";
+                    default:
+                        return string.IsNullOrWhiteSpace(reason) ? "risk limit" : reason.ToLowerInvariant();
+                }
+            }
+
+            private string FormatCurrency(double value)
+            {
+                return value.ToString("C0", CultureInfo.CurrentCulture);
+            }
+
             private void NotifyDerivedProperties(string propertyName)
             {
                 switch (propertyName)
@@ -5074,6 +5127,19 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "AutoLocked":
                     case "LockReason":
                         OnPropertyChanged("PlanSummary");
+                        break;
+                }
+
+                switch (propertyName)
+                {
+                    case "SessionPnl":
+                    case "Drawdown":
+                    case "DailyLossLimit":
+                    case "MaxDrawdown":
+                    case "ProfitTarget":
+                    case "AutoLocked":
+                    case "LockReason":
+                        OnPropertyChanged("RiskProgressSummary");
                         break;
                 }
             }
