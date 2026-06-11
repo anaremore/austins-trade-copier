@@ -287,15 +287,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             UpdateStartPauseButtonState();
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
-            flattenOnButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
+            flattenOnButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions. Rows stay On but become manual-locked afterward; copying state is unchanged. Symbol filters are respected.");
             flattenOnButton.Click += FlattenOnButton_Click;
             sessionRiskRow.Children.Add(flattenOnButton);
 
-            flattenSelectedButton = CreateButton("Flatten Selection", Brushes.Firebrick, "Flatten selected rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
+            flattenSelectedButton = CreateButton("Flatten Selection", Brushes.Firebrick, "Flatten selected rows' managed positions. Rows keep their On/Off state but become manual-locked afterward; copying state is unchanged. Symbol filters are respected.");
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
-            flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by On rows while leaving the copier state unchanged.");
+            flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by On rows. Copying and row On/Off setup stay unchanged.");
             flattenAllButton.Click += FlattenAllButton_Click;
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
@@ -2043,7 +2043,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (connectedCount == 0)
                 return onCount + " On row(s) are offline; no flatten orders can be submitted.";
 
-            var tooltip = "Flatten " + connectedCount + " connected On row(s) and manual-lock them afterward. Symbol filters are respected.";
+            var tooltip = "Flatten " + connectedCount + " connected On row(s). They stay On but become manual-locked afterward; copying state is unchanged. Symbol filters are respected.";
             if (offlineCount > 0)
                 tooltip += " " + offlineCount + " offline On row(s) will be manual-locked but cannot submit flatten orders.";
 
@@ -2058,7 +2058,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (connectedCount == 0)
                 return selectedCount + " selected row(s) are offline; no flatten orders can be submitted.";
 
-            var tooltip = "Flatten " + connectedCount + " connected selected row(s) and manual-lock them afterward. Symbol filters are respected.";
+            var tooltip = "Flatten " + connectedCount + " connected selected row(s). Rows keep their On/Off state but become manual-locked afterward; copying state is unchanged. Symbol filters are respected.";
             if (offlineCount > 0)
                 tooltip += " " + offlineCount + " offline selected row(s) will be manual-locked but cannot submit flatten orders.";
 
@@ -2070,9 +2070,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (connectedCount == 0)
                 return "No connected table or active lead accounts to flatten.";
 
-            var tooltip = "Flatten " + connectedCount + " connected table/lead account(s). Copying state is unchanged.";
+            var tooltip = "Flatten " + connectedCount + " connected table/lead account(s). Copying and row On/Off setup stay unchanged.";
             if (leadCount > 0)
-                tooltip = "Flatten " + connectedCount + " connected table/lead account(s), including " + leadCount + " active lead account(s). Copying state is unchanged.";
+                tooltip = "Flatten " + connectedCount + " connected table/lead account(s), including " + leadCount + " active lead account(s). Copying and row On/Off setup stay unchanged.";
 
             if (skippedOfflineCount > 0)
                 tooltip += " " + skippedOfflineCount + " offline account(s) will be skipped.";
@@ -3894,7 +3894,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             var filteredCount = rows == null ? 0 : rows.Count(HasInstrumentFilter);
             var offlineCount = rows == null ? 0 : rows.Count(r => r != null && !RowHasConnectedAccount(r));
             var prompt = "Flatten " + rowCount + " " + scope + " row(s)?\n\n"
-                + "This cancels active orders and closes managed positions for those rows.";
+                + "This cancels active orders and closes managed positions for those rows.\n"
+                + "It does not change row On/Off state.";
             var accountSummary = BuildRowAccountPromptLine(rows);
             if (!string.IsNullOrEmpty(accountSummary))
                 prompt += "\n" + accountSummary;
@@ -3907,9 +3908,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             else
                 prompt += "\nNo row symbol filters are set.";
 
-            prompt += "\nRows will be manual-locked afterward so new entries stay blocked.";
+            prompt += "\nRows will be manual-locked afterward so new entries stay blocked until you unlock them.";
             if (isCopying)
-                prompt += "\nCopying remains active.";
+                prompt += "\nCopying remains active; other eligible rows can still copy new lead fills.";
 
             return prompt;
         }
@@ -3942,13 +3943,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                 + (leadCount > 0 ? ", including " + leadCount + " active lead account(s)" : string.Empty)
                 + "?\n\n"
                 + "This cancels active orders and closes open positions across each account.\n"
-                + "Row symbol filters are not applied to Flatten All.";
+                + "Row symbol filters are not applied to Flatten All.\n"
+                + "Copying and row On/Off setup stay unchanged.";
 
             if (skippedOfflineCount > 0)
                 prompt += "\n" + skippedOfflineCount + " offline account(s) will be skipped.";
 
             if (copyingActive)
-                prompt += "\nCopying remains active after the request.";
+                prompt += "\nCopying remains active; pause first if you want the copier stopped.";
 
             return prompt;
         }

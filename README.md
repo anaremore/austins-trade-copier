@@ -14,7 +14,7 @@
 - 🧱 **Max Net Position Guard**: Cap each row's absolute resulting position per instrument.
 - 🧯 **Risk Lockouts**: Set max loss, max drawdown, and profit-target thresholds per row with entry-lock or auto-close behavior.
 - ✅ **Pause Without Flattening**: Pause copying without touching open positions; flatten actions are separate and confirmed.
-- 🧹 **Flatten Controls**: Flatten On rows, the selected rows, or all connected table/lead accounts without changing the copier's running state.
+- 🧹 **Flatten Controls**: Flatten On rows, the selected rows, or all connected table/lead accounts without changing the copier's running state or row On/Off setup. Row-level flatten requests manual-lock the affected rows afterward.
 - 🧮 **Reconcile**: Deliberately align selected rows to their leads using each row's sizing rules.
 - 🧪 **Dry Run Mode**: Simulate copy and reconcile decisions without submitting copied/reconcile orders.
 - 💾 **Profiles**: Save, load, and delete copier profiles so On rows, lead assignments, sizing, filters, and risk rules survive restarts.
@@ -57,7 +57,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming, resets active-row risk baselines, and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selection**, or **Flatten All** when you intend to close positions. Use **Reconcile** only when you want selected rows adjusted back toward their configured leads.
+9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selection**, or **Flatten All** when you intend to close positions. Flatten does not pause copying; row-level flatten actions manual-lock affected rows so new entries stay blocked until you unlock them. Use **Reconcile** only when you want selected rows adjusted back toward their configured leads.
 
 ---
 
