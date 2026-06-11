@@ -1173,7 +1173,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             NormalizeNumericTextBox(textBox);
             var binding = textBox.GetBindingExpression(TextBox.TextProperty);
             if (binding != null)
+            {
                 binding.UpdateSource();
+                ApplySizingModeFromCommittedTextBox(textBox);
+            }
         }
 
         private void NormalizeNumericTextBox(TextBox textBox)
@@ -1704,20 +1707,45 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (suppressEnableValidation || suppressSizingModeAutoSwitch || row == null)
                 return;
 
-            if (propertyName == "Multiplier"
-                && row.Multiplier > 0
-                && row.SizingMode != SizingMode.Multiplier)
-            {
-                SetSizingModeWithoutLivePause(row, SizingMode.Multiplier);
+            var sizingMode = GetSizingModeFromQuantityField(row, propertyName);
+            if (!sizingMode.HasValue)
                 return;
-            }
 
-            if (propertyName == "FixedQuantity"
-                && row.FixedQuantity > 0
-                && row.SizingMode != SizingMode.Fixed)
-            {
-                SetSizingModeWithoutLivePause(row, SizingMode.Fixed);
-            }
+            SetSizingModeWithoutLivePause(row, sizingMode.Value);
+        }
+
+        private void ApplySizingModeFromCommittedTextBox(TextBox textBox)
+        {
+            if (suppressEnableValidation || suppressSizingModeAutoSwitch || textBox == null)
+                return;
+
+            var row = textBox.DataContext as AccountCopyRow;
+            var sizingMode = GetSizingModeFromQuantityField(row, GetTextBoxBindingPropertyName(textBox));
+            if (!sizingMode.HasValue || row == null || row.SizingMode == sizingMode.Value)
+                return;
+
+            row.SizingMode = sizingMode.Value;
+        }
+
+        private SizingMode? GetSizingModeFromQuantityField(AccountCopyRow row, string propertyName)
+        {
+            if (row == null)
+                return null;
+
+            if (propertyName == "Multiplier" && row.Multiplier > 0)
+                return row.SizingMode == SizingMode.Multiplier ? (SizingMode?)null : SizingMode.Multiplier;
+
+            if (propertyName == "FixedQuantity" && row.FixedQuantity > 0)
+                return row.SizingMode == SizingMode.Fixed ? (SizingMode?)null : SizingMode.Fixed;
+
+            return null;
+        }
+
+        private string GetTextBoxBindingPropertyName(TextBox textBox)
+        {
+            var binding = textBox == null ? null : textBox.GetBindingExpression(TextBox.TextProperty);
+            var parentBinding = binding == null ? null : binding.ParentBinding;
+            return parentBinding == null || parentBinding.Path == null ? string.Empty : parentBinding.Path.Path;
         }
 
         private void SetSizingModeWithoutLivePause(AccountCopyRow row, SizingMode sizingMode)
@@ -2406,7 +2434,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 NormalizeNumericTextBox(focusedTextBox);
                 var binding = focusedTextBox.GetBindingExpression(TextBox.TextProperty);
                 if (binding != null)
+                {
                     binding.UpdateSource();
+                    ApplySizingModeFromCommittedTextBox(focusedTextBox);
+                }
             }
         }
 
