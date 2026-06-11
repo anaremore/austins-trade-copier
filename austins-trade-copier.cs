@@ -5491,14 +5491,37 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string GetNearRiskLimitStatusText(AccountCopyRow row)
         {
-            if (row.DailyLossLimit > 0 && row.SessionPnl <= -Math.Abs(row.DailyLossLimit) * 0.9)
-                return "Near max loss";
+            if (row.DailyLossLimit > 0)
+            {
+                var lossLimit = Math.Abs(row.DailyLossLimit);
+                var lossUsed = Math.Max(0, -row.SessionPnl);
+                if (lossUsed >= lossLimit)
+                    return "Max loss hit";
 
-            if (row.MaxDrawdown > 0 && row.Drawdown >= Math.Abs(row.MaxDrawdown) * 0.9)
-                return "Near max DD";
+                if (lossUsed >= lossLimit * 0.9)
+                    return "Near max loss";
+            }
 
-            if (row.ProfitTarget > 0 && row.SessionPnl >= Math.Abs(row.ProfitTarget) * 0.9)
-                return "Near target";
+            if (row.MaxDrawdown > 0)
+            {
+                var drawdownLimit = Math.Abs(row.MaxDrawdown);
+                if (row.Drawdown >= drawdownLimit)
+                    return "Max DD hit";
+
+                if (row.Drawdown >= drawdownLimit * 0.9)
+                    return "Near max DD";
+            }
+
+            if (row.ProfitTarget > 0)
+            {
+                var target = Math.Abs(row.ProfitTarget);
+                var profitProgress = Math.Max(0, row.SessionPnl);
+                if (profitProgress >= target)
+                    return "Target hit";
+
+                if (profitProgress >= target * 0.9)
+                    return "Near target";
+            }
 
             return string.Empty;
         }
