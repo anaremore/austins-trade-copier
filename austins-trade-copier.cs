@@ -327,7 +327,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            copyLeadSettingsButton = CreateButton("Copy Setup to Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Setup to Peers", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to other rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
 
@@ -1820,11 +1820,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var leadName = sourceRow == null ? string.Empty : sourceRow.LeadAccountName;
                 return string.IsNullOrWhiteSpace(leadName)
-                    ? "No other follower rows use this source row's lead."
-                    : "No other follower rows use lead " + leadName + ".";
+                    ? "No peer rows use this source row's lead."
+                    : "No peer rows use lead " + leadName + ".";
             }
 
-            return "Copy mode, sizing, risk limits, Limit Action, and Symbols to " + targetCount + " follower row(s) that use the selected row's lead. Lead selections stay unchanged.";
+            return "Copy mode, sizing, risk limits, Limit Action, and Symbols to " + targetCount + " peer row(s) using the same lead. Lead selections stay unchanged.";
         }
 
         private string BuildReconcileSelectedTooltip(int selectedRowCount, int eligibleCount)
@@ -3263,7 +3263,9 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string BuildFlattenAllPrompt(IList<Account> accounts, int leadCount, int skippedOfflineCount, bool copyingActive)
         {
             var accountCount = accounts == null ? 0 : accounts.Count(a => a != null);
-            var prompt = "Flatten all " + accountCount + " account(s), including " + leadCount + " active lead account(s)?\n\n"
+            var prompt = "Flatten all " + accountCount + " account(s)"
+                + (leadCount > 0 ? ", including " + leadCount + " active lead account(s)" : string.Empty)
+                + "?\n\n"
                 + "This cancels active orders and closes open positions across each account.\n"
                 + "Row symbol filters are not applied to Flatten All.";
 
