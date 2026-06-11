@@ -6413,6 +6413,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 switch (propertyName)
                 {
                     case "AccountName":
+                    case "ConnectionStatus":
                     case "Enabled":
                     case "LeadAccountName":
                     case "SizingMode":
