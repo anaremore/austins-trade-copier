@@ -1862,10 +1862,18 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return BuildSelectedRowLabel(rows[0]);
 
             var onCount = rows.Count(r => r.Enabled);
+            var offCount = rows.Count - onCount;
+            var offlineCount = rows.Count(IsOfflineRow);
             var attentionCount = rows.Count(IsAttentionRow);
             var label = rows.Count + " highlighted | " + BuildAccountNamePreview(rows, 2);
             if (onCount > 0)
                 label += " | On " + onCount;
+
+            if (offCount > 0)
+                label += " | Off " + offCount;
+
+            if (offlineCount > 0)
+                label += " | Offline " + offlineCount;
 
             if (attentionCount > 0)
                 label += " | Review " + attentionCount;
@@ -5635,6 +5643,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var onCount = rows.Count(r => r.Enabled);
                 var offCount = rows.Count - onCount;
+                var offlineCount = rows.Count(IsOfflineRow);
                 var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(IsAttentionRow);
@@ -5646,6 +5655,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 if (offCount > 0)
                     parts.Add("Off " + offCount);
+
+                if (offlineCount > 0)
+                    parts.Add("Offline " + offlineCount);
 
                 if (copyRowCount > 0)
                     parts.Add("Copy " + copyRowCount);
