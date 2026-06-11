@@ -149,7 +149,11 @@ namespace NinjaTrader.NinjaScript.AddOns
         private TextBox profileNameTextBox;
         private DataGrid accountsGrid;
         private Button startPauseButton;
+        private Button reconcileSelectedButton;
         private Button toggleSelectedButton;
+        private Button unlockSelectedButton;
+        private Button resetBaselineButton;
+        private Button copyLeadSettingsButton;
         private CheckBox dryRunCheckBox;
         private TextBlock statusTextBlock;
         private TextBox eventLogTextBox;
@@ -271,7 +275,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var selectionRow = CreateToolbarRow();
             selectionRow.Children.Add(CreateToolbarLabel("Selected Rows"));
-            var reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
+            reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
@@ -280,15 +284,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
             selectionRow.Children.Add(toggleSelectedButton);
 
-            var unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines.");
+            unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines.");
             unlockSelectedButton.Click += UnlockSelectedButton_Click;
             selectionRow.Children.Add(unlockSelectedButton);
 
-            var resetBaselineButton = CreateButton("Reset Baselines", Brushes.DimGray, "Reset selected rows' session PnL baselines and clear auto risk locks.");
+            resetBaselineButton = CreateButton("Reset Baselines", Brushes.DimGray, "Reset selected rows' session PnL baselines and clear auto risk locks.");
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            var copyLeadSettingsButton = CreateButton("Copy Settings", Brushes.DimGray, "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Settings", Brushes.DimGray, "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -414,6 +418,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             root.Children.Add(logSection);
 
             Content = root;
+            UpdateSelectedActionButtons();
         }
 
         private Brush BrushRgb(byte red, byte green, byte blue)
@@ -489,7 +494,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private Button CreateButton(string text, Brush background, string tooltip = null)
         {
-            return new Button
+            var button = new Button
             {
                 Content = text,
                 Padding = new Thickness(10, 4, 10, 4),
@@ -501,6 +506,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 MinHeight = 28,
                 ToolTip = tooltip
             };
+            ToolTipService.SetShowOnDisabled(button, true);
+            return button;
         }
 
         private Style CreateGridHeaderStyle()
@@ -1123,7 +1130,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 QueueRowRefresh();
 
             if (e.PropertyName == "Enabled")
-                UpdateSelectedEnableButtonState();
+                UpdateSelectedActionButtons();
         }
 
         private void ApplySizingModeFromEditedQuantityField(AccountCopyRow row, string propertyName)
@@ -1395,15 +1402,50 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var row in accountRows)
                 row.SelectionMarker = selectedRows.Contains(row) ? "SEL" : string.Empty;
 
-            UpdateSelectedEnableButtonState();
+            UpdateSelectedActionButtons();
         }
 
-        private void UpdateSelectedEnableButtonState()
+        private void UpdateSelectedActionButtons()
         {
+            var rows = GetSelectedRows();
+            var hasSelection = rows.Count > 0;
+
+            if (reconcileSelectedButton != null)
+            {
+                reconcileSelectedButton.IsEnabled = hasSelection;
+                reconcileSelectedButton.ToolTip = hasSelection
+                    ? "Adjust selected rows toward each row's lead positions using current sizing and limits."
+                    : "Select one or more rows to reconcile.";
+            }
+
+            if (unlockSelectedButton != null)
+            {
+                unlockSelectedButton.IsEnabled = hasSelection;
+                unlockSelectedButton.ToolTip = hasSelection
+                    ? "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines."
+                    : "Select one or more rows to unlock.";
+            }
+
+            if (resetBaselineButton != null)
+            {
+                resetBaselineButton.IsEnabled = hasSelection;
+                resetBaselineButton.ToolTip = hasSelection
+                    ? "Reset selected rows' session PnL baselines and clear auto risk locks."
+                    : "Select one or more rows before resetting baselines.";
+            }
+
+            if (copyLeadSettingsButton != null)
+            {
+                copyLeadSettingsButton.IsEnabled = rows.Count == 1;
+                copyLeadSettingsButton.ToolTip = rows.Count == 1
+                    ? "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged."
+                    : "Select exactly one source row before copying settings.";
+            }
+
             if (toggleSelectedButton == null)
                 return;
 
-            var rows = GetSelectedRows();
+            toggleSelectedButton.IsEnabled = hasSelection;
             if (rows.Count == 0)
             {
                 toggleSelectedButton.Content = "Enable / Disable";
