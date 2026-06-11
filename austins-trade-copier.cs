@@ -3477,6 +3477,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (isCopying)
             {
                 var prompt = "Copy settings from " + source.AccountName + " to " + rows.Count + " row(s) that use lead " + leadName + " while copying is active? Active target row baselines will be reset. Lead selections stay unchanged.";
+                var accountSummary = BuildRowAccountPromptLine(rows);
+                if (!string.IsNullOrEmpty(accountSummary))
+                    prompt += "\n" + accountSummary;
+
                 if (MessageBox.Show(prompt, "Confirm Live Settings Copy", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
