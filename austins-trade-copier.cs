@@ -2536,12 +2536,21 @@ namespace NinjaTrader.NinjaScript.AddOns
             startPauseButton.Content = dryRunArmed ? "Start Dry Run" : "Start Copying";
             startPauseButton.Background = dryRunArmed ? Brushes.SteelBlue : Brushes.SeaGreen;
             var hasOnRows = accountRows.Any(IsConfiguredCopyRow);
-            startPauseButton.IsEnabled = hasOnRows;
+            var hasConnectedOnRows = accountRows.Any(IsConnectedCopyRow);
+            startPauseButton.IsEnabled = hasConnectedOnRows;
             if (!hasOnRows)
             {
                 startPauseButton.ToolTip = dryRunArmed
                     ? "Turn at least one copy row On before starting a dry run."
                     : "Turn at least one copy row On before starting.";
+                return;
+            }
+
+            if (!hasConnectedOnRows)
+            {
+                startPauseButton.ToolTip = dryRunArmed
+                    ? "Reconnect at least one On copy row before starting a dry run."
+                    : "Reconnect at least one On copy row before starting.";
                 return;
             }
 
