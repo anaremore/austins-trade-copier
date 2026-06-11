@@ -4667,10 +4667,27 @@ namespace NinjaTrader.NinjaScript.AddOns
             var lockedCount = accountRows.Count(IsLockedCopyRow);
             var attentionCount = accountRows.Count(IsAttentionRow);
             var offlineCount = accountRows.Count(IsOfflineRow);
-            var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
-            if (offlineCount > 0)
-                summary += " | Offline: " + offlineCount;
 
+            var parts = new List<string>
+            {
+                mode,
+                "Leads: " + armedLeadCount,
+                "Entries: " + entryActiveCount
+            };
+
+            if (exitsOnlyCount > 0)
+                parts.Add("Exits only: " + exitsOnlyCount);
+
+            if (lockedCount > 0)
+                parts.Add("Locked: " + lockedCount);
+
+            if (attentionCount > 0)
+                parts.Add("Attention: " + attentionCount);
+
+            if (offlineCount > 0)
+                parts.Add("Offline: " + offlineCount);
+
+            var summary = string.Join(" | ", parts);
             var selectionSummary = BuildSelectionSummary();
             return string.IsNullOrEmpty(selectionSummary) ? summary : summary + " | " + selectionSummary;
         }
@@ -4721,7 +4738,24 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(IsAttentionRow);
-                return "Selected: " + rows.Count + " rows | On: " + onCount + " | Off: " + offCount + " | Copy rows: " + copyRowCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
+                var parts = new List<string> { "Selected: " + rows.Count + " rows" };
+
+                if (onCount > 0)
+                    parts.Add("On: " + onCount);
+
+                if (offCount > 0)
+                    parts.Add("Off: " + offCount);
+
+                if (copyRowCount > 0)
+                    parts.Add("Copy rows: " + copyRowCount);
+
+                if (lockedCount > 0)
+                    parts.Add("Locked: " + lockedCount);
+
+                if (attentionCount > 0)
+                    parts.Add("Attention: " + attentionCount);
+
+                return string.Join(" | ", parts);
             }
 
             var row = rows[0];
