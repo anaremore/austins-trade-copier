@@ -256,10 +256,13 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Foreground = Brushes.White,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 12, 0),
-                ToolTip = "Simulate copied and reconcile orders without submitting live orders."
+                ToolTip = "Check before starting to simulate copied and reconcile orders without submitting live orders. Dry Run is locked for the session once started."
             };
+            dryRunCheckBox.Checked += DryRunCheckBox_CheckedChanged;
+            dryRunCheckBox.Unchecked += DryRunCheckBox_CheckedChanged;
             ToolTipService.SetShowOnDisabled(dryRunCheckBox, true);
             sessionRiskRow.Children.Add(dryRunCheckBox);
+            UpdateStartPauseButtonState();
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
             var flattenFollowersButton = CreateButton("Flatten Enabled", Brushes.Firebrick, "Flatten enabled rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
@@ -2040,6 +2043,35 @@ namespace NinjaTrader.NinjaScript.AddOns
                 PauseCopyingTrades();
         }
 
+        private void DryRunCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            if (!isCopying)
+                UpdateStartPauseButtonState();
+        }
+
+        private void UpdateStartPauseButtonState()
+        {
+            if (startPauseButton == null)
+                return;
+
+            if (isCopying)
+            {
+                startPauseButton.Content = dryRunMode ? "Pause Dry Run" : "Pause Copying";
+                startPauseButton.Background = Brushes.DarkOrange;
+                startPauseButton.ToolTip = dryRunMode
+                    ? "Pause the dry-run simulation. Copier-submitted positions were simulated only."
+                    : "Pause live copying. Existing positions are left untouched.";
+                return;
+            }
+
+            var dryRunArmed = dryRunCheckBox != null && dryRunCheckBox.IsChecked == true;
+            startPauseButton.Content = dryRunArmed ? "Start Dry Run" : "Start Copying";
+            startPauseButton.Background = dryRunArmed ? Brushes.SteelBlue : Brushes.SeaGreen;
+            startPauseButton.ToolTip = dryRunArmed
+                ? "Start a simulation session after preflight validation. Copied and reconcile orders are logged only."
+                : "Start live copying for enabled rows after preflight validation.";
+        }
+
         private void StartCopyingTrades()
         {
             if (!accountRows.Any(r => r.Enabled && r.SizingMode != SizingMode.Disabled))
@@ -2067,11 +2099,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             maxNetVirtualPositions.Clear();
             dryRunMode = dryRunCheckBox != null && dryRunCheckBox.IsChecked == true;
             isCopying = true;
-            startPauseButton.Content = "Pause Copying";
-            startPauseButton.Background = Brushes.DarkOrange;
             if (dryRunCheckBox != null)
                 dryRunCheckBox.IsEnabled = false;
 
+            UpdateStartPauseButtonState();
             var startMessage = BuildStartStatusMessage();
             SetStatus(startMessage);
             Log(startMessage);
@@ -2103,15 +2134,10 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             isCopying = false;
             dryRunMode = false;
-            if (startPauseButton != null)
-            {
-                startPauseButton.Content = "Start Copying";
-                startPauseButton.Background = Brushes.SeaGreen;
-            }
-
             if (dryRunCheckBox != null)
                 dryRunCheckBox.IsEnabled = true;
 
+            UpdateStartPauseButtonState();
             if (silent)
                 return;
 
