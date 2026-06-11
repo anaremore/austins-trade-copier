@@ -161,6 +161,9 @@ namespace NinjaTrader.NinjaScript.AddOns
         private TextBox profileNameTextBox;
         private DataGrid accountsGrid;
         private Button startPauseButton;
+        private Button flattenOnButton;
+        private Button flattenSelectedButton;
+        private Button flattenAllButton;
         private Button reconcileSelectedButton;
         private Button toggleSelectedButton;
         private Button unlockSelectedButton;
@@ -279,15 +282,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             UpdateStartPauseButtonState();
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
-            var flattenOnButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
+            flattenOnButton = CreateButton("Flatten On", Brushes.Firebrick, "Flatten On rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
             flattenOnButton.Click += FlattenOnButton_Click;
             sessionRiskRow.Children.Add(flattenOnButton);
 
-            var flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick, "Flatten selected rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
+            flattenSelectedButton = CreateButton("Flatten Selected", Brushes.Firebrick, "Flatten selected rows' managed positions and manual-lock entries afterward. Symbol filters are respected.");
             flattenSelectedButton.Click += FlattenSelectedButton_Click;
             sessionRiskRow.Children.Add(flattenSelectedButton);
 
-            var flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by On rows while leaving the copier state unchanged.");
+            flattenAllButton = CreateButton("Flatten All", Brushes.DarkRed, "Flatten every table account plus lead accounts used by On rows while leaving the copier state unchanged.");
             flattenAllButton.Click += FlattenAllButton_Click;
             sessionRiskRow.Children.Add(flattenAllButton);
             actionPanel.Children.Add(sessionRiskRow);
@@ -1574,6 +1577,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             var hasSelection = rows.Count > 0;
             UpdateSelectedRowsText(rows);
+            UpdateFlattenActionButtons(rows);
 
             if (reconcileSelectedButton != null)
             {
@@ -1657,6 +1661,82 @@ namespace NinjaTrader.NinjaScript.AddOns
                 toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are leads, missing a Lead, self-copy, using an active copy row as Lead, or Sizing is off.";
             if (onCount > 0)
                 toggleSelectedButton.ToolTip += " " + onCount + " selected row(s) already on.";
+        }
+
+        private void UpdateFlattenActionButtons(IList<AccountCopyRow> selectedRows)
+        {
+            if (flattenOnButton != null)
+            {
+                var onRows = accountRows.Where(r => r != null && r.Enabled).ToList();
+                var connectedOnCount = onRows.Count(RowHasConnectedAccount);
+                var offlineOnCount = onRows.Count - connectedOnCount;
+                flattenOnButton.IsEnabled = connectedOnCount > 0;
+                flattenOnButton.ToolTip = BuildFlattenOnTooltip(onRows.Count, connectedOnCount, offlineOnCount);
+            }
+
+            if (flattenSelectedButton != null)
+            {
+                var rows = selectedRows == null ? new List<AccountCopyRow>() : selectedRows.Where(r => r != null).Distinct().ToList();
+                var connectedSelectedCount = rows.Count(RowHasConnectedAccount);
+                var offlineSelectedCount = rows.Count - connectedSelectedCount;
+                flattenSelectedButton.IsEnabled = connectedSelectedCount > 0;
+                flattenSelectedButton.ToolTip = BuildFlattenSelectedTooltip(rows.Count, connectedSelectedCount, offlineSelectedCount);
+            }
+
+            if (flattenAllButton != null)
+            {
+                var leadAccounts = GetConfiguredLeadAccounts();
+                var candidateAccounts = GetFlattenAllCandidateAccounts(leadAccounts);
+                var connectedCount = candidateAccounts.Count(a => a.ConnectionStatus == ConnectionStatus.Connected);
+                var skippedOfflineCount = CountSkippedOfflineFlattenAllAccounts(candidateAccounts);
+                flattenAllButton.IsEnabled = connectedCount > 0;
+                flattenAllButton.ToolTip = BuildFlattenAllTooltip(connectedCount, leadAccounts.Count, skippedOfflineCount);
+            }
+        }
+
+        private string BuildFlattenOnTooltip(int onCount, int connectedCount, int offlineCount)
+        {
+            if (onCount == 0)
+                return "No On rows. Turn rows On before using Flatten On.";
+
+            if (connectedCount == 0)
+                return onCount + " On row(s) are offline; no flatten orders can be submitted.";
+
+            var tooltip = "Flatten " + connectedCount + " connected On row(s) and manual-lock them afterward. Symbol filters are respected.";
+            if (offlineCount > 0)
+                tooltip += " " + offlineCount + " offline On row(s) will be manual-locked but cannot submit flatten orders.";
+
+            return tooltip;
+        }
+
+        private string BuildFlattenSelectedTooltip(int selectedCount, int connectedCount, int offlineCount)
+        {
+            if (selectedCount == 0)
+                return "Select one or more connected rows to flatten.";
+
+            if (connectedCount == 0)
+                return selectedCount + " selected row(s) are offline; no flatten orders can be submitted.";
+
+            var tooltip = "Flatten " + connectedCount + " connected selected row(s) and manual-lock selected rows afterward. Symbol filters are respected.";
+            if (offlineCount > 0)
+                tooltip += " " + offlineCount + " offline selected row(s) will be manual-locked but cannot submit flatten orders.";
+
+            return tooltip;
+        }
+
+        private string BuildFlattenAllTooltip(int connectedCount, int leadCount, int skippedOfflineCount)
+        {
+            if (connectedCount == 0)
+                return "No connected table or active lead accounts to flatten.";
+
+            var tooltip = "Flatten " + connectedCount + " connected table/lead account(s). Copying state is unchanged.";
+            if (leadCount > 0)
+                tooltip = "Flatten " + connectedCount + " connected table/lead account(s), including " + leadCount + " active lead account(s). Copying state is unchanged.";
+
+            if (skippedOfflineCount > 0)
+                tooltip += " " + skippedOfflineCount + " offline account(s) will be skipped.";
+
+            return tooltip;
         }
 
         private void UpdateSelectedRowsText(List<AccountCopyRow> rows)
@@ -3036,23 +3116,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             var wasCopying = isCopying;
             var leadAccounts = GetConfiguredLeadAccounts();
             var leadCount = leadAccounts.Count;
-            var candidateAccounts = leadAccounts
-                .Concat(accountRows.Select(r => r.Account))
-                .Where(a => a != null)
-                .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
-                .ToList();
+            var candidateAccounts = GetFlattenAllCandidateAccounts(leadAccounts);
             var accounts = candidateAccounts
                 .Where(a => a.ConnectionStatus == ConnectionStatus.Connected)
                 .ToList();
-            var skippedOfflineAccountNames = candidateAccounts
-                .Where(a => a.ConnectionStatus != ConnectionStatus.Connected)
-                .Select(a => a.Name)
-                .Concat(accountRows.Where(r => r.Account == null).Select(r => r.AccountName))
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var skippedOfflineCount = skippedOfflineAccountNames.Count;
+            var skippedOfflineCount = CountSkippedOfflineFlattenAllAccounts(candidateAccounts);
 
             if (accounts.Count == 0)
             {
@@ -3083,6 +3151,29 @@ namespace NinjaTrader.NinjaScript.AddOns
             SetStatus(message);
             Log(message);
             RefreshAllRows();
+        }
+
+        private List<Account> GetFlattenAllCandidateAccounts(IEnumerable<Account> leadAccounts)
+        {
+            var safeLeadAccounts = leadAccounts ?? Enumerable.Empty<Account>();
+            return safeLeadAccounts
+                .Concat(accountRows.Select(r => r.Account))
+                .Where(a => a != null)
+                .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+        }
+
+        private int CountSkippedOfflineFlattenAllAccounts(IEnumerable<Account> candidateAccounts)
+        {
+            var safeCandidateAccounts = candidateAccounts ?? Enumerable.Empty<Account>();
+            return safeCandidateAccounts
+                .Where(a => a != null && a.ConnectionStatus != ConnectionStatus.Connected)
+                .Select(a => a.Name)
+                .Concat(accountRows.Where(r => r.Account == null).Select(r => r.AccountName))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
         }
 
         private void LockRowsForManualFlatten(IEnumerable<AccountCopyRow> rows, string lastAction)
@@ -4346,6 +4437,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 UpdateRowStatus(row);
             }
 
+            UpdateSelectedActionButtons();
             RefreshStatusSummary();
         }
 
