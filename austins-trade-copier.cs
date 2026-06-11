@@ -1643,8 +1643,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (rows.Count == 1)
             {
                 var row = rows[0];
-                var lead = DescribeSelectedLead(row);
-                selectedRowsTextBlock.Text = row.AccountName + " <- " + lead;
+                selectedRowsTextBlock.Text = BuildSelectedRowLabel(row);
                 selectedRowsTextBlock.ToolTip = BuildSelectionSummary();
                 return;
             }
@@ -4998,12 +4997,34 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var row = rows[0];
+            if (ShouldUseSimpleSelectionSummary(row))
+                return "Selected: " + row.AccountName + " | " + DescribeSelectedLead(row);
+
             var lead = DescribeSelectedLead(row);
             var sizing = DescribeSizing(row);
             var risk = DescribeRisk(row);
             var riskNow = DescribeRiskProgressForSelection(row);
             var summary = "Selected: " + row.AccountName + " <- " + lead + " | " + row.Status + " | " + sizing + " | " + risk;
             return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
+        }
+
+        private string BuildSelectedRowLabel(AccountCopyRow row)
+        {
+            if (row == null)
+                return "No rows selected";
+
+            if (ShouldUseSimpleSelectionSummary(row))
+                return row.AccountName + " | " + DescribeSelectedLead(row);
+
+            return row.AccountName + " <- " + DescribeSelectedLead(row);
+        }
+
+        private bool ShouldUseSimpleSelectionSummary(AccountCopyRow row)
+        {
+            return row == null
+                || string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(row.RoleSummary, "Available", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(row.LeadAccountName);
         }
 
         private string DescribeSelectedLead(AccountCopyRow row)
