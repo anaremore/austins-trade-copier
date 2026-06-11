@@ -959,10 +959,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (wasUnavailable)
                     {
                         row.ResetBaseline(ReadAccountPnl(account), false);
-                        row.LastAction = "Account reconnected - baseline reset";
+                        row.LastAction = row.AutoLocked
+                            ? "Reconnected - risk lock preserved"
+                            : "Account reconnected - baseline reset";
                         ClearLockedVirtualPositions(row);
                         ClearMaxNetVirtualPositions(row);
-                        Log(row.AccountName + " reconnected; risk baseline reset.");
+                        Log(row.AccountName + (row.AutoLocked
+                            ? " reconnected; risk baseline reset and risk lock preserved."
+                            : " reconnected; risk baseline reset."));
                     }
 
                     continue;
