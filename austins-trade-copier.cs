@@ -4970,6 +4970,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountRows.Count == 0)
                 return mode + " | No connected accounts";
 
+            var onCount = accountRows.Count(IsConnectedCopyRow);
             var entryActiveCount = accountRows.Count(IsEntryActiveRow);
             var exitsOnlyCount = accountRows.Count(IsExitsOnlyCopyRow);
             var leadCount = GetReferencedLeadAccountCount();
@@ -4979,22 +4980,28 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var parts = new List<string>
             {
-                mode,
-                "Leads: " + leadCount,
-                "Entries: " + entryActiveCount
+                mode
             };
 
+            parts.Add(onCount > 0 ? "On " + onCount : "No On rows");
+
+            if (leadCount > 0)
+                parts.Add("Leads " + leadCount);
+
+            if (entryActiveCount > 0 && entryActiveCount != onCount)
+                parts.Add("Entries " + entryActiveCount);
+
             if (exitsOnlyCount > 0)
-                parts.Add("Exits only: " + exitsOnlyCount);
+                parts.Add("Exits-only " + exitsOnlyCount);
 
             if (lockedCount > 0)
-                parts.Add("Locked: " + lockedCount);
+                parts.Add("Locked " + lockedCount);
 
             if (attentionCount > 0)
-                parts.Add("Attention: " + attentionCount);
+                parts.Add("Attention " + attentionCount);
 
             if (offlineCount > 0)
-                parts.Add("Offline: " + offlineCount);
+                parts.Add("Offline " + offlineCount);
 
             return string.Join(" | ", parts);
         }
@@ -5181,10 +5188,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             var summary = BuildSummaryStatus();
             if (!string.IsNullOrWhiteSpace(heldStatusMessage) && DateTime.Now <= heldStatusUntil)
             {
-                statusTextBlock.Text = heldStatusMessage + " | " + summary;
-                statusTextBlock.ToolTip = string.IsNullOrWhiteSpace(heldStatusDetail)
+                var detail = string.IsNullOrWhiteSpace(heldStatusDetail) ? heldStatusMessage : heldStatusDetail;
+                statusTextBlock.Text = heldStatusMessage;
+                statusTextBlock.ToolTip = string.IsNullOrWhiteSpace(detail)
                     ? summary
-                    : heldStatusDetail + Environment.NewLine + Environment.NewLine + summary;
+                    : detail + Environment.NewLine + Environment.NewLine + summary;
                 return;
             }
 
