@@ -2830,8 +2830,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string GetProfileDirectoryPath()
         {
             return Path.Combine(
-                GetCurrentUserDocumentsPath(),
-                "NinjaTrader 8",
+                GetNinjaTraderUserDataPath(),
                 "templates",
                 ProfileFolderName);
         }
@@ -2846,11 +2845,26 @@ namespace NinjaTrader.NinjaScript.AddOns
             return Path.Combine(GetProfileDirectoryPath(), NormalizeProfileName(profileName) + ProfileFileExtension);
         }
 
+        private string GetNinjaTraderUserDataPath()
+        {
+            try
+            {
+                var userDataDirectory = NinjaTrader.Core.Globals.UserDataDir;
+                if (!string.IsNullOrWhiteSpace(userDataDirectory))
+                    return userDataDirectory;
+            }
+            catch
+            {
+            }
+
+            return Path.Combine(GetCurrentUserDocumentsPath(), "NinjaTrader 8");
+        }
+
         private string GetCurrentUserDocumentsPath()
         {
             var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             if (string.IsNullOrWhiteSpace(documents))
-                throw new InvalidOperationException("Unable to resolve the current Windows user's Documents folder. Check Windows known-folder settings or reinstall NinjaTrader for this Windows user.");
+                throw new InvalidOperationException("Unable to resolve NinjaTrader's user data folder or the current Windows user's Documents folder. Check Windows known-folder settings or reinstall NinjaTrader for this Windows user.");
 
             return documents;
         }

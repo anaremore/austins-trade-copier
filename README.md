@@ -73,9 +73,11 @@ Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. 
 
 Before copying starts, On rows are validated. Disconnected rows, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
 
-Profiles are stored under the current Windows user's NinjaTrader documents templates folder:
+Profiles are stored under NinjaTrader's active user data templates folder:
 
-`<Documents>\NinjaTrader 8\templates\AustinTradeCopier`
+`<NinjaTrader user data>\templates\AustinTradeCopier`
+
+For a standard install this is usually `<Documents>\NinjaTrader 8\templates\AustinTradeCopier`.
 
 Current profiles save table entries as `Row` elements. Older profiles that used `Follower` elements still load.
 
