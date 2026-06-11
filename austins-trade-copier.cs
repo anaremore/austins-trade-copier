@@ -5653,7 +5653,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     return "No limits";
 
                 if (AutoLocked)
-                    return "Locked: " + FormatRiskReasonForProgress(LockReason);
+                    return (LimitAction == RiskAction.HardFlatten ? "Auto-close: " : "Locked: ") + FormatRiskReasonForProgress(LockReason);
 
                 var parts = new List<string>();
                 if (DailyLossLimit > 0)
