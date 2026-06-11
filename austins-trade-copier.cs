@@ -5172,6 +5172,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                         return false;
 
+                    if (string.Equals(Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
+                        return false;
+
                     return true;
                 }
             }
@@ -5194,6 +5197,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     if (string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                         return "An account cannot copy itself. Choose a different Lead.";
+
+                    if (string.Equals(Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
+                        return "The selected Lead is not connected.";
 
                     return "Turn this copy row on.";
                 }
@@ -5472,6 +5478,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                     && string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                     return "Self-copy";
 
+                if (!string.IsNullOrWhiteSpace(LeadAccountName)
+                    && string.Equals(Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
+                    return "Missing lead " + LeadAccountName;
+
                 if (!string.IsNullOrWhiteSpace(LeadAccountName))
                     return "Lead " + LeadAccountName;
 
@@ -5608,6 +5618,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "LeadAccountName":
                     case "SizingMode":
                     case "RoleSummary":
+                    case "Status":
                         OnPropertyChanged("CanToggleEnabled");
                         OnPropertyChanged("EnableTooltip");
                         break;
@@ -5631,6 +5642,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "AutoLocked":
                     case "LockReason":
                     case "RoleSummary":
+                    case "Status":
                         OnPropertyChanged("PlanSummary");
                         break;
                 }
