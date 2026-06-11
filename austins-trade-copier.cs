@@ -324,7 +324,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            copyLeadSettingsButton = CreateButton("Copy Settings", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Setup to Same Lead", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
 
