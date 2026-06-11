@@ -1283,6 +1283,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 case "ManualLock":
                 case "AutoLocked":
                 case "IsEntryLocked":
+                case "ConnectionStatus":
                 case "RoleSummary":
                 case "Status":
                     return true;
@@ -1594,10 +1595,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (resetBaselineButton != null)
             {
-                resetBaselineButton.IsEnabled = hasSelection;
+                var resettableCount = rows.Count(IsBaselineResettableRow);
+                resetBaselineButton.IsEnabled = resettableCount > 0;
                 resetBaselineButton.ToolTip = hasSelection
-                    ? "Reset selected rows' session PnL baselines. Risk-locked rows require confirmation because this clears auto risk locks."
-                    : "Select one or more rows before resetting baselines.";
+                    ? resettableCount > 0
+                        ? "Reset session PnL baselines for " + resettableCount + " connected selected row(s). Risk-locked rows require confirmation because this clears auto risk locks."
+                        : "Selected rows are offline, so baselines cannot be reset."
+                    : "Select one or more connected rows before resetting baselines.";
             }
 
             if (copyLeadSettingsButton != null)
@@ -2837,6 +2841,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             return row != null && row.IsEntryLocked;
         }
 
+        private bool IsBaselineResettableRow(AccountCopyRow row)
+        {
+            return RowHasConnectedAccount(row);
+        }
+
         private string GetReduceOnlyReason(AccountCopyRow row)
         {
             if (row == null)
@@ -3823,22 +3832,28 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (!ConfirmRiskLockClear(rows, "Confirm Reset Risk Locks", "Reset baselines for", "This sets session PnL baselines to current account PnL and clears auto risk locks. On rows may become eligible to copy again."))
+            var resettableRows = rows.Where(IsBaselineResettableRow).ToList();
+            if (resettableRows.Count == 0)
+            {
+                SetStatus("Selected rows are offline, so baselines cannot be reset.");
+                return;
+            }
+
+            if (!ConfirmRiskLockClear(resettableRows, "Confirm Reset Risk Locks", "Reset baselines for", "This sets session PnL baselines to current account PnL and clears auto risk locks. On rows may become eligible to copy again."))
                 return;
 
             var resetCount = 0;
             var skippedCount = 0;
-            foreach (var row in rows)
+            foreach (var row in rows.Except(resettableRows))
             {
-                if (!RowHasConnectedAccount(row))
-                {
-                    if (row != null)
-                        row.LastAction = "Baseline reset skipped - offline";
+                if (row != null)
+                    row.LastAction = "Baseline reset skipped - offline";
 
-                    skippedCount++;
-                    continue;
-                }
+                skippedCount++;
+            }
 
+            foreach (var row in resettableRows)
+            {
                 row.ResetBaseline(ReadAccountPnl(row.Account));
                 row.LastAction = "Baseline reset";
                 ClearLockedVirtualPositions(row);
