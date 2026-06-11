@@ -1945,9 +1945,9 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string BuildStartStatusMessage()
         {
             var leadCount = GetConfiguredLeadAccounts().Count;
-            var entryActiveCount = accountRows.Count(r => IsConnectedCopyRow(r) && !RowIsReduceOnly(r));
-            var exitsOnlyCount = accountRows.Count(r => IsConnectedCopyRow(r) && RowIsReduceOnly(r));
-            var lockedCount = accountRows.Count(r => IsConnectedCopyRow(r) && r.IsEntryLocked);
+            var entryActiveCount = accountRows.Count(IsEntryActiveRow);
+            var exitsOnlyCount = accountRows.Count(IsExitsOnlyCopyRow);
+            var lockedCount = accountRows.Count(IsLockedCopyRow);
 
             var message = (dryRunMode ? "Dry run active" : "Copying active")
                 + ": " + leadCount + " lead(s), "
@@ -2349,6 +2349,21 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool RowIsReduceOnly(AccountCopyRow row)
         {
             return row.IsEntryLocked || row.CopyMode == TradeCopyMode.ExitsOnly;
+        }
+
+        private bool IsEntryActiveRow(AccountCopyRow row)
+        {
+            return IsConnectedCopyRow(row) && !row.IsEntryLocked && row.CopyMode != TradeCopyMode.ExitsOnly;
+        }
+
+        private bool IsExitsOnlyCopyRow(AccountCopyRow row)
+        {
+            return IsConnectedCopyRow(row) && !row.IsEntryLocked && row.CopyMode == TradeCopyMode.ExitsOnly;
+        }
+
+        private bool IsLockedCopyRow(AccountCopyRow row)
+        {
+            return IsConnectedCopyRow(row) && row.IsEntryLocked;
         }
 
         private string GetReduceOnlyReason(AccountCopyRow row)
@@ -4236,10 +4251,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountRows.Count == 0)
                 return mode + " | No connected accounts";
 
-            var entryActiveCount = accountRows.Count(r => IsConnectedCopyRow(r) && !RowIsReduceOnly(r));
-            var exitsOnlyCount = accountRows.Count(r => IsConnectedCopyRow(r) && RowIsReduceOnly(r));
+            var entryActiveCount = accountRows.Count(IsEntryActiveRow);
+            var exitsOnlyCount = accountRows.Count(IsExitsOnlyCopyRow);
             var armedLeadCount = GetConfiguredLeadAccounts().Count;
-            var lockedCount = accountRows.Count(r => IsConnectedCopyRow(r) && r.IsEntryLocked);
+            var lockedCount = accountRows.Count(IsLockedCopyRow);
             var errorCount = accountRows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
             var offlineCount = accountRows.Count(IsOfflineRow);
             var summary = mode + " | Leads: " + armedLeadCount + " | Entries active: " + entryActiveCount + " | Exits only: " + exitsOnlyCount + " | Locked: " + lockedCount + " | Attention: " + errorCount;
