@@ -348,7 +348,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             rowPresetComboBox.SelectionChanged += RowPresetComboBox_SelectionChanged;
             presetRow.Children.Add(rowPresetComboBox);
 
-            applyRowPresetButton = CreateButton("Apply", Brushes.DimGray, "Apply the selected row preset to highlighted rows.");
+            applyRowPresetButton = CreateButton("Apply", Brushes.DimGray, "Apply the chosen row preset to highlighted rows.");
             applyRowPresetButton.Width = 72;
             applyRowPresetButton.IsEnabled = false;
             applyRowPresetButton.Click += ApplyRowPresetButton_Click;
@@ -1872,7 +1872,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var rows = GetSelectedRows();
             var eligibleCount = rows.Count(CanApplyRowPresetToRow);
-            var presetLabel = preset != null ? preset.Label : "the selected preset";
+            var presetLabel = preset != null ? preset.Label : "the chosen preset";
             if (rows.Count == 0)
             {
                 applyRowPresetButton.IsEnabled = false;
