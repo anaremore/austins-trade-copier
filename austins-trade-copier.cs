@@ -1335,7 +1335,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void ApplyRiskSettingsEdit(AccountCopyRow row)
         {
-            if (suppressEnableValidation || suppressLiveSettingsPause || row == null || !isCopying || !row.Enabled || row.Account == null)
+            if (suppressEnableValidation || suppressLiveSettingsPause || row == null || !isCopying || !row.Enabled || !RowHasConnectedAccount(row))
                 return;
 
             RefreshRowMetrics(row);
@@ -3582,6 +3582,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             var previousConnectionStatus = row.ConnectionStatus;
             row.ConnectionStatus = row.Account.ConnectionStatus.ToString();
             HandleRowConnectionStatusChange(row, previousConnectionStatus);
+            if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
+            {
+                row.NetPosition = 0;
+                row.PositionSummary = "Offline";
+                return;
+            }
+
             var currentPnl = ReadAccountPnl(row.Account);
             row.SessionPnl = currentPnl - row.BaselinePnl;
             row.PeakPnl = Math.Max(row.PeakPnl, row.SessionPnl);
@@ -3612,6 +3619,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (isCopying
                 && row != null
                 && row.AutoLocked
+                && RowHasConnectedAccount(row)
                 && row.LimitAction == RiskAction.HardFlatten
                 && !row.AutoCloseRequested
                 && (!dryRunMode || !row.AutoCloseDryRunRequested))
@@ -3625,7 +3633,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool TryTriggerRiskLock(AccountCopyRow row)
         {
-            if (!isCopying || row.AutoLocked || row.Account == null || !row.Enabled || row.SizingMode == SizingMode.Disabled)
+            if (!isCopying || row.AutoLocked || !RowHasConnectedAccount(row) || !row.Enabled || row.SizingMode == SizingMode.Disabled)
                 return false;
 
             var reason = GetRiskLimitReason(row);
@@ -3667,7 +3675,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RequestRiskAutoClose(AccountCopyRow row, string reason)
         {
-            if (row == null || row.Account == null)
+            if (!RowHasConnectedAccount(row))
                 return;
 
             if (row.AutoCloseRequested)
