@@ -1,6 +1,6 @@
 # Austin's Trade Copier
 
-**Austin's Trade Copier** is a NinjaTrader 8 add-on that lets you mirror trades from one lead account to multiple target accounts in real time. Built for traders managing multiple accounts, it provides a simple UI and robust functionality to streamline account management.
+**Austin's Trade Copier** is a NinjaTrader 8 add-on for copying orders from one or more lead accounts into per-account copy rows. Every connected account appears in one table, where you choose its lead, sizing plan, symbol filter, and risk limits without managing separate account groups.
 
 ## 🚀 Features
 
@@ -23,14 +23,24 @@
 
 ---
 
+## 🖼️ Screenshot
+
+A current screenshot is intentionally not checked in yet. The old `images/screenshot.png` file was removed because it showed an outdated add-account/group layout instead of the current table-first workflow. Capture a fresh NinjaTrader screenshot after the next UI pass and add it back under `images/`.
+
+---
+
 ## 🛠️ Installation
 
-1. Run `.\scripts\install-ninjascript.ps1 -Verify` to copy the add-on into your NinjaTrader 8 `AddOns` directory with the current Git short hash stamped into the bottom-right build tag, then compile-check the stamped file.
+1. From this repository in PowerShell, run `.\scripts\install-ninjascript.ps1 -Verify`.
+   - By default, the script installs for the current Windows user at `<Documents>\NinjaTrader 8\bin\Custom\AddOns`.
+   - The installed file is stamped with the current Git short hash for the bottom-right build tag.
+   - `-Verify` compile-checks the stamped file against the installed NinjaTrader assemblies.
 2. Open NinjaTrader, go to **NinjaScript Editor**, and press `F5` to compile.
 3. Open the copier from **Control Center > Tools > Austin's Trade Copier**.
 
 > ℹ️ The add-on registers a Control Center Tools menu item after NinjaTrader loads or recompiles the script. If the menu does not appear immediately after compiling, restart NinjaTrader once.
-> The install and verify scripts resolve paths from the current Windows user's Documents and Program Files folders; they do not use hardcoded `C:\Users\...` paths. For custom NinjaTrader locations, pass `-NinjaTraderUserDirectory`, `-AddOnDirectory`, or `-NinjaTraderBin`. You can also set `NINJATRADER_USER_DIR` to the folder that contains that user's `bin\Custom` tree, `NINJATRADER_ADDON_DIR` to the exact AddOns folder, and `NINJATRADER_BIN` to the folder containing NinjaTrader assemblies. If NinjaTrader has not created the user data folder yet, open NinjaTrader once or pass an explicit `-AddOnDirectory`.
+>
+> The install and verify scripts resolve paths from the current Windows user's Documents and Program Files folders; they do not use hardcoded `C:\Users\...` paths. For custom NinjaTrader locations or another Windows user's NinjaTrader data folder, pass `-NinjaTraderUserDirectory`, `-AddOnDirectory`, or `-NinjaTraderBin`. You can also set `NINJATRADER_USER_DIR` to the folder that contains that user's `bin\Custom` tree, `NINJATRADER_ADDON_DIR` to the exact AddOns folder, and `NINJATRADER_BIN` to the folder containing NinjaTrader assemblies. If NinjaTrader has not created the user data folder yet, open NinjaTrader once or pass an explicit `-AddOnDirectory`.
 
 For a local syntax/build check outside NinjaTrader, run:
 
@@ -46,7 +56,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. **Role** describes setup (`Lead`, `Copy`, or `Available`), **Plan** summarizes the row setup, and **Status** and **Conn** describe readiness and connection state. Rows with no lead can stay available as lead-only or unused accounts. The left setup columns stay pinned while you scroll across sizing and risk fields.
 2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. The dropdown hides the row itself and active copy rows to avoid invalid setup. As soon as another row points at an account, that account is marked **Lead** and its Plan shows how many rows follow it. Its own Lead selection is cleared and disabled. If it was on, the copier turns it off because lead accounts drive copy rows instead of receiving copied orders. Copy setup and row risk cells are disabled on Lead rows because they apply to copy rows.
-3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The **Selection** toolbar's **Turn On/Off** button turns ready off rows on first; if none are ready, it turns selected On rows off.
+3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The **Selection** toolbar's **Turn On/Off** button turns ready off rows on first; if none are ready, it turns selected On rows off. Rows that cannot turn on keep their setup and show the reason in **Last Action**.
 4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy Setup** from one copy row to push Copy, Symbols, sizing, caps, risk limits, and Limit Action to peer rows with the same Lead; Lead and On/Off stay unchanged. During active copying, connected live targets are manual-locked with baselines reset so you can review before unlocking. Pending table edits are committed before the next copied fill, so live setup changes take effect through the same review pause. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
@@ -121,6 +131,8 @@ Dry run mode is selected before starting a copy session and stays locked for tha
 ## 📁 File Overview
 
 - `austins-trade-copier.cs` – The complete NinjaScript AddOn source code.
+- `scripts/install-ninjascript.ps1` – Installs the NinjaScript file into a resolved NinjaTrader `AddOns` folder and stamps the build tag.
+- `scripts/verify-ninjascript.ps1` – Compile-checks the source against local NinjaTrader and .NET Framework references.
 
 ---
 
