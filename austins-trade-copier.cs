@@ -2508,19 +2508,26 @@ namespace NinjaTrader.NinjaScript.AddOns
             var accounts = candidateAccounts
                 .Where(a => a.ConnectionStatus == ConnectionStatus.Connected)
                 .ToList();
-            var skippedDisconnectedCount = candidateAccounts.Count - accounts.Count;
+            var skippedOfflineAccountNames = candidateAccounts
+                .Where(a => a.ConnectionStatus != ConnectionStatus.Connected)
+                .Select(a => a.Name)
+                .Concat(accountRows.Where(r => r.Account == null).Select(r => r.AccountName))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var skippedOfflineCount = skippedOfflineAccountNames.Count;
 
             if (accounts.Count == 0)
             {
                 var noAccountsMessage = "No connected table or lead accounts to flatten.";
-                if (skippedDisconnectedCount > 0)
-                    noAccountsMessage = noAccountsMessage.TrimEnd('.') + "; skipped " + skippedDisconnectedCount + " disconnected account(s).";
+                if (skippedOfflineCount > 0)
+                    noAccountsMessage = noAccountsMessage.TrimEnd('.') + "; skipped " + skippedOfflineCount + " offline account(s).";
 
                 SetStatus(noAccountsMessage);
                 return;
             }
 
-            if (MessageBox.Show(BuildFlattenAllPrompt(accounts, leadCount, skippedDisconnectedCount, wasCopying), "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(BuildFlattenAllPrompt(accounts, leadCount, skippedOfflineCount, wasCopying), "Confirm Flatten All", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
             mirroredTargetQuantities.Clear();
@@ -2528,12 +2535,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             foreach (var account in accounts)
                 FlattenAccount(account, "Manual flatten all");
 
-            foreach (var row in accountRows.Where(r => r.Account != null && r.Account.ConnectionStatus != ConnectionStatus.Connected))
+            foreach (var row in accountRows.Where(IsOfflineRow))
                 row.LastAction = "Manual flatten all skipped - offline";
 
             var message = "Flatten all requested for " + accounts.Count + " connected account(s)";
-            if (skippedDisconnectedCount > 0)
-                message += "; skipped " + skippedDisconnectedCount + " disconnected account(s)";
+            if (skippedOfflineCount > 0)
+                message += "; skipped " + skippedOfflineCount + " offline account(s)";
 
             message += wasCopying ? "; copying remains active." : ".";
             SetStatus(message);
@@ -2600,15 +2607,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             return prompt;
         }
 
-        private string BuildFlattenAllPrompt(IList<Account> accounts, int leadCount, int skippedDisconnectedCount, bool copyingActive)
+        private string BuildFlattenAllPrompt(IList<Account> accounts, int leadCount, int skippedOfflineCount, bool copyingActive)
         {
             var accountCount = accounts == null ? 0 : accounts.Count(a => a != null);
             var prompt = "Flatten all " + accountCount + " account(s), including " + leadCount + " active lead account(s)?\n\n"
                 + "This cancels active orders and closes open positions across each account.\n"
                 + "Row symbol filters are not applied to Flatten All.";
 
-            if (skippedDisconnectedCount > 0)
-                prompt += "\n" + skippedDisconnectedCount + " disconnected account(s) will be skipped.";
+            if (skippedOfflineCount > 0)
+                prompt += "\n" + skippedOfflineCount + " offline account(s) will be skipped.";
 
             if (copyingActive)
                 prompt += "\nCopying remains active after the request.";
