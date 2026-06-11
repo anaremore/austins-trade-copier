@@ -276,6 +276,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             selectionRow.Children.Add(reconcileSelectedButton);
 
             toggleSelectedButton = CreateButton("Enable / Disable", Brushes.DimGray, "If every selected row is on, turn selected rows off. Otherwise turn on selected rows that are off; invalid rows are skipped with reasons.");
+            toggleSelectedButton.Width = 128;
             toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
             selectionRow.Children.Add(toggleSelectedButton);
 
