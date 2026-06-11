@@ -823,7 +823,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (focusedComboBox == null)
                 return;
 
-            CommitLeadComboBoxSelection(focusedComboBox, leadSnapshot);
+            CommitLeadComboBoxSelection(focusedComboBox, leadSnapshot, focusedComboBox.IsDropDownOpen);
         }
 
         private Dictionary<AccountCopyRow, string> CaptureLeadSelections()
@@ -865,6 +865,10 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     var savedLead = pair.Value ?? string.Empty;
                     if (AccountNamesEqual(row.LeadAccountName, savedLead))
+                        continue;
+
+                    // Repair only accidental blanks; a stale snapshot should never overwrite a newer lead choice.
+                    if (string.IsNullOrWhiteSpace(savedLead) || !string.IsNullOrWhiteSpace(row.LeadAccountName))
                         continue;
 
                     row.LeadAccountName = savedLead;
@@ -1008,20 +1012,20 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!comboBox.IsDropDownOpen)
                 return;
 
-            CommitLeadComboBoxSelection(comboBox);
+            CommitLeadComboBoxSelection(comboBox, null, true);
         }
 
         private void LeadComboBoxCell_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
-            CommitLeadComboBoxSelection(sender as ComboBox);
+            CommitLeadComboBoxSelection(sender as ComboBox, null, false);
         }
 
         private void CommitLeadComboBoxSelection(ComboBox comboBox)
         {
-            CommitLeadComboBoxSelection(comboBox, null);
+            CommitLeadComboBoxSelection(comboBox, null, false);
         }
 
-        private void CommitLeadComboBoxSelection(ComboBox comboBox, Dictionary<AccountCopyRow, string> leadSnapshot)
+        private void CommitLeadComboBoxSelection(ComboBox comboBox, Dictionary<AccountCopyRow, string> leadSnapshot, bool allowClearingLead)
         {
             if (comboBox == null || !string.Equals(comboBox.Tag as string, "LeadAccountName", StringComparison.Ordinal))
                 return;
@@ -1032,6 +1036,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             var row = comboBox.DataContext as AccountCopyRow;
             var previousLead = row != null ? row.LeadAccountName : string.Empty;
             var selectedLead = GetSelectedLeadName(comboBox);
+
+            if (row != null
+                && !allowClearingLead
+                && string.IsNullOrWhiteSpace(selectedLead)
+                && !string.IsNullOrWhiteSpace(previousLead))
+            {
+                RefreshLeadComboBoxSelection(comboBox);
+                return;
+            }
 
             var selectedItemBinding = comboBox.GetBindingExpression(Selector.SelectedItemProperty);
             if (selectedItemBinding != null)
@@ -1063,6 +1076,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return comboBox.SelectedValue.ToString();
 
             return comboBox.SelectedItem == null ? string.Empty : comboBox.SelectedItem.ToString();
+        }
+
+        private void RefreshLeadComboBoxSelection(ComboBox comboBox)
+        {
+            if (comboBox == null)
+                return;
+
+            var selectedItemBinding = comboBox.GetBindingExpression(Selector.SelectedItemProperty);
+            if (selectedItemBinding != null)
+                selectedItemBinding.UpdateTarget();
+
+            var selectedValueBinding = comboBox.GetBindingExpression(Selector.SelectedValueProperty);
+            if (selectedValueBinding != null)
+                selectedValueBinding.UpdateTarget();
         }
 
         private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, bool numericOnly, bool allowDecimal, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null)
