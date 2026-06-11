@@ -2104,8 +2104,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             try
             {
-                LoadProfile(profileName);
-                var message = BuildLoadedProfileMessage(profileName);
+                var loadedOffCount = LoadProfile(profileName);
+                var message = BuildLoadedProfileMessage(profileName, loadedOffCount);
                 SetStatus(message);
                 Log(message);
             }
@@ -2126,7 +2126,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 + "Open positions and working orders are not changed.";
         }
 
-        private string BuildLoadedProfileMessage(string profileName)
+        private string BuildLoadedProfileMessage(string profileName, int loadedOffCount)
         {
             var rowCount = accountRows.Count;
             var onCount = accountRows.Count(r => r != null && r.Enabled);
@@ -2144,6 +2144,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (offlineCount > 0)
                 parts.Add(offlineCount + " offline");
+
+            if (loadedOffCount > 0)
+                parts.Add(loadedOffCount + " turned Off");
 
             return string.Join(", ", parts) + ".";
         }
@@ -2246,13 +2249,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             document.Save(GetProfilePath(profileName));
         }
 
-        private void LoadProfile(string profileName)
+        private int LoadProfile(string profileName)
         {
             var path = GetProfilePath(profileName);
             if (!File.Exists(path))
             {
                 SetStatus("Profile " + profileName + " does not exist.");
-                return;
+                return 0;
             }
 
             var accounts = GetConnectedAccountsSnapshot();
@@ -2274,6 +2277,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             maxNetVirtualPositions.Clear();
 
             var seenAccounts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var loadedOffCount = 0;
             foreach (var element in GetProfileRowElements(root))
             {
                 var accountName = element.GetAttribute("account");
@@ -2354,6 +2358,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LockReason = rowWasAutoLocked ? rowLockReason : string.Empty;
                 NormalizeLegacySizingMode(row);
                 rowLoadedOffReason = DisableLoadedRowWithInvalidSizing(row);
+                if (!string.IsNullOrWhiteSpace(rowLoadedOffReason))
+                    loadedOffCount++;
+
                 row.LastAction = GetLoadedProfileLastAction(row, rowWasAutoLocked, rowLoadedAvailableBecauseNoLead, rowLoadedOffReason);
 
                 accountRows.Add(row);
@@ -2361,8 +2368,50 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
             SyncAccountRowsWithConnectedAccounts();
             RefreshConnectedAccountNames();
+            RefreshAllRows();
+            loadedOffCount += DisableLoadedRowsThatCannotStart();
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
+            return loadedOffCount;
+        }
+
+        private int DisableLoadedRowsThatCannotStart()
+        {
+            var targetRows = accountRows
+                .Where(r => r != null && r.Enabled && r.SizingMode != SizingMode.Disabled)
+                .ToList();
+            if (targetRows.Count == 0)
+                return 0;
+
+            var disabledCount = 0;
+            var desiredLeadNames = BuildDesiredLeadNames(targetRows);
+            var wasSuppressed = suppressEnableValidation;
+            suppressEnableValidation = true;
+            try
+            {
+                foreach (var row in targetRows)
+                {
+                    string skipReason;
+                    if (CanEnableRow(row, desiredLeadNames, out skipReason))
+                        continue;
+
+                    var friendlyReason = DescribeReadinessSkipReason(skipReason);
+                    row.Enabled = false;
+                    row.ManualLock = false;
+                    row.LastAction = "Loaded Off: " + friendlyReason;
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                    ClearMirroredTargetQuantities(row);
+                    Log("Profile loaded " + row.AccountName + " Off because " + friendlyReason + ".");
+                    disabledCount++;
+                }
+            }
+            finally
+            {
+                suppressEnableValidation = wasSuppressed;
+            }
+
+            return disabledCount;
         }
 
         private string GetLoadedProfileLastAction(AccountCopyRow row, bool wasAutoLocked, bool loadedAvailableBecauseNoLead, string loadedOffReason)
