@@ -1,7 +1,9 @@
 param(
     [string] $SourcePath = (Join-Path $PSScriptRoot '..\austins-trade-copier.cs'),
     [string] $AddOnDirectory = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NinjaTrader 8\bin\Custom\AddOns'),
-    [string] $Version = ''
+    [string] $Version = '',
+    [string] $NinjaTraderBin = 'C:\Program Files\NinjaTrader 8\bin',
+    [switch] $Verify
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,3 +76,9 @@ Set-Content -LiteralPath $destination -Value $content -Encoding UTF8
 $installedVersion = if ($null -ne $versionToWrite) { $versionToWrite } else { '0.1.0-dev' }
 Write-Host "Installed Austin's Trade Copier to $destination"
 Write-Host "Build tag: v$installedVersion+$commit"
+
+if ($Verify) {
+    $verifyScript = Resolve-RequiredPath (Join-Path $PSScriptRoot 'verify-ninjascript.ps1') 'NinjaScript verifier'
+    Write-Host "Verifying installed NinjaScript..."
+    & $verifyScript -SourcePath $destination -NinjaTraderBin $NinjaTraderBin
+}
