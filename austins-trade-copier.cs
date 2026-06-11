@@ -1136,7 +1136,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 QueueRowRefresh();
 
             if (SelectedActionButtonsDependOnProperty(e.PropertyName))
+            {
                 UpdateSelectedActionButtons();
+                RefreshStatusSummary();
+            }
         }
 
         private bool SelectedActionButtonsDependOnProperty(string propertyName)
@@ -1145,9 +1148,17 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 case "Enabled":
                 case "LeadAccountName":
+                case "CopyMode":
+                case "InstrumentFilter":
                 case "SizingMode":
                 case "Multiplier":
                 case "FixedQuantity":
+                case "MaxQuantity":
+                case "MaxNetPosition":
+                case "DailyLossLimit":
+                case "MaxDrawdown":
+                case "ProfitTarget":
+                case "LimitAction":
                     return true;
                 default:
                     return false;
