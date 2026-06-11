@@ -5134,11 +5134,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (ShouldUseSimpleSelectionSummary(row))
                 return "Selected: " + row.AccountName + " | " + DescribeSelectedLead(row);
 
-            var lead = DescribeSelectedLead(row);
+            var relationship = DescribeSelectedCopyRelationship(row);
             var sizing = DescribeSizing(row);
             var risk = DescribeRisk(row);
             var riskNow = DescribeRiskProgressForSelection(row);
-            var summary = "Selected: " + row.AccountName + " <- " + lead + " | " + row.Status + " | " + sizing + " | " + risk;
+            var summary = "Selected: " + relationship + " | " + row.Status + " | " + sizing + " | " + risk;
             return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
         }
 
@@ -5150,7 +5150,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (ShouldUseSimpleSelectionSummary(row))
                 return row.AccountName + " | " + DescribeSelectedLead(row);
 
-            return row.AccountName + " <- " + DescribeSelectedLead(row);
+            return DescribeSelectedCopyRelationship(row);
         }
 
         private bool ShouldUseSimpleSelectionSummary(AccountCopyRow row)
@@ -5179,6 +5179,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return row.LeadAccountName;
 
             return "Available";
+        }
+
+        private string DescribeSelectedCopyRelationship(AccountCopyRow row)
+        {
+            if (row == null)
+                return "Unknown";
+
+            if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                return row.AccountName + " self-copy";
+
+            return row.AccountName + " copies " + DescribeSelectedLead(row);
         }
 
         private string DescribeSizing(AccountCopyRow row)
