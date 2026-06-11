@@ -1667,6 +1667,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void UpdateSelectedActionButtons()
         {
+            UpdateStartPauseButtonState();
             var rows = GetSelectedRows();
             var hasSelection = rows.Count > 0;
             UpdateSelectedRowsText(rows);
@@ -2542,6 +2543,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (isCopying)
             {
+                startPauseButton.IsEnabled = true;
                 startPauseButton.Content = dryRunMode ? "Pause Dry Run" : "Pause Copying";
                 startPauseButton.Background = Brushes.DarkOrange;
                 startPauseButton.ToolTip = dryRunMode
@@ -2553,6 +2555,16 @@ namespace NinjaTrader.NinjaScript.AddOns
             var dryRunArmed = dryRunCheckBox != null && dryRunCheckBox.IsChecked == true;
             startPauseButton.Content = dryRunArmed ? "Start Dry Run" : "Start Copying";
             startPauseButton.Background = dryRunArmed ? Brushes.SteelBlue : Brushes.SeaGreen;
+            var hasOnRows = accountRows.Any(IsConfiguredCopyRow);
+            startPauseButton.IsEnabled = hasOnRows;
+            if (!hasOnRows)
+            {
+                startPauseButton.ToolTip = dryRunArmed
+                    ? "Turn at least one copy row On before starting a dry run."
+                    : "Turn at least one copy row On before starting.";
+                return;
+            }
+
             startPauseButton.ToolTip = dryRunArmed
                 ? "Start a simulation session after preflight validation. Copied and reconcile orders are logged only."
                 : "Start live copying for On rows after preflight validation.";
