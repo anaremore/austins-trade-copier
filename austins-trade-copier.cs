@@ -3099,6 +3099,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.AutoLocked = false;
                 row.LockReason = string.Empty;
                 row.AutoCloseRequested = false;
+                row.AutoCloseDryRunRequested = false;
                 row.LastAction = wasAutoLocked
                     ? baselineReset ? "Unlocked - baseline reset" : "Unlocked - baseline unchanged"
                     : "Unlocked";
@@ -3527,6 +3528,17 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void EvaluateRisk(AccountCopyRow row)
         {
+            if (isCopying
+                && row != null
+                && row.AutoLocked
+                && row.LimitAction == RiskAction.HardFlatten
+                && !row.AutoCloseRequested
+                && (!dryRunMode || !row.AutoCloseDryRunRequested))
+            {
+                RequestRiskAutoClose(row, string.IsNullOrEmpty(row.LockReason) ? "Risk limit" : row.LockReason);
+                return;
+            }
+
             TryTriggerRiskLock(row);
         }
 
@@ -3583,7 +3595,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            row.AutoCloseRequested = true;
+            if (dryRunMode && row.AutoCloseDryRunRequested)
+            {
+                row.LastAction = reason + " - dry run auto close already simulated";
+                return;
+            }
+
+            if (dryRunMode)
+                row.AutoCloseDryRunRequested = true;
+            else
+            {
+                row.AutoCloseRequested = true;
+                row.AutoCloseDryRunRequested = false;
+            }
+
             AutoCloseRiskLockedRow(row, reason);
         }
 
@@ -4274,6 +4299,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private bool manualLock;
             private bool autoLocked;
             private bool autoCloseRequested;
+            private bool autoCloseDryRunRequested;
             private string lockReason = string.Empty;
             private string lastAction = "Ready";
 
@@ -4476,6 +4502,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 set { SetField(ref autoCloseRequested, value, "AutoCloseRequested"); }
             }
 
+            public bool AutoCloseDryRunRequested
+            {
+                get { return autoCloseDryRunRequested; }
+                set { SetField(ref autoCloseDryRunRequested, value, "AutoCloseDryRunRequested"); }
+            }
+
             public string LockReason
             {
                 get { return lockReason; }
@@ -4508,6 +4540,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 {
                     AutoLocked = false;
                     AutoCloseRequested = false;
+                    AutoCloseDryRunRequested = false;
                     LockReason = string.Empty;
                 }
 
