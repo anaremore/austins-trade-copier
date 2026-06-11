@@ -5879,7 +5879,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var row = rows[0];
             if (ShouldUseSimpleSelectionSummary(row))
-                return BuildSelectedRowLabel(row) + " | " + row.Status;
+                return BuildSimpleSelectionSummary(row);
 
             var relationship = DescribeSelectedCopyRelationship(row);
             var sizing = DescribeSizing(row);
@@ -5887,6 +5887,33 @@ namespace NinjaTrader.NinjaScript.AddOns
             var riskNow = DescribeRiskProgressForSelection(row);
             var summary = relationship + " | " + row.Status + " | " + sizing + " | " + risk;
             return string.IsNullOrEmpty(riskNow) ? summary : summary + " | now " + riskNow;
+        }
+
+        private string BuildSimpleSelectionSummary(AccountCopyRow row)
+        {
+            var label = BuildSelectedRowLabel(row);
+            if (row == null || string.IsNullOrWhiteSpace(row.Status))
+                return label;
+
+            if (SelectionLabelAlreadyShowsState(label, row.Status))
+                return label;
+
+            if (string.Equals(row.Status, "Lead missing", StringComparison.OrdinalIgnoreCase)
+                && SelectionLabelAlreadyShowsState(label, "Needs lead"))
+                return label;
+
+            if (string.Equals(row.Status, "Self-copy", StringComparison.OrdinalIgnoreCase)
+                && SelectionLabelAlreadyShowsState(label, "Self-copy"))
+                return label;
+
+            return label + " | " + row.Status;
+        }
+
+        private bool SelectionLabelAlreadyShowsState(string label, string state)
+        {
+            return !string.IsNullOrWhiteSpace(label)
+                && !string.IsNullOrWhiteSpace(state)
+                && label.IndexOf(" | " + state, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private string BuildAccountNamePreview(IList<AccountCopyRow> rows, int previewCount)
@@ -5929,26 +5956,18 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "No selection";
 
             if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-            {
-                if (row.FollowerCount == 1)
-                    return row.AccountName + " leads 1 row";
-
-                if (row.FollowerCount > 1)
-                    return row.AccountName + " leads " + row.FollowerCount.ToString(CultureInfo.InvariantCulture) + " rows";
-
-                return row.AccountName + " leads";
-            }
+                return row.AccountName + " | Lead";
 
             if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
-                return row.AccountName + " has a lead conflict";
+                return row.AccountName + " | Lead conflict";
 
             if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
-                return row.AccountName + " cannot copy itself";
+                return row.AccountName + " | Self-copy";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
-                return row.AccountName + " " + (string.Equals(row.PlanSummary, "Needs lead", StringComparison.OrdinalIgnoreCase) ? "needs lead" : "available");
+                return row.AccountName + " | " + (string.Equals(row.PlanSummary, "Needs lead", StringComparison.OrdinalIgnoreCase) ? "Needs lead" : "Available");
 
-            return row.AccountName + " follows " + row.LeadAccountName;
+            return row.AccountName + " <- " + row.LeadAccountName;
         }
 
         private bool ShouldUseSimpleSelectionSummary(AccountCopyRow row)
@@ -5985,9 +6004,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "Unknown";
 
             if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
-                return row.AccountName + " self-copy";
+                return row.AccountName + " | Self-copy";
 
-            return row.AccountName + " follows " + DescribeSelectedLead(row);
+            return row.AccountName + " <- " + DescribeSelectedLead(row);
         }
 
         private string DescribeSizing(AccountCopyRow row)
