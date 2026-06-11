@@ -332,7 +332,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            copyLeadSettingsButton = CreateButton("Copy Setup", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to other rows that use the selected row's lead. Lead selections stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Setup", Brushes.DimGray, "Copy the selected row's copy mode, Symbols, sizing, caps, risk limits, and Limit Action to peers with the same Lead. Lead and On/Off stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -2189,7 +2189,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     : "No peer rows use lead " + leadName + ".";
             }
 
-            return "Copy mode, sizing, risk limits, Limit Action, and Symbols to " + targetCount + " peer row(s) using the same lead. Lead selections stay unchanged.";
+            return "Copy this row's copy mode, Symbols, sizing, caps, risk limits, and Limit Action to " + targetCount + " peer row(s) using the same Lead. Lead and On/Off stay unchanged.";
         }
 
         private string BuildReconcileSelectedTooltip(int selectedRowCount, int eligibleCount)
@@ -4935,7 +4935,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (isCopying)
             {
-                var prompt = "Copy setup from " + source.AccountName + " to " + rows.Count + " peer row(s) using lead " + leadName + " while copying is active? Active target row baselines will be reset. Lead selections stay unchanged.";
+                var prompt = "Copy setup from " + source.AccountName + " to " + rows.Count + " peer row(s) using lead " + leadName + " while copying is active?\n\n"
+                    + "This copies Copy, Symbols, Sizing, Multiplier, Fixed Qty, Max Qty, Max Net, Max Loss, Max DD, Profit Target, and Limit Action.\n"
+                    + "Lead and On/Off stay unchanged. Active target row baselines will be reset.";
                 var accountSummary = BuildRowAccountPromptLine(rows);
                 if (!string.IsNullOrEmpty(accountSummary))
                     prompt += "\n" + accountSummary;
@@ -4983,14 +4985,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             var autoCloseRequestedCount = ApplyPendingAutoCloseActions(rows);
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            var message = "Copied setup from " + source.AccountName + " to " + appliedCount + " peer row(s) using lead " + leadName;
+            var message = "Copied copy/sizing/risk setup from " + source.AccountName + " to " + appliedCount + " peer row(s) using lead " + leadName;
             if (liveBaselineResetCount > 0)
                 message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
 
             if (autoCloseRequestedCount > 0)
                 message += "; auto-close requested for " + autoCloseRequestedCount + " risk-locked row(s)";
 
-            message += ". Lead selections were left unchanged.";
+            message += ". Lead and On/Off were left unchanged.";
             SetStatus(message);
             Log(message);
             RefreshAllRows();
