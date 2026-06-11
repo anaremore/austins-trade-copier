@@ -2117,14 +2117,15 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var onCount = rows.Count(r => r.Enabled);
             var offCount = rows.Count - onCount;
-            var enableableOffCount = rows.Count(r => !r.Enabled && r.CanToggleEnabled);
+            Dictionary<string, int> turnOnSkipReasons;
+            var enableableOffCount = CountRowsReadyToTurnOn(rows.Where(r => !r.Enabled), out turnOnSkipReasons);
             var skippedOffCount = offCount - enableableOffCount;
 
             if (enableableOffCount == 0 && onCount == 0)
             {
                 toggleSelectedButton.Content = "Turn On";
                 toggleSelectedButton.IsEnabled = false;
-                toggleSelectedButton.ToolTip = "Selected rows are not ready to turn on. Connect the account, choose a Lead, and use active Sizing; lead accounts stay off.";
+                toggleSelectedButton.ToolTip = "Selected rows are not ready to turn on. " + FormatTurnOnSkipTooltip(turnOnSkipReasons);
                 return;
             }
 
@@ -2138,9 +2139,45 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Turn On" : "Turn On Ready";
             toggleSelectedButton.ToolTip = "Turn on " + enableableOffCount + " ready row(s).";
             if (skippedOffCount > 0)
-                toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are disconnected, leads, missing a Lead, self-copy, using an active copy row as Lead, Sizing is off, or the sizing value is invalid.";
+                toggleSelectedButton.ToolTip += " " + FormatTurnOnSkipTooltip(turnOnSkipReasons);
             if (onCount > 0)
                 toggleSelectedButton.ToolTip += " " + onCount + " selected row(s) already on.";
+        }
+
+        private int CountRowsReadyToTurnOn(IEnumerable<AccountCopyRow> rows, out Dictionary<string, int> skipReasons)
+        {
+            var targetRows = rows == null ? new List<AccountCopyRow>() : rows.Where(r => r != null).Distinct().ToList();
+            var targetRowSet = new HashSet<AccountCopyRow>(targetRows);
+            var desiredLeadNames = accountRows
+                .Where(r => !targetRowSet.Contains(r) && r.Enabled && r.SizingMode != SizingMode.Disabled && !string.IsNullOrWhiteSpace(r.LeadAccountName))
+                .Select(r => r.LeadAccountName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            skipReasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var readyCount = 0;
+            foreach (var row in targetRows)
+            {
+                string skipReason;
+                if (!CanEnableRow(row, desiredLeadNames, out skipReason))
+                {
+                    IncrementReason(skipReasons, DescribeReadinessSkipReason(skipReason));
+                    continue;
+                }
+
+                readyCount++;
+                AddDesiredLeadName(row, desiredLeadNames);
+            }
+
+            return readyCount;
+        }
+
+        private string FormatTurnOnSkipTooltip(Dictionary<string, int> skipReasons)
+        {
+            if (skipReasons == null || skipReasons.Count == 0)
+                return string.Empty;
+
+            return "Skipped " + skipReasons.Values.Sum() + " (" + FormatReasonCounts(skipReasons) + ").";
         }
 
         private void UpdateFlattenActionButtons(IList<AccountCopyRow> selectedRows)
@@ -4658,7 +4695,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var offRows = rows.Where(r => !r.Enabled).ToList();
-            if (offRows.Any(r => r.CanToggleEnabled))
+            Dictionary<string, int> turnOnSkipReasons;
+            if (CountRowsReadyToTurnOn(offRows, out turnOnSkipReasons) > 0)
             {
                 EnableRows(offRows, "selected");
                 return;
@@ -4671,7 +4709,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            SetStatus("Selected rows are not ready to turn on.");
+            SetStatus("Selected rows are not ready to turn on.", FormatTurnOnSkipTooltip(turnOnSkipReasons));
         }
 
         private void DisableRows(IEnumerable<AccountCopyRow> rows, string scopeDescription)
@@ -5042,12 +5080,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (skipReasons.Count == 0)
                 return string.Empty;
 
-            var parts = skipReasons
-                .OrderBy(pair => pair.Key)
-                .Select(pair => pair.Value + " " + pair.Key)
-                .ToList();
-
-            return "; skipped " + skipReasons.Values.Sum() + " (" + string.Join(", ", parts) + ")";
+            return "; skipped " + skipReasons.Values.Sum() + " (" + FormatReasonCounts(skipReasons) + ")";
         }
 
         private void CopyLeadSettingsButton_Click(object sender, RoutedEventArgs e)
