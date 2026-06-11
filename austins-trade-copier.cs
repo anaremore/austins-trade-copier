@@ -4042,33 +4042,48 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
         }
 
-        private void FlattenAccount(Account account, string reason)
+        private FlattenRequestResult FlattenAccount(Account account, string reason)
         {
-            FlattenAccount(account, reason, null, null);
+            return FlattenAccount(account, reason, null, null);
         }
 
-        private void FlattenRow(AccountCopyRow row, string reason)
+        private FlattenRequestResult FlattenRow(AccountCopyRow row, string reason)
         {
             if (row == null)
-                return;
+                return new FlattenRequestResult { FlattenFailed = true };
 
             var hasSymbolFilter = HasInstrumentFilter(row);
-            FlattenAccount(row.Account, reason, hasSymbolFilter ? new Func<Instrument, bool>(instrument => RowAllowsInstrument(row, instrument)) : null, row);
+            return FlattenAccount(row.Account, reason, hasSymbolFilter ? new Func<Instrument, bool>(instrument => RowAllowsInstrument(row, instrument)) : null, row);
         }
 
-        private void FlattenAccount(Account account, string reason, Func<Instrument, bool> instrumentFilter, AccountCopyRow statusRow)
+        private FlattenRequestResult FlattenAccount(Account account, string reason, Func<Instrument, bool> instrumentFilter, AccountCopyRow statusRow)
         {
+            var result = new FlattenRequestResult();
             if (account == null)
-                return;
+            {
+                result.FlattenFailed = true;
+                return result;
+            }
 
             try
             {
-                CancelActiveOrders(account, instrumentFilter);
-                CloseOpenPositions(account, instrumentFilter);
+                result.CancelOrderFailures = CancelActiveOrders(account, instrumentFilter);
+                result.CloseOrdersSubmitted = CloseOpenPositions(account, instrumentFilter, result);
                 Log(account.Name + " flatten requested" + (instrumentFilter == null ? string.Empty : " for matching symbols") + ": " + reason + ".");
+
+                if (result.HasFailures)
+                {
+                    var row = statusRow ?? accountRows.FirstOrDefault(r => r.Account == account);
+                    if (row != null)
+                    {
+                        row.SetStatus("Error", result.CloseOrdersSubmitted > 0 ? "Flatten partial" : "Flatten failed");
+                        row.LastAction = result.CloseOrdersSubmitted > 0 ? "Flatten partial" : "Flatten failed";
+                    }
+                }
             }
             catch (Exception ex)
             {
+                result.FlattenFailed = true;
                 Log("ERROR " + account.Name + " flatten failed: " + ex.Message);
                 var row = statusRow ?? accountRows.FirstOrDefault(r => r.Account == account);
                 if (row != null)
@@ -4077,10 +4092,13 @@ namespace NinjaTrader.NinjaScript.AddOns
                     row.LastAction = "Flatten failed";
                 }
             }
+
+            return result;
         }
 
-        private void CancelActiveOrders(Account account, Func<Instrument, bool> instrumentFilter)
+        private int CancelActiveOrders(Account account, Func<Instrument, bool> instrumentFilter)
         {
+            var failures = 0;
             Order[] orders;
             lock (account.Orders)
                 orders = account.Orders.ToArray();
@@ -4100,9 +4118,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
                 catch (Exception ex)
                 {
+                    failures++;
                     Log("ERROR " + account.Name + " cancel failed: " + ex.Message);
                 }
             }
+
+            return failures;
         }
 
         private bool IsActiveOrder(Order order)
@@ -4116,8 +4137,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     || order.OrderState == OrderState.Working);
         }
 
-        private void CloseOpenPositions(Account account, Func<Instrument, bool> instrumentFilter)
+        private int CloseOpenPositions(Account account, Func<Instrument, bool> instrumentFilter, FlattenRequestResult result)
         {
+            var submitted = 0;
             Position[] positions;
             lock (account.Positions)
                 positions = account.Positions.ToArray();
@@ -4148,13 +4170,19 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     account.Submit(new[] { closeOrder });
                     MarkFlattenRequested(account, position.Instrument);
+                    submitted++;
                     Log(account.Name + " closing " + DescribeOrder(closeAction, quantity, position.Instrument) + ".");
                 }
                 catch (Exception ex)
                 {
+                    if (result != null)
+                        result.CloseOrderFailures++;
+
                     Log("ERROR " + account.Name + " close failed: " + ex.Message);
                 }
             }
+
+            return submitted;
         }
 
         private void MarkFlattenRequested(Account account, Instrument instrument)
@@ -5080,20 +5108,30 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             if (dryRunMode)
-                row.AutoCloseDryRunRequested = true;
-            else
             {
-                row.AutoCloseRequested = true;
-                row.AutoCloseDryRunRequested = false;
+                row.AutoCloseDryRunRequested = true;
+                AutoCloseRiskLockedRow(row, reason);
+                return;
             }
 
-            AutoCloseRiskLockedRow(row, reason);
+            row.AutoCloseDryRunRequested = false;
+            var result = AutoCloseRiskLockedRow(row, reason);
+            if (result.ShouldRememberAutoCloseRequest)
+            {
+                row.AutoCloseRequested = true;
+                return;
+            }
+
+            row.AutoCloseRequested = false;
+            row.LastAction = reason + " - auto close retry pending";
+            row.SetStatus("Error", "Auto-close retry", "Auto-close could not submit a close order and will retry while the risk lock remains active.");
+            Log(row.AccountName + " auto-close by " + reason + " did not submit a close order; will retry while the risk lock remains active.");
         }
 
-        private void AutoCloseRiskLockedRow(AccountCopyRow row, string reason)
+        private FlattenRequestResult AutoCloseRiskLockedRow(AccountCopyRow row, string reason)
         {
             if (row == null || row.Account == null)
-                return;
+                return new FlattenRequestResult { FlattenFailed = true };
 
             ClearLockedVirtualPositions(row);
             ClearMaxNetVirtualPositions(row);
@@ -5103,12 +5141,20 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.LastAction = reason + " - dry run auto close";
                 Log("DRY RUN " + row.AccountName + " would auto-close managed positions by " + reason + ". New copied orders are blocked.");
-                return;
+                return new FlattenRequestResult();
             }
 
             row.LastAction = reason + " - auto close";
             Log(row.AccountName + " auto-closing managed positions by " + reason + ". New copied orders are blocked.");
-            FlattenRow(row, reason);
+            var result = FlattenRow(row, reason);
+            if (result.ShouldRememberAutoCloseRequest && result.HasFailures)
+            {
+                row.LastAction = reason + " - auto close partial";
+                row.SetStatus("Error", "Auto-close partial", "Some auto-close requests were submitted, but at least one cancel or close action failed. Check the account.");
+                Log(row.AccountName + " auto-close by " + reason + " had errors after a close request was submitted. Check the account before unlocking.");
+            }
+
+            return result;
         }
 
         private void UpdateRowStatus(AccountCopyRow row)
@@ -5979,6 +6025,24 @@ namespace NinjaTrader.NinjaScript.AddOns
             public bool WasCapped
             {
                 get { return Quantity < RequestedQuantity; }
+            }
+        }
+
+        private class FlattenRequestResult
+        {
+            public int CancelOrderFailures { get; set; }
+            public int CloseOrdersSubmitted { get; set; }
+            public int CloseOrderFailures { get; set; }
+            public bool FlattenFailed { get; set; }
+
+            public bool HasFailures
+            {
+                get { return FlattenFailed || CancelOrderFailures > 0 || CloseOrderFailures > 0; }
+            }
+
+            public bool ShouldRememberAutoCloseRequest
+            {
+                get { return CloseOrdersSubmitted > 0 || !HasFailures; }
             }
         }
 
