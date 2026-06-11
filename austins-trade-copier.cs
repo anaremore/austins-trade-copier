@@ -666,6 +666,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var factory = new FrameworkElementFactory(typeof(CheckBox));
             factory.SetValue(ToggleButton.IsThreeStateProperty, false);
             factory.SetValue(UIElement.FocusableProperty, false);
+            factory.SetValue(FrameworkElement.TagProperty, propertyName);
             factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
             factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
@@ -699,17 +700,123 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (checkBox == null || row == null || !checkBox.IsEnabled)
                 return;
 
-            SelectRowForDirectCellAction(row);
+            e.Handled = true;
+            CommitFocusedLeadComboBoxEdit();
             CommitFocusedTextBoxEdit();
-            checkBox.IsChecked = checkBox.IsChecked != true;
+            var leadSnapshot = CaptureLeadSelections();
+            SetDirectCheckBoxValue(row, checkBox.Tag as string, checkBox.IsChecked != true);
 
             var binding = checkBox.GetBindingExpression(ToggleButton.IsCheckedProperty);
             if (binding != null)
-                binding.UpdateSource();
+                binding.UpdateTarget();
 
-            e.Handled = true;
+            SelectRowForDirectCellAction(row);
+            RepairLeadSelectionsAfterDirectCellAction(leadSnapshot);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RepairLeadSelectionsAfterDirectCellAction(leadSnapshot);
+            }), DispatcherPriority.Background);
+
             UpdateSelectedActionButtons();
             RefreshStatusSummary();
+        }
+
+        private void SetDirectCheckBoxValue(AccountCopyRow row, string propertyName, bool value)
+        {
+            if (row == null)
+                return;
+
+            if (string.Equals(propertyName, "Enabled", StringComparison.Ordinal))
+            {
+                row.Enabled = value;
+                return;
+            }
+
+            if (string.Equals(propertyName, "ManualLock", StringComparison.Ordinal))
+                row.ManualLock = value;
+        }
+
+        private void CommitFocusedLeadComboBoxEdit()
+        {
+            var focusedComboBox = Keyboard.FocusedElement as ComboBox;
+            if (focusedComboBox == null)
+                return;
+
+            CommitLeadComboBoxSelection(focusedComboBox);
+        }
+
+        private Dictionary<AccountCopyRow, string> CaptureLeadSelections()
+        {
+            return accountRows
+                .Where(row => row != null)
+                .ToDictionary(row => row, row => row.LeadAccountName ?? string.Empty);
+        }
+
+        private void RepairLeadSelectionsAfterDirectCellAction(Dictionary<AccountCopyRow, string> leadSnapshot)
+        {
+            if (!RestoreLeadSelectionsAfterDirectCellAction(leadSnapshot))
+                return;
+
+            ValidateEnabledRowsAfterLeadRestore();
+            RefreshLeadRoleState();
+            SyncLeadAccountSubscriptions();
+        }
+
+        private bool RestoreLeadSelectionsAfterDirectCellAction(Dictionary<AccountCopyRow, string> leadSnapshot)
+        {
+            if (leadSnapshot == null || leadSnapshot.Count == 0)
+                return false;
+
+            var restoredAny = false;
+            var wasEnableSuppressed = suppressEnableValidation;
+            var wasLiveSuppressed = suppressLiveSettingsPause;
+            var wasLeadRefreshSuppressed = suppressLeadRoleRefresh;
+            suppressEnableValidation = true;
+            suppressLiveSettingsPause = true;
+            suppressLeadRoleRefresh = true;
+            try
+            {
+                foreach (var pair in leadSnapshot)
+                {
+                    var row = pair.Key;
+                    if (row == null || SnapshotHadFollowers(leadSnapshot, row))
+                        continue;
+
+                    var savedLead = pair.Value ?? string.Empty;
+                    if (AccountNamesEqual(row.LeadAccountName, savedLead))
+                        continue;
+
+                    row.LeadAccountName = savedLead;
+                    restoredAny = true;
+                }
+            }
+            finally
+            {
+                suppressEnableValidation = wasEnableSuppressed;
+                suppressLiveSettingsPause = wasLiveSuppressed;
+                suppressLeadRoleRefresh = wasLeadRefreshSuppressed;
+            }
+
+            return restoredAny;
+        }
+
+        private bool SnapshotHadFollowers(Dictionary<AccountCopyRow, string> leadSnapshot, AccountCopyRow row)
+        {
+            if (leadSnapshot == null || row == null || string.IsNullOrWhiteSpace(row.AccountName))
+                return false;
+
+            return leadSnapshot.Any(pair =>
+                pair.Key != row
+                && pair.Key != null
+                && !string.IsNullOrWhiteSpace(pair.Value)
+                && !AccountNamesEqual(pair.Key.AccountName, pair.Value)
+                && AccountNamesEqual(pair.Value, row.AccountName));
+        }
+
+        private void ValidateEnabledRowsAfterLeadRestore()
+        {
+            foreach (var row in accountRows.Where(r => r != null && r.Enabled).ToList())
+                ValidateEnabledRowAfterEdit(row);
         }
 
         private void SelectRowForDirectCellAction(AccountCopyRow row)
