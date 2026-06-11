@@ -964,6 +964,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                             : "Account reconnected - baseline reset";
                         ClearLockedVirtualPositions(row);
                         ClearMaxNetVirtualPositions(row);
+                        ClearMirroredTargetQuantities(row);
                         Log(row.AccountName + (row.AutoLocked
                             ? " reconnected; risk baseline reset and risk lock preserved."
                             : " reconnected; risk baseline reset."));
@@ -1189,6 +1190,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
                     ClearLockedVirtualPositions(row);
                     ClearMaxNetVirtualPositions(row);
+                    ClearMirroredTargetQuantities(row);
                 }
                 finally
                 {
@@ -1208,6 +1210,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     row.LastAction = "Enable skipped: " + skipReason;
                     ClearLockedVirtualPositions(row);
                     ClearMaxNetVirtualPositions(row);
+                    ClearMirroredTargetQuantities(row);
                 }
                 finally
                 {
@@ -1253,6 +1256,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LastAction = "Disabled: " + skipReason;
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
+                ClearMirroredTargetQuantities(row);
             }
             finally
             {
@@ -1271,6 +1275,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             ClearLockedVirtualPositions(row);
             ClearMaxNetVirtualPositions(row);
+            ClearMirroredTargetQuantities(row);
 
             if (row.ManualLock)
             {
@@ -1361,6 +1366,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             row.LastAction = wasManualLocked ? "Live settings edited - baseline reset" : "Live settings edited - row paused";
             ClearLockedVirtualPositions(row);
             ClearMaxNetVirtualPositions(row);
+            ClearMirroredTargetQuantities(row);
 
             var message = row.AccountName + " was paused after a live settings edit; unlock the row when ready.";
             SetStatus(message);
@@ -2446,6 +2452,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 maxNetVirtualPositions.Remove(key);
         }
 
+        private void ClearMirroredTargetQuantities(AccountCopyRow row)
+        {
+            if (row == null || string.IsNullOrWhiteSpace(row.AccountName))
+                return;
+
+            var suffix = "|" + row.AccountName;
+            foreach (var key in mirroredTargetQuantities.Keys.Where(k => k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)).ToList())
+                mirroredTargetQuantities.Remove(key);
+        }
+
         private bool IsBuyAction(OrderAction action)
         {
             return action == OrderAction.Buy || action == OrderAction.BuyToCover;
@@ -2556,6 +2572,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LastAction = lastAction + " locked";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
+                ClearMirroredTargetQuantities(row);
             }
 
             Log("Locked " + rows.Count(r => r != null) + " row(s) after flatten request. Entries are blocked; exits remain allowed.");
@@ -3115,6 +3132,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
+                ClearMirroredTargetQuantities(row);
             }
 
             SyncLeadAccountSubscriptions();
@@ -3165,6 +3183,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     : "Unlocked";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
+                ClearMirroredTargetQuantities(row);
             }
 
             var message = "Unlocked " + rows.Count + " selected row(s)" + (autoResetCount > 0 ? "; reset baselines for " + autoResetCount + " risk-locked row(s)" : string.Empty) + ".";
@@ -3312,6 +3331,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             row.LastAction = GetEnableLastAction(row, shouldResetLiveBaseline);
             ClearLockedVirtualPositions(row);
             ClearMaxNetVirtualPositions(row);
+            ClearMirroredTargetQuantities(row);
         }
 
         private string GetEnableLastAction(AccountCopyRow row, bool liveBaselineReset)
@@ -3611,6 +3631,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             row.LastAction = "Account disconnected";
             ClearLockedVirtualPositions(row);
             ClearMaxNetVirtualPositions(row);
+            ClearMirroredTargetQuantities(row);
             Log(row.AccountName + " disconnected; copied orders blocked until reconnect.");
         }
 
