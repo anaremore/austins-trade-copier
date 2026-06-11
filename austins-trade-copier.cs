@@ -3240,6 +3240,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void CopyOrderToCopyRows(Order sourceOrder)
         {
+            CommitGridEditsBeforeCopy();
+
             if (sourceOrder == null || sourceOrder.Account == null || sourceOrder.Filled <= 0)
                 return;
 
@@ -3394,6 +3396,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             RefreshAllRows();
+        }
+
+        private void CommitGridEditsBeforeCopy()
+        {
+            if (accountsGrid == null || !accountsGrid.IsKeyboardFocusWithin)
+                return;
+
+            CommitGridEdits();
         }
 
         private int CalculateDesiredTargetQuantity(AccountCopyRow row, Order sourceOrder)
