@@ -1566,17 +1566,30 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var onCount = rows.Count(r => r.Enabled);
             var offCount = rows.Count - onCount;
-            if (offCount == 0)
+            var enableableOffCount = rows.Count(r => !r.Enabled && r.CanToggleEnabled);
+            var skippedOffCount = offCount - enableableOffCount;
+
+            if (enableableOffCount == 0 && onCount == 0)
             {
-                toggleSelectedButton.Content = "Disable Selected";
-                toggleSelectedButton.ToolTip = "Turn " + onCount + " selected row(s) off. Rows stay visible and saved in profiles.";
+                toggleSelectedButton.Content = "Enable Selected";
+                toggleSelectedButton.IsEnabled = false;
+                toggleSelectedButton.ToolTip = "Selected rows are not ready to enable. Choose a Lead and active Sizing; lead accounts stay off.";
                 return;
             }
 
-            toggleSelectedButton.Content = onCount == 0 ? "Enable Selected" : "Enable Off Rows";
-            toggleSelectedButton.ToolTip = onCount == 0
-                ? "Turn on " + offCount + " selected row(s). Invalid rows are skipped with reasons."
-                : "Turn on " + offCount + " off selected row(s); " + onCount + " already on. Invalid rows are skipped with reasons.";
+            if (enableableOffCount == 0)
+            {
+                toggleSelectedButton.Content = "Disable Selected";
+                toggleSelectedButton.ToolTip = "Turn " + onCount + " selected on row(s) off. Rows stay visible and saved in profiles.";
+                return;
+            }
+
+            toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Enable Selected" : "Enable Ready Rows";
+            toggleSelectedButton.ToolTip = "Turn on " + enableableOffCount + " ready row(s).";
+            if (skippedOffCount > 0)
+                toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are leads, missing a Lead, self-copy, or Sizing is off.";
+            if (onCount > 0)
+                toggleSelectedButton.ToolTip += " " + onCount + " selected row(s) already on.";
         }
 
         private void UpdateRowPresetToolTip()
@@ -3481,13 +3494,21 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (rows.All(r => r.Enabled))
+            var offRows = rows.Where(r => !r.Enabled).ToList();
+            if (offRows.Any(r => r.CanToggleEnabled))
             {
-                DisableRows(rows, "selected");
+                EnableRows(offRows, "selected");
                 return;
             }
 
-            EnableRows(rows.Where(r => !r.Enabled), "selected");
+            var onRows = rows.Where(r => r.Enabled).ToList();
+            if (onRows.Count > 0)
+            {
+                DisableRows(onRows, "selected");
+                return;
+            }
+
+            SetStatus("Selected rows are not ready to enable.");
         }
 
         private void DisableRows(IEnumerable<AccountCopyRow> rows, string scopeDescription)
