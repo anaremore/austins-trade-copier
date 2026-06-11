@@ -4898,6 +4898,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row == null)
                 return "unknown";
 
+            if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                return "self-copy";
+
             if (!string.IsNullOrWhiteSpace(row.LeadAccountName))
                 return row.LeadAccountName;
 
@@ -5190,7 +5193,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         return "Choose a Lead before turning this row on.";
 
                     if (string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
-                        return "An account cannot copy itself.";
+                        return "An account cannot copy itself. Choose a different Lead.";
 
                     return "Turn this copy row on.";
                 }
@@ -5465,6 +5468,10 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             private string BuildLeadSummary()
             {
+                if (!string.IsNullOrWhiteSpace(LeadAccountName)
+                    && string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                    return "Self-copy";
+
                 if (!string.IsNullOrWhiteSpace(LeadAccountName))
                     return "Lead " + LeadAccountName;
 
