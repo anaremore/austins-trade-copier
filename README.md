@@ -92,7 +92,7 @@ Clearing a risk lock through **Unlock Selected** or **Reset Baselines** requires
 
 `ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the copy row's current position.
 
-Reconciliation is selected-row only and requires confirmation. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
+Reconciliation is selected-row only and requires confirmation. It applies to selected On copy rows with a connected lead; lead, available, off, invalid, and auto-close-locked rows are skipped. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.
 
 Dry run mode is selected before starting a copy session and stays locked for that session. In dry run, copied orders and reconcile adjustments are logged as simulated actions instead of being submitted. Manual flatten buttons remain real emergency controls.
 

@@ -1553,10 +1553,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (reconcileSelectedButton != null)
             {
-                reconcileSelectedButton.IsEnabled = hasSelection;
-                reconcileSelectedButton.ToolTip = hasSelection
-                    ? "Adjust selected rows toward each row's lead positions using current sizing and limits."
-                    : "Select one or more rows to reconcile.";
+                var reconcileEligibleCount = rows.Count(CanAttemptReconcileRow);
+                reconcileSelectedButton.IsEnabled = reconcileEligibleCount > 0;
+                reconcileSelectedButton.ToolTip = BuildReconcileSelectedTooltip(rows.Count, reconcileEligibleCount);
             }
 
             if (unlockSelectedButton != null)
@@ -1707,6 +1706,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return sourceBlockReason;
 
             return "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
+        }
+
+        private string BuildReconcileSelectedTooltip(int selectedRowCount, int eligibleCount)
+        {
+            if (selectedRowCount == 0)
+                return "Select On copy rows with a connected Lead to reconcile.";
+
+            if (eligibleCount == 0)
+                return "Selected rows cannot reconcile. Use On copy rows with a connected Lead; lead, available, off, and auto-close-locked rows are skipped.";
+
+            if (eligibleCount < selectedRowCount)
+                return "Reconcile " + eligibleCount + " eligible row(s); lead, available, off, invalid, and auto-close-locked rows are skipped.";
+
+            return "Adjust selected On copy rows toward their lead positions using sizing and limits.";
         }
 
         private string GetCopySettingsSourceBlockReason(AccountCopyRow row)
@@ -3105,6 +3118,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            if (!rows.Any(CanAttemptReconcileRow))
+            {
+                SetStatus("Select an On copy row with a connected Lead to reconcile.");
+                return;
+            }
+
             if (MessageBox.Show(BuildReconcileRowsPrompt(rows), "Confirm Reconcile Selected", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
@@ -3202,6 +3221,17 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             return reasons;
+        }
+
+        private bool CanAttemptReconcileRow(AccountCopyRow row)
+        {
+            if (row == null || !RowHasConnectedAccount(row))
+                return false;
+
+            if (row.AutoLocked && row.LimitAction == RiskAction.HardFlatten)
+                return false;
+
+            return string.IsNullOrEmpty(ValidateRowForReconcile(row));
         }
 
         private string FormatReasonCounts(Dictionary<string, int> reasons)
@@ -3314,6 +3344,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string ValidateRowForReconcile(AccountCopyRow row)
         {
+            if (AccountHasFollower(row.AccountName, row))
+                return "row is a lead account";
+
             if (!row.Enabled || row.SizingMode == SizingMode.Disabled)
                 return "row is disabled";
 
