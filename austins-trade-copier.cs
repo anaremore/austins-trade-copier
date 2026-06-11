@@ -168,6 +168,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private ComboBox rowPresetComboBox;
         private Button applyRowPresetButton;
         private CheckBox dryRunCheckBox;
+        private TextBlock selectedRowsTextBlock;
         private TextBlock statusTextBlock;
         private TextBox eventLogTextBox;
 
@@ -233,7 +234,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             };
             profilePanel.Children.Add(profileNameTextBox);
 
-            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including disabled rows, per-row leads, sizing, and risk settings. Existing profiles require overwrite confirmation.");
+            var saveProfileButton = CreateButton("Save Profile", Brushes.DimGray, "Save the current table setup, including off rows, per-row leads, sizing, and risk settings. Existing profiles require overwrite confirmation.");
             saveProfileButton.Click += SaveProfileButton_Click;
             profilePanel.Children.Add(saveProfileButton);
 
@@ -292,11 +293,24 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var selectionRow = CreateToolbarRow();
             selectionRow.Children.Add(CreateToolbarLabel("Selected Rows"));
+            selectedRowsTextBlock = new TextBlock
+            {
+                Text = "No rows selected",
+                Foreground = BrushRgb(210, 216, 224),
+                FontWeight = FontWeights.Bold,
+                Width = 180,
+                Margin = new Thickness(0, 0, 12, 6),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = "Current table selection for the Selected Rows buttons."
+            };
+            selectionRow.Children.Add(selectedRowsTextBlock);
+
             reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
-            toggleSelectedButton = CreateButton("Enable / Disable", Brushes.DimGray, "If every selected row is on, turn selected rows off. Otherwise turn on selected rows that are off; invalid rows are skipped with reasons.");
+            toggleSelectedButton = CreateButton("Turn On / Off", Brushes.DimGray, "If every selected row is on, turn selected rows off. Otherwise turn on selected rows that are off; invalid rows are skipped with reasons.");
             toggleSelectedButton.Width = 128;
             toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
             selectionRow.Children.Add(toggleSelectedButton);
@@ -381,7 +395,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 8),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Text = "Ready. Enable accounts, choose each row's lead, sizing, and risk, then start copying."
+                Text = "Ready. Turn copy rows On, choose each row's lead, sizing, and risk, then start copying."
             };
             Grid.SetRow(statusTextBlock, 3);
             root.Children.Add(statusTextBlock);
@@ -585,7 +599,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AddGridColumns(DataGrid grid)
         {
-            grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 42, null, true, "Rows marked SEL are selected for the Selected Rows buttons."));
+            grid.Columns.Add(CreateTextColumn("Selected", "SelectionMarker", 64, null, true, "Rows marked SEL are selected for the Selected Rows buttons."));
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
@@ -593,7 +607,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders."));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
-            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, "Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, flatten selected/enabled, and auto-close row."));
+            grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, "Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, Flatten Selected, Flatten On, and auto-close row."));
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, "Choose how this row sizes copied orders. 1:1 follows the lead fill. Multiplier uses floor(lead fill x multiplier). Fixed qty sends the Fixed Qty value. Balance ratio uses account value data and skips orders if values are unavailable."));
 
             grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, "Editing this value switches Sizing to Multiplier. Uses floor(lead fill x multiplier), so small multipliers can round to 0."));
@@ -910,6 +924,21 @@ namespace NinjaTrader.NinjaScript.AddOns
             var style = new Style(typeof(TextBlock));
             style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
             style.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+
+            if (propertyName == "SelectionMarker")
+            {
+                style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
+
+                var selectedMarkerTrigger = new DataTrigger
+                {
+                    Binding = new Binding("SelectionMarker"),
+                    Value = "SEL"
+                };
+                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.BackgroundProperty, BrushRgb(64, 88, 118)));
+                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.ForegroundProperty, Brushes.White));
+                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.Bold));
+                style.Triggers.Add(selectedMarkerTrigger);
+            }
 
             var tooltipBinding = new Binding(propertyName == "Status" ? "StatusDetail" : propertyName);
             if (propertyName != "Status" && !string.IsNullOrEmpty(stringFormat))
@@ -1316,7 +1345,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 try
                 {
                     row.Enabled = false;
-                    row.LastAction = "Enable skipped: " + friendlyReason;
+                    row.LastAction = "Turn-on skipped: " + friendlyReason;
                     ClearLockedVirtualPositions(row);
                     ClearMaxNetVirtualPositions(row);
                     ClearMirroredTargetQuantities(row);
@@ -1326,7 +1355,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     suppressEnableValidation = false;
                 }
 
-                var message = row.AccountName + " was not enabled: " + friendlyReason + ".";
+                var message = row.AccountName + " was not turned on: " + friendlyReason + ".";
                 SetStatus(message);
                 Log(message);
                 return;
@@ -1343,8 +1372,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var enabledMessage = row.AccountName + (isCopying
-                ? row.AutoLocked ? " enabled while copying; still risk locked." : " enabled while copying; risk baseline reset."
-                : " enabled.");
+                ? row.AutoLocked ? " turned on while copying; still risk locked." : " turned on while copying; risk baseline reset."
+                : " turned on.");
             SetStatus(enabledMessage);
             Log(enabledMessage);
         }
@@ -1390,7 +1419,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.ManualLock)
             {
                 row.LastAction = "Manual lock on";
-                Log(row.AccountName + " manual lock enabled. Entries are blocked; exits remain allowed.");
+                Log(row.AccountName + " manual lock turned on. Entries are blocked; exits remain allowed.");
             }
             else
             {
@@ -1516,6 +1545,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var rows = GetSelectedRows();
             var hasSelection = rows.Count > 0;
+            UpdateSelectedRowsText(rows);
 
             if (reconcileSelectedButton != null)
             {
@@ -1562,8 +1592,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.IsEnabled = hasSelection;
             if (rows.Count == 0)
             {
-                toggleSelectedButton.Content = "Enable / Disable";
-                toggleSelectedButton.ToolTip = "Select rows to enable or disable.";
+                toggleSelectedButton.Content = "Turn On / Off";
+                toggleSelectedButton.ToolTip = "Select rows to turn on or off.";
                 return;
             }
 
@@ -1574,25 +1604,54 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (enableableOffCount == 0 && onCount == 0)
             {
-                toggleSelectedButton.Content = "Enable Selected";
+                toggleSelectedButton.Content = "Turn On Selected";
                 toggleSelectedButton.IsEnabled = false;
-                toggleSelectedButton.ToolTip = "Selected rows are not ready to enable. Choose a Lead and active Sizing; lead accounts stay off.";
+                toggleSelectedButton.ToolTip = "Selected rows are not ready to turn on. Choose a Lead and active Sizing; lead accounts stay off.";
                 return;
             }
 
             if (enableableOffCount == 0)
             {
-                toggleSelectedButton.Content = "Disable Selected";
+                toggleSelectedButton.Content = "Turn Off Selected";
                 toggleSelectedButton.ToolTip = "Turn " + onCount + " selected on row(s) off. Rows stay visible and saved in profiles.";
                 return;
             }
 
-            toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Enable Selected" : "Enable Ready Rows";
+            toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Turn On Selected" : "Turn On Ready Rows";
             toggleSelectedButton.ToolTip = "Turn on " + enableableOffCount + " ready row(s).";
             if (skippedOffCount > 0)
                 toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are leads, missing a Lead, self-copy, or Sizing is off.";
             if (onCount > 0)
                 toggleSelectedButton.ToolTip += " " + onCount + " selected row(s) already on.";
+        }
+
+        private void UpdateSelectedRowsText(List<AccountCopyRow> rows)
+        {
+            if (selectedRowsTextBlock == null)
+                return;
+
+            if (rows == null || rows.Count == 0)
+            {
+                selectedRowsTextBlock.Text = "No rows selected";
+                selectedRowsTextBlock.ToolTip = "Click a row before using Selected Rows actions.";
+                return;
+            }
+
+            if (rows.Count == 1)
+            {
+                var row = rows[0];
+                var lead = DescribeSelectedLead(row);
+                selectedRowsTextBlock.Text = row.AccountName + " <- " + lead;
+                selectedRowsTextBlock.ToolTip = BuildSelectionSummary();
+                return;
+            }
+
+            var onCount = rows.Count(r => r.Enabled);
+            var attentionCount = rows.Count(IsAttentionRow);
+            selectedRowsTextBlock.Text = rows.Count + " selected | On " + onCount;
+            selectedRowsTextBlock.ToolTip = BuildSelectionSummary();
+            if (attentionCount > 0)
+                selectedRowsTextBlock.Text += " | Attention " + attentionCount;
         }
 
         private void UpdateRowPresetToolTip()
@@ -3502,7 +3561,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows to enable or disable.");
+                SetStatus("Select one or more rows to turn on or off.");
                 return;
             }
 
@@ -3520,7 +3579,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            SetStatus("Selected rows are not ready to enable.");
+            SetStatus("Selected rows are not ready to turn on.");
         }
 
         private void DisableRows(IEnumerable<AccountCopyRow> rows, string scopeDescription)
@@ -3560,7 +3619,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (!ConfirmRiskLockClear(rows, "Confirm Unlock Risk Locks", "Unlock", "This clears auto risk locks. Connected risk-locked rows will also reset their session PnL baselines. Enabled rows may become eligible to copy again."))
+            if (!ConfirmRiskLockClear(rows, "Confirm Unlock Risk Locks", "Unlock", "This clears auto risk locks. Connected risk-locked rows will also reset their session PnL baselines. On rows may become eligible to copy again."))
                 return;
 
             var autoResetCount = 0;
@@ -3633,7 +3692,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (!ConfirmRiskLockClear(rows, "Confirm Reset Risk Locks", "Reset baselines for", "This sets session PnL baselines to current account PnL and clears auto risk locks. Enabled rows may become eligible to copy again."))
+            if (!ConfirmRiskLockClear(rows, "Confirm Reset Risk Locks", "Reset baselines for", "This sets session PnL baselines to current account PnL and clears auto risk locks. On rows may become eligible to copy again."))
                 return;
 
             var resetCount = 0;
@@ -3693,7 +3752,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (!TryEnableRow(row, desiredLeadNames, out skipReason))
                 {
                     var friendlyReason = DescribeReadinessSkipReason(skipReason);
-                    row.LastAction = "Enable skipped: " + friendlyReason;
+                    row.LastAction = "Turn-on skipped: " + friendlyReason;
                     IncrementReason(skipReasons, friendlyReason);
                     continue;
                 }
@@ -3706,7 +3765,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
-            var message = "Enabled " + enabledCount + " " + scopeDescription + " row(s)" + FormatSkipReasons(skipReasons);
+            var message = "Turned on " + enabledCount + " " + scopeDescription + " row(s)" + FormatSkipReasons(skipReasons);
             if (liveBaselineResetCount > 0)
                 message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
 
@@ -3773,12 +3832,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (isCopying)
             {
                 if (row.AutoLocked)
-                    return liveBaselineReset ? "Enabled live - still risk locked" : "Enabled - still risk locked";
+                    return liveBaselineReset ? "Turned on live - still risk locked" : "Turned on - still risk locked";
 
-                return liveBaselineReset ? "Enabled live - baseline reset" : "Enabled";
+                return liveBaselineReset ? "Turned on live - baseline reset" : "Turned on";
             }
 
-            return row.AutoLocked ? "Enabled - still risk locked" : "Enabled";
+            return row.AutoLocked ? "Turned on - still risk locked" : "Turned on";
         }
 
         private bool CanEnableRow(AccountCopyRow row, List<string> desiredLeadNames, out string skipReason)

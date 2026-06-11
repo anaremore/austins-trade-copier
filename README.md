@@ -44,7 +44,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. Rows with no lead can stay available as lead-only or unused accounts.
 2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. As soon as another row points at an account, that account is marked **Lead**. If it was on, the copier turns it off because lead accounts drive followers instead of receiving copied orders.
-3. **Enable Copy Rows** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The selected-row **Enable / Disable** button enables ready off rows first; if none are ready, it disables selected on rows.
+3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The selected-row **Turn On / Off** button turns ready off rows on first; if none are ready, it turns selected on rows off.
 4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
@@ -55,7 +55,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-9. **Flatten or Reconcile Deliberately** – Use enabled, selected, or all-account flatten buttons when you intend to close positions. Use **Reconcile Selected** only when you want selected rows adjusted back toward their configured leads.
+9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selected**, or **Flatten All** when you intend to close positions. Use **Reconcile Selected** only when you want selected rows adjusted back toward their configured leads.
 
 ---
 
