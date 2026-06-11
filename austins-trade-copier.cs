@@ -1585,7 +1585,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (applyRowPresetButton != null)
             {
-                applyRowPresetButton.IsEnabled = hasSelection;
+                applyRowPresetButton.IsEnabled = rows.Any(CanApplyRowPresetToRow);
                 UpdateRowPresetToolTip();
             }
 
@@ -1670,9 +1670,25 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             var rows = GetSelectedRows();
-            applyRowPresetButton.ToolTip = rows.Count == 0
-                ? "Select one or more rows before applying a row preset. " + tooltip
-                : "Apply " + (preset != null ? preset.Label : "the selected preset") + " to " + rows.Count + " selected row(s). " + tooltip;
+            var eligibleCount = rows.Count(CanApplyRowPresetToRow);
+            var presetLabel = preset != null ? preset.Label : "the selected preset";
+            if (rows.Count == 0)
+            {
+                applyRowPresetButton.IsEnabled = false;
+                applyRowPresetButton.ToolTip = "Select one or more rows before applying a row preset. " + tooltip;
+                return;
+            }
+
+            applyRowPresetButton.IsEnabled = eligibleCount > 0;
+            if (eligibleCount == 0)
+            {
+                applyRowPresetButton.ToolTip = "Selected rows are lead accounts. Row presets apply to copy or available rows only. " + tooltip;
+                return;
+            }
+
+            applyRowPresetButton.ToolTip = eligibleCount < rows.Count
+                ? "Apply " + presetLabel + " to " + eligibleCount + " eligible row(s); lead rows are skipped. " + tooltip
+                : "Apply " + presetLabel + " to " + rows.Count + " selected row(s). " + tooltip;
         }
 
         private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceBlockReason)
@@ -4064,11 +4080,22 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            var targetRows = rows.Where(CanApplyRowPresetToRow).ToList();
+            var skippedLeadCount = rows.Count - targetRows.Count;
+            if (targetRows.Count == 0)
+            {
+                SetStatus("Row presets apply to copy or available rows; selected lead rows were skipped.");
+                return;
+            }
+
             if (isCopying)
             {
-                var prompt = "Apply row preset " + preset.Label + " to " + rows.Count + " selected row(s) while copying is active?\n\n"
+                var prompt = "Apply row preset " + preset.Label + " to " + targetRows.Count + " selected row(s) while copying is active?\n\n"
                     + "Connected live copy rows will be paused with baselines reset so you can review before unlocking.";
-                var accountSummary = BuildRowAccountPromptLine(rows);
+                if (skippedLeadCount > 0)
+                    prompt += "\n" + skippedLeadCount + " lead row(s) will be skipped.";
+
+                var accountSummary = BuildRowAccountPromptLine(targetRows);
                 if (!string.IsNullOrEmpty(accountSummary))
                     prompt += "\n" + accountSummary;
 
@@ -4081,7 +4108,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             suppressLiveSettingsPause = true;
             try
             {
-                foreach (var row in rows)
+                foreach (var row in targetRows)
                 {
                     ApplyRowPreset(row, preset);
                     row.LastAction = "Applied preset " + preset.Label;
@@ -4109,10 +4136,18 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (livePausedCount > 0)
                 message += "; paused " + livePausedCount + " live row(s) for review";
 
+            if (skippedLeadCount > 0)
+                message += "; skipped " + skippedLeadCount + " lead row(s)";
+
             message += ".";
             SetStatus(message);
             Log(message);
             RefreshAllRows();
+        }
+
+        private bool CanApplyRowPresetToRow(AccountCopyRow row)
+        {
+            return row != null && !IsReferencedLeadAccount(row.AccountName, row);
         }
 
         private void ApplyRowPreset(AccountCopyRow row, RowPresetOption preset)
