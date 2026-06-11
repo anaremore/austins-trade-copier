@@ -4222,7 +4222,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             EnforceLeadRowsStayOff();
 
             foreach (var candidate in accountRows.ToList())
+            {
+                UpdateRowStatus(candidate);
                 UpdateRowRole(candidate);
+            }
         }
 
         private void RefreshRowMetrics(AccountCopyRow row)
