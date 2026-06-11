@@ -2114,7 +2114,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (File.Exists(GetProfilePath(profileName))
+            string profilePath;
+            if (!TryGetProfilePathForAction(profileName, "save", out profilePath))
+                return;
+
+            if (File.Exists(profilePath)
                 && MessageBox.Show(BuildOverwriteProfilePrompt(profileName), "Confirm Save Profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
                 return;
@@ -2160,7 +2164,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var profilePath = GetProfilePath(profileName);
+            string profilePath;
+            if (!TryGetProfilePathForAction(profileName, "load", out profilePath))
+                return;
+
             if (!File.Exists(profilePath))
             {
                 SetStatus("Profile " + profileName + " does not exist.");
@@ -2232,7 +2239,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var path = GetProfilePath(profileName);
+            string path;
+            if (!TryGetProfilePathForAction(profileName, "delete", out path))
+                return;
+
             if (!File.Exists(path))
             {
                 SetStatus("Profile " + profileName + " does not exist.");
@@ -2596,20 +2606,28 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private List<string> GetProfileNames()
         {
-            var directory = GetProfileDirectoryPath();
-            if (!Directory.Exists(directory))
-                return new List<string>();
+            try
+            {
+                var directory = GetProfileDirectoryPath();
+                if (!Directory.Exists(directory))
+                    return new List<string>();
 
-            return Directory.GetFiles(directory, "*" + ProfileFileExtension)
-                .Select(Path.GetFileNameWithoutExtension)
-                .OrderBy(name => name)
-                .ToList();
+                return Directory.GetFiles(directory, "*" + ProfileFileExtension)
+                    .Select(Path.GetFileNameWithoutExtension)
+                    .OrderBy(name => name)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Log("Profile list unavailable: " + ex.Message);
+                return new List<string>();
+            }
         }
 
         private string GetProfileDirectoryPath()
         {
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                GetCurrentUserDocumentsPath(),
                 "NinjaTrader 8",
                 "templates",
                 ProfileFolderName);
@@ -2623,6 +2641,32 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string GetProfilePath(string profileName)
         {
             return Path.Combine(GetProfileDirectoryPath(), NormalizeProfileName(profileName) + ProfileFileExtension);
+        }
+
+        private string GetCurrentUserDocumentsPath()
+        {
+            var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (string.IsNullOrWhiteSpace(documents))
+                throw new InvalidOperationException("Unable to resolve the current Windows user's Documents folder. Check Windows known-folder settings or reinstall NinjaTrader for this Windows user.");
+
+            return documents;
+        }
+
+        private bool TryGetProfilePathForAction(string profileName, string action, out string profilePath)
+        {
+            profilePath = string.Empty;
+            try
+            {
+                profilePath = GetProfilePath(profileName);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                var actionText = string.IsNullOrWhiteSpace(action) ? "use" : action;
+                SetStatus("Cannot " + actionText + " profile.", ex.Message);
+                Log("ERROR cannot " + actionText + " profile: " + ex.Message);
+                return false;
+            }
         }
 
         private string NormalizeProfileName(string profileName)
