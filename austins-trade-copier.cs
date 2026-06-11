@@ -586,7 +586,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void AddGridColumns(DataGrid grid)
         {
             grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 42, null, true, "Rows marked SEL are selected for the Selected Rows buttons."));
-            grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders."));
+            grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available accounts can be used as leads. Lead accounts are being copied by another row. Copy rows receive orders from their selected Lead."));
@@ -618,12 +618,25 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private DataGridTemplateColumn CreateCheckBoxColumn(string header, string propertyName, double width, string tooltip)
         {
+            return CreateCheckBoxColumn(header, propertyName, width, tooltip, null, null);
+        }
+
+        private DataGridTemplateColumn CreateCheckBoxColumn(string header, string propertyName, double width, string tooltip, string tooltipPropertyName, string isEnabledPropertyName)
+        {
             var factory = new FrameworkElementFactory(typeof(CheckBox));
             factory.SetValue(ToggleButton.IsThreeStateProperty, false);
             factory.SetValue(UIElement.FocusableProperty, false);
             factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-            factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
+            if (string.IsNullOrWhiteSpace(tooltipPropertyName))
+                factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            else
+                factory.SetBinding(FrameworkElement.ToolTipProperty, new Binding(tooltipPropertyName));
+
+            if (!string.IsNullOrWhiteSpace(isEnabledPropertyName))
+                factory.SetBinding(UIElement.IsEnabledProperty, new Binding(isEnabledPropertyName));
+
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(CheckBoxCell_PreviewMouseLeftButtonDown));
             factory.SetBinding(ToggleButton.IsCheckedProperty, new Binding(propertyName)
             {
@@ -1047,12 +1060,22 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool IsReferencedLeadAccount(string accountName)
         {
-            return accountRows.Any(r => !string.IsNullOrWhiteSpace(r.LeadAccountName) && AccountNamesEqual(r.LeadAccountName, accountName));
+            return IsReferencedLeadAccount(accountName, null);
+        }
+
+        private bool IsReferencedLeadAccount(string accountName, AccountCopyRow exceptRow)
+        {
+            return accountRows.Any(r =>
+                r != exceptRow
+                && !string.IsNullOrWhiteSpace(r.LeadAccountName)
+                && !AccountNamesEqual(r.AccountName, r.LeadAccountName)
+                && AccountNamesEqual(r.LeadAccountName, accountName));
         }
 
         private int GetReferencedLeadAccountCount()
         {
             return accountRows
+                .Where(r => !AccountNamesEqual(r.AccountName, r.LeadAccountName))
                 .Select(r => r.LeadAccountName)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -2555,6 +2578,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     return "lead account is disconnected";
                 case "self-copy":
                     return "cannot copy from itself";
+                case "lead account":
+                    return "lead accounts stay off";
                 case "lead is copy row":
                     return "lead is already an active copy row";
                 case "used as lead":
@@ -3738,6 +3763,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return false;
             }
 
+            if (IsReferencedLeadAccount(row.AccountName, row))
+            {
+                skipReason = "lead account";
+                return false;
+            }
+
             if (row.SizingMode == SizingMode.Disabled)
             {
                 skipReason = "sizing disabled";
@@ -4251,7 +4282,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsReferencedLeadAccount(row.AccountName))
+            if (AccountNamesEqual(row.AccountName, rowLead.Name) || IsReferencedLeadAccount(row.AccountName, row))
             {
                 row.SetStatus("Error", "Lead conflict", "This account is also assigned as a lead. Lead accounts cannot receive copied entries.");
                 return;
@@ -4321,7 +4352,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Off";
 
-            if (IsReferencedLeadAccount(row.AccountName))
+            if (IsReferencedLeadAccount(row.AccountName, row))
                 return "Lead";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4348,7 +4379,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.SizingMode == SizingMode.Disabled)
                 return "Sizing is off. This row will not copy entries.";
 
-            if (IsReferencedLeadAccount(row.AccountName))
+            if (IsReferencedLeadAccount(row.AccountName, row))
                 return "Lead account. It can drive copy rows but does not receive copied orders.";
 
             if (string.IsNullOrWhiteSpace(row.LeadAccountName))
@@ -4378,7 +4409,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var usedAsLead = IsReferencedLeadAccount(row.AccountName);
+            var usedAsLead = IsReferencedLeadAccount(row.AccountName, row);
             var activeCopyRow = row.Enabled && row.SizingMode != SizingMode.Disabled;
 
             if (activeCopyRow && usedAsLead)
@@ -5062,6 +5093,52 @@ namespace NinjaTrader.NinjaScript.AddOns
                 set { SetField(ref enabled, value, "Enabled"); }
             }
 
+            public bool CanToggleEnabled
+            {
+                get
+                {
+                    if (Enabled)
+                        return true;
+
+                    if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                        return false;
+
+                    if (SizingMode == SizingMode.Disabled)
+                        return false;
+
+                    if (string.IsNullOrWhiteSpace(LeadAccountName))
+                        return false;
+
+                    if (string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                        return false;
+
+                    return true;
+                }
+            }
+
+            public string EnableTooltip
+            {
+                get
+                {
+                    if (Enabled)
+                        return "Turn this copy row off. The row stays visible and saved.";
+
+                    if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                        return "Lead account. It stays off and can drive follower rows.";
+
+                    if (SizingMode == SizingMode.Disabled)
+                        return "Choose an active Sizing mode before turning this row on.";
+
+                    if (string.IsNullOrWhiteSpace(LeadAccountName))
+                        return "Choose a Lead before turning this row on.";
+
+                    if (string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                        return "An account cannot copy itself.";
+
+                    return "Turn this copy row on.";
+                }
+            }
+
             public string LeadAccountName
             {
                 get { return leadAccountName; }
@@ -5460,6 +5537,18 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             private void NotifyDerivedProperties(string propertyName)
             {
+                switch (propertyName)
+                {
+                    case "AccountName":
+                    case "Enabled":
+                    case "LeadAccountName":
+                    case "SizingMode":
+                    case "RoleSummary":
+                        OnPropertyChanged("CanToggleEnabled");
+                        OnPropertyChanged("EnableTooltip");
+                        break;
+                }
+
                 switch (propertyName)
                 {
                     case "LeadAccountName":
