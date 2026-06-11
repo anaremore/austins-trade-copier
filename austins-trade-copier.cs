@@ -149,6 +149,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private TextBox profileNameTextBox;
         private DataGrid accountsGrid;
         private Button startPauseButton;
+        private Button toggleSelectedButton;
         private CheckBox dryRunCheckBox;
         private TextBlock statusTextBlock;
         private TextBox eventLogTextBox;
@@ -274,7 +275,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
-            var toggleSelectedButton = CreateButton("Enable / Disable", Brushes.DimGray, "If every selected row is on, turn selected rows off. Otherwise turn on selected rows that are off; invalid rows are skipped with reasons.");
+            toggleSelectedButton = CreateButton("Enable / Disable", Brushes.DimGray, "If every selected row is on, turn selected rows off. Otherwise turn on selected rows that are off; invalid rows are skipped with reasons.");
             toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
             selectionRow.Children.Add(toggleSelectedButton);
 
@@ -559,7 +560,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateCheckBoxColumn("Manual Lock", "ManualLock", 92, "Blocks entries for this row while still allowing exits."));
 
             grid.Columns.Add(CreateTextColumn("Status", "Status", 132, null, true, "Current copier state for this row."));
-            grid.Columns.Add(CreateTextColumn("Pnl", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
+            grid.Columns.Add(CreateTextColumn("PnL", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
             grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 96, null, TextAlignment.Left, false, false, "Optional row filter. Blank copies all instruments. Enter roots or full names separated by commas, for example MES, MNQ, MES JUN26. Filtered rows only copy, reconcile, and auto-close matching instruments."));
@@ -1119,6 +1120,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (RowPropertyAffectsReadiness(e.PropertyName))
                 QueueRowRefresh();
+
+            if (e.PropertyName == "Enabled")
+                UpdateSelectedEnableButtonState();
         }
 
         private void ApplySizingModeFromEditedQuantityField(AccountCopyRow row, string propertyName)
@@ -1389,6 +1393,32 @@ namespace NinjaTrader.NinjaScript.AddOns
             var selectedRows = new HashSet<AccountCopyRow>(GetSelectedRows());
             foreach (var row in accountRows)
                 row.SelectionMarker = selectedRows.Contains(row) ? "SEL" : string.Empty;
+
+            UpdateSelectedEnableButtonState();
+        }
+
+        private void UpdateSelectedEnableButtonState()
+        {
+            if (toggleSelectedButton == null)
+                return;
+
+            var rows = GetSelectedRows();
+            if (rows.Count == 0)
+            {
+                toggleSelectedButton.Content = "Enable / Disable";
+                toggleSelectedButton.ToolTip = "Select rows to enable or disable.";
+                return;
+            }
+
+            if (rows.All(r => r.Enabled))
+            {
+                toggleSelectedButton.Content = "Disable Selected";
+                toggleSelectedButton.ToolTip = "Turn selected rows off. Rows stay visible and saved in profiles.";
+                return;
+            }
+
+            toggleSelectedButton.Content = "Enable Selected";
+            toggleSelectedButton.ToolTip = "Turn on selected rows that are off. Invalid rows are skipped with reasons.";
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
