@@ -253,9 +253,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             var root = new Grid { Margin = new Thickness(12) };
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 120 });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(240) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(240), MinHeight = 150 });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var profilePanel = new WrapPanel
@@ -454,6 +455,20 @@ namespace NinjaTrader.NinjaScript.AddOns
             Grid.SetRow(statusTextBlock, 3);
             root.Children.Add(statusTextBlock);
 
+            var logSplitter = new GridSplitter
+            {
+                Height = 6,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = BrushRgb(48, 50, 55),
+                ResizeDirection = GridResizeDirection.Rows,
+                ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+                ShowsPreview = true,
+                ToolTip = "Drag to resize the account table and event log."
+            };
+            Grid.SetRow(logSplitter, 4);
+            root.Children.Add(logSplitter);
+
             var logPanel = new Grid();
             logPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             logPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -521,7 +536,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Margin = new Thickness(0),
                 Child = logPanel
             };
-            Grid.SetRow(logSection, 4);
+            Grid.SetRow(logSection, 5);
             root.Children.Add(logSection);
 
             var buildTagBlock = new TextBlock
@@ -533,7 +548,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Margin = new Thickness(0, 4, 2, 0),
                 ToolTip = "Austin's Trade Copier " + BuildTag + ". Include this tag in screenshots or support notes to identify the build."
             };
-            Grid.SetRow(buildTagBlock, 5);
+            Grid.SetRow(buildTagBlock, 6);
             root.Children.Add(buildTagBlock);
 
             Content = root;
