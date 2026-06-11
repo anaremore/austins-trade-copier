@@ -2945,6 +2945,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             var lockedCount = rows == null ? 0 : rows.Count(r => r != null && RowIsReduceOnly(r) && !(r.AutoLocked && r.LimitAction == RiskAction.HardFlatten));
             var cappedCount = rows == null ? 0 : rows.Count(r => r != null && r.MaxNetPosition > 0);
             var offlineCount = rows == null ? 0 : rows.Count(r => r != null && !RowHasConnectedAccount(r));
+            var invalidReasons = BuildReconcileInvalidReasons(rows);
+            var invalidCount = invalidReasons.Values.Sum();
 
             var prompt = "Reconcile " + rowCount + " selected row(s) to their lead positions?\n\n"
                 + "This may submit market orders using each row's lead, sizing, copy mode, and max position settings.";
@@ -2964,6 +2966,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (autoCloseCount > 0)
                 prompt += "\n" + autoCloseCount + " auto-close risk-locked row(s) will be skipped.";
 
+            if (invalidCount > 0)
+                prompt += "\n" + invalidCount + " row(s) are not eligible and will be skipped: " + FormatReasonCounts(invalidReasons) + ".";
+
             if (cappedCount > 0)
                 prompt += "\n" + cappedCount + " row(s) have Max Net caps.";
 
@@ -2971,6 +2976,39 @@ namespace NinjaTrader.NinjaScript.AddOns
                 prompt += "\nDry Run is on, so reconcile orders will be simulated.";
 
             return prompt;
+        }
+
+        private Dictionary<string, int> BuildReconcileInvalidReasons(IList<AccountCopyRow> rows)
+        {
+            var reasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (rows == null)
+                return reasons;
+
+            foreach (var row in rows.Where(r => r != null))
+            {
+                if (!RowHasConnectedAccount(row))
+                    continue;
+
+                if (row.AutoLocked && row.LimitAction == RiskAction.HardFlatten)
+                    continue;
+
+                var reason = ValidateRowForReconcile(row);
+                if (!string.IsNullOrWhiteSpace(reason))
+                    IncrementReason(reasons, reason);
+            }
+
+            return reasons;
+        }
+
+        private string FormatReasonCounts(Dictionary<string, int> reasons)
+        {
+            if (reasons == null || reasons.Count == 0)
+                return string.Empty;
+
+            return string.Join(", ", reasons
+                .OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key)
+                .Select(pair => pair.Value + " " + pair.Key));
         }
 
         private ReconcileOutcome ReconcileAccountToLead(AccountCopyRow row)
