@@ -140,7 +140,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             new RowPresetOption("1:1 copy", "Copy entries and exits at the lead account quantity.", TradeCopyMode.All, SizingMode.OneToOne, DefaultMultiplier, DefaultFixedQuantity, null),
             new RowPresetOption("Multiplier x2", "Copy entries and exits at twice the lead account quantity.", TradeCopyMode.All, SizingMode.Multiplier, 2.0, DefaultFixedQuantity, null),
-            new RowPresetOption("Fixed 1", "Copy entries and exits with one contract per lead fill.", TradeCopyMode.All, SizingMode.Fixed, DefaultMultiplier, 1, null),
+            new RowPresetOption("Fixed 1", "Copy entries and exits with one contract per lead order.", TradeCopyMode.All, SizingMode.Fixed, DefaultMultiplier, 1, null),
             new RowPresetOption("Exits only", "Follow reducing exits only; block new or increasing exposure.", TradeCopyMode.ExitsOnly, SizingMode.OneToOne, DefaultMultiplier, DefaultFixedQuantity, null),
             new RowPresetOption("Auto-close limits", "Keep sizing as-is and auto-close matching managed positions when limits are hit.", null, null, null, null, RiskAction.HardFlatten),
             new RowPresetOption("Lock-entry limits", "Keep sizing as-is and block new entries when limits are hit.", null, null, null, null, RiskAction.SoftLock)
@@ -632,7 +632,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateComboBoxColumn("Sizing", "SizingMode", sizingModeOptions, "Label", "Value", 98, BuildCopySetupColumnTooltip("Choose how this row sizes copied orders. 1:1 follows the lead fill. Multiplier uses floor(lead fill x multiplier). Fixed qty sends the Fixed Qty value. Balance ratio uses account value data and skips orders if values are unavailable."), null, "CanEditCopySetup"));
 
             grid.Columns.Add(CreateTextBoxColumn("Multiplier", "Multiplier", 70, "{0:0.##}", TextAlignment.Right, true, true, BuildCopySetupColumnTooltip("Editing this value switches Sizing to Multiplier. Uses floor(lead fill x multiplier), so small multipliers can round to 0."), null, "CanEditCopySetup"));
-            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, BuildCopySetupColumnTooltip("Editing this value switches Sizing to Fixed qty. Sends this quantity for each copied lead fill."), null, "CanEditCopySetup"));
+            grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, BuildCopySetupColumnTooltip("Editing this value switches Sizing to Fixed qty. Sends this target quantity once per copied lead order."), null, "CanEditCopySetup"));
             grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, BuildCopySetupColumnTooltip("Caps the final copied quantity after sizing. 0 disables the cap."), null, "CanEditCopySetup"));
 
             grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, BuildCopySetupColumnTooltip("Caps this account row's net position size. 0 disables the cap."), null, "CanEditCopySetup"));
@@ -6029,9 +6029,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             switch (row.SizingMode)
             {
                 case SizingMode.Multiplier:
-                    return "x" + row.Multiplier.ToString("0.##", CultureInfo.InvariantCulture);
+                    return "floor(fill x " + row.Multiplier.ToString("0.##", CultureInfo.InvariantCulture) + ")";
                 case SizingMode.Fixed:
-                    return "fixed " + row.FixedQuantity.ToString(CultureInfo.InvariantCulture);
+                    return "fixed " + row.FixedQuantity.ToString(CultureInfo.InvariantCulture) + "/order";
                 case SizingMode.BalanceRatio:
                     return "balance ratio";
                 case SizingMode.Disabled:
@@ -6778,10 +6778,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 switch (SizingMode)
                 {
                     case SizingMode.Multiplier:
-                        sizing = "x" + Multiplier.ToString("0.##", CultureInfo.InvariantCulture);
+                        sizing = "floor(fill x " + Multiplier.ToString("0.##", CultureInfo.InvariantCulture) + ")";
                         break;
                     case SizingMode.Fixed:
-                        sizing = "fixed " + FixedQuantity.ToString(CultureInfo.InvariantCulture);
+                        sizing = "fixed " + FixedQuantity.ToString(CultureInfo.InvariantCulture) + "/order";
                         break;
                     case SizingMode.BalanceRatio:
                         sizing = "balance ratio";
