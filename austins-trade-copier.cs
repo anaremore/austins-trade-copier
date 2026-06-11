@@ -4008,6 +4008,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             mirroredTargetQuantities.Clear();
+            lockedVirtualPositions.Clear();
+            maxNetVirtualPositions.Clear();
 
             foreach (var account in accounts)
                 FlattenAccount(account, "Manual flatten all");
