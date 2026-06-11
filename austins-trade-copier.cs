@@ -3698,6 +3698,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                     return "multiplier must be greater than 0";
                 case "bad fixed qty":
                     return "fixed quantity must be greater than 0";
+                case "bad lead balance":
+                    return "balance-ratio sizing needs usable lead value data";
+                case "bad account balance":
+                    return "balance-ratio sizing needs usable account value data";
                 default:
                     return string.IsNullOrWhiteSpace(skipReason) ? "not ready" : skipReason;
             }
@@ -5053,6 +5057,23 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 skipReason = "bad fixed qty";
                 return false;
+            }
+
+            if (row.SizingMode == SizingMode.BalanceRatio)
+            {
+                double leadBalance;
+                if (!TryGetSizingBalance(rowLead, out leadBalance) || leadBalance <= 0)
+                {
+                    skipReason = "bad lead balance";
+                    return false;
+                }
+
+                double rowBalance;
+                if (!TryGetSizingBalance(row.Account, out rowBalance) || rowBalance <= 0)
+                {
+                    skipReason = "bad account balance";
+                    return false;
+                }
             }
 
             return true;

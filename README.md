@@ -82,13 +82,13 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 
 Sizing is calculated from the cumulative filled quantity of the lead order. This avoids over-copying partial fills: if the lead order fills in pieces, each copy row receives only the remaining quantity needed for its configured target size.
 
-Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the copier skips that row's order instead of falling back to the full lead size.
+Balance-ratio sizing uses `NetLiquidation` first and falls back to `CashValue`. If either account has missing or zero balance data, the row cannot turn on or start copying; copied orders never fall back to the full lead size.
 
 `Max Qty` caps every sizing mode when greater than zero. A value of `0` means no max cap.
 
 `Max Net` caps the absolute resulting row position per instrument. A value of `0` means no net-position cap. The guard blocks or caps exposure increases but still allows position-reducing orders.
 
-Before copying starts, On rows are validated. Disconnected rows, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values block startup instead of silently creating an unsafe copier state.
+Rows are validated before they can turn on and again before copying starts. Disconnected rows, zero multipliers, zero fixed quantities, or unavailable balance-ratio account values are blocked instead of silently creating an unsafe copier state.
 
 Profiles are stored under NinjaTrader's active user data templates folder:
 
