@@ -2138,7 +2138,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Turn On" : "Turn On Ready";
             toggleSelectedButton.ToolTip = "Turn on " + enableableOffCount + " ready row(s).";
             if (skippedOffCount > 0)
-                toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are disconnected, leads, missing a Lead, self-copy, using an active copy row as Lead, or Sizing is off.";
+                toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are disconnected, leads, missing a Lead, self-copy, using an active copy row as Lead, Sizing is off, or the sizing value is invalid.";
             if (onCount > 0)
                 toggleSelectedButton.ToolTip += " " + onCount + " selected row(s) already on.";
         }
@@ -6695,6 +6695,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (SizingMode == SizingMode.Disabled)
                         return false;
 
+                    if (SizingMode == SizingMode.Multiplier && Multiplier <= 0)
+                        return false;
+
+                    if (SizingMode == SizingMode.Fixed && FixedQuantity <= 0)
+                        return false;
+
                     if (string.IsNullOrWhiteSpace(LeadAccountName))
                         return false;
 
@@ -6726,6 +6732,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                     if (SizingMode == SizingMode.Disabled)
                         return "Choose an active Sizing mode before turning this row on.";
+
+                    if (SizingMode == SizingMode.Multiplier && Multiplier <= 0)
+                        return "Set Multiplier above 0 before turning this row on.";
+
+                    if (SizingMode == SizingMode.Fixed && FixedQuantity <= 0)
+                        return "Set Fixed Qty above 0 before turning this row on.";
 
                     if (string.IsNullOrWhiteSpace(LeadAccountName))
                         return "Choose a Lead before turning this row on.";
@@ -7289,6 +7301,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "Enabled":
                     case "LeadAccountName":
                     case "SizingMode":
+                    case "Multiplier":
+                    case "FixedQuantity":
                     case "RoleSummary":
                     case "Status":
                     case "ManualLock":
