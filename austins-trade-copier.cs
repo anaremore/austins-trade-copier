@@ -324,12 +324,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SelectedIndex = 0,
                 ToolTip = "Choose a common setup to apply to selected rows. Leads, Symbols, enabled state, and risk amounts are preserved."
             };
+            rowPresetComboBox.SelectionChanged += RowPresetComboBox_SelectionChanged;
             selectionRow.Children.Add(rowPresetComboBox);
 
             applyRowPresetButton = CreateButton("Apply", Brushes.DimGray, "Apply the selected row preset to selected rows.");
             applyRowPresetButton.Width = 72;
+            applyRowPresetButton.IsEnabled = false;
             applyRowPresetButton.Click += ApplyRowPresetButton_Click;
             selectionRow.Children.Add(applyRowPresetButton);
+            UpdateRowPresetToolTip();
             actionPanel.Children.Add(selectionRow);
 
             var actionSection = CreateSection("Controls", actionPanel);
@@ -1456,6 +1459,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshStatusSummary();
         }
 
+        private void RowPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateRowPresetToolTip();
+        }
+
         private void UpdateSelectionMarkers()
         {
             if (accountsGrid == null)
@@ -1509,9 +1517,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (applyRowPresetButton != null)
             {
                 applyRowPresetButton.IsEnabled = hasSelection;
-                applyRowPresetButton.ToolTip = hasSelection
-                    ? "Apply the selected row preset to " + rows.Count + " selected row(s). Leads, Symbols, enabled state, and risk amounts are preserved."
-                    : "Select one or more rows before applying a row preset.";
+                UpdateRowPresetToolTip();
             }
 
             if (toggleSelectedButton == null)
@@ -1538,6 +1544,25 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.ToolTip = onCount == 0
                 ? "Turn on " + offCount + " selected row(s). Invalid rows are skipped with reasons."
                 : "Turn on " + offCount + " off selected row(s); " + onCount + " already on. Invalid rows are skipped with reasons.";
+        }
+
+        private void UpdateRowPresetToolTip()
+        {
+            var preset = rowPresetComboBox != null ? rowPresetComboBox.SelectedItem as RowPresetOption : null;
+            var description = preset != null ? preset.Description : "Choose a common setup to apply to selected rows.";
+            var preservation = "Leads, Symbols, enabled state, and risk amounts are preserved.";
+            var tooltip = description + " " + preservation;
+
+            if (rowPresetComboBox != null)
+                rowPresetComboBox.ToolTip = tooltip;
+
+            if (applyRowPresetButton == null)
+                return;
+
+            var rows = GetSelectedRows();
+            applyRowPresetButton.ToolTip = rows.Count == 0
+                ? "Select one or more rows before applying a row preset. " + tooltip
+                : "Apply " + (preset != null ? preset.Label : "the selected preset") + " to " + rows.Count + " selected row(s). " + tooltip;
         }
 
         private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceSizingBlockReason)
