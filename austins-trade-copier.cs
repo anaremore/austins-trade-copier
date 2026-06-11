@@ -1258,6 +1258,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 case "MaxDrawdown":
                 case "ProfitTarget":
                 case "LimitAction":
+                case "RoleSummary":
+                case "Status":
                     return true;
                 default:
                     return false;
@@ -1324,7 +1326,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 try
                 {
                     SetManualLockWithoutAction(row, false);
-                    row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
+                    row.LastAction = row.AutoLocked ? "Turned off - risk lock preserved" : "Turned off";
                     ClearLockedVirtualPositions(row);
                     ClearMaxNetVirtualPositions(row);
                     ClearMirroredTargetQuantities(row);
@@ -1392,7 +1394,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             try
             {
                 row.Enabled = false;
-                row.LastAction = "Disabled: " + friendlyReason;
+                row.LastAction = "Turned off: " + friendlyReason;
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
                 ClearMirroredTargetQuantities(row);
@@ -1402,7 +1404,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 suppressEnableValidation = false;
             }
 
-            var message = row.AccountName + " was disabled: " + friendlyReason + ".";
+            var message = row.AccountName + " was turned off: " + friendlyReason + ".";
             SetStatus(message);
             Log(message);
         }
@@ -1620,7 +1622,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Content = onCount == 0 && skippedOffCount == 0 ? "Turn On Selected" : "Turn On Ready Rows";
             toggleSelectedButton.ToolTip = "Turn on " + enableableOffCount + " ready row(s).";
             if (skippedOffCount > 0)
-                toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are leads, missing a Lead, self-copy, or Sizing is off.";
+                toggleSelectedButton.ToolTip += " " + skippedOffCount + " selected row(s) stay off because they are leads, missing a Lead, self-copy, using an active copy row as Lead, or Sizing is off.";
             if (onCount > 0)
                 toggleSelectedButton.ToolTip += " " + onCount + " selected row(s) already on.";
         }
@@ -1703,6 +1705,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (string.Equals(row.Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
                 return "Choose a row with a connected lead before copying settings.";
+
+            if (string.Equals(row.Status, "Lead copying", StringComparison.OrdinalIgnoreCase))
+                return "Choose a row whose Lead is not an active copy row before copying settings.";
 
             if (row.SizingMode == SizingMode.Disabled)
                 return "Choose active sizing on the selected row before copying settings.";
@@ -3587,7 +3592,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var targetRows = rows == null ? new List<AccountCopyRow>() : rows.Where(r => r != null).Distinct().ToList();
             if (targetRows.Count == 0)
             {
-                SetStatus("No rows to disable.");
+                SetStatus("No rows to turn off.");
                 return;
             }
 
@@ -3595,7 +3600,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 row.Enabled = false;
                 SetManualLockWithoutAction(row, false);
-                row.LastAction = row.AutoLocked ? "Disabled - risk lock preserved" : "Disabled";
+                row.LastAction = row.AutoLocked ? "Turned off - risk lock preserved" : "Turned off";
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
                 ClearMirroredTargetQuantities(row);
@@ -3603,7 +3608,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
-            var message = "Disabled " + targetRows.Count + " " + scopeDescription + " row(s).";
+            var message = "Turned off " + targetRows.Count + " " + scopeDescription + " row(s).";
             SetStatus(message);
             Log(message);
         }
@@ -3731,7 +3736,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var targetRows = rows.Where(r => r != null).Distinct().ToList();
             if (targetRows.Count == 0)
             {
-                SetStatus("No rows to enable.");
+                SetStatus("No rows to turn on.");
                 return;
             }
 
@@ -4226,6 +4231,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 UpdateRowStatus(candidate);
                 UpdateRowRole(candidate);
             }
+
+            UpdateSelectedActionButtons();
+            RefreshStatusSummary();
         }
 
         private void RefreshRowMetrics(AccountCopyRow row)
@@ -4543,16 +4551,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var usedAsLead = IsReferencedLeadAccount(row.AccountName, row);
-            var activeCopyRow = row.Enabled && row.SizingMode != SizingMode.Disabled;
-
-            if (activeCopyRow && usedAsLead)
-            {
-                row.RoleSummary = "Conflict";
-                return;
-            }
-
-            if (usedAsLead)
+            if (IsReferencedLeadAccount(row.AccountName, row))
             {
                 row.RoleSummary = "Lead";
                 return;
@@ -4975,17 +4974,17 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row == null)
                 return "unknown";
 
-            if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
-                return "self-copy";
-
-            if (!string.IsNullOrWhiteSpace(row.LeadAccountName))
-                return row.LeadAccountName;
-
             if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
                 return "Lead account";
 
             if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                 return "Lead/copy conflict";
+
+            if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                return "self-copy";
+
+            if (!string.IsNullOrWhiteSpace(row.LeadAccountName))
+                return row.LeadAccountName;
 
             return "Available";
         }
@@ -5572,6 +5571,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             private string BuildLeadSummary()
             {
+                if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                    return "Lead account";
+
+                if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
+                    return "Lead/copy conflict";
+
                 if (!string.IsNullOrWhiteSpace(LeadAccountName)
                     && string.Equals(AccountName ?? string.Empty, LeadAccountName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                     return "Self-copy";
@@ -5586,12 +5591,6 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 if (!string.IsNullOrWhiteSpace(LeadAccountName))
                     return "Lead " + LeadAccountName;
-
-                if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                    return "Lead account";
-
-                if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
-                    return "Lead/copy conflict";
 
                 return Enabled && SizingMode != SizingMode.Disabled
                     ? "Needs lead"
