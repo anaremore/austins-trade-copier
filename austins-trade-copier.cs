@@ -1992,7 +1992,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private void ResetActiveRiskBaselines()
         {
             var rows = accountRows
-                .Where(r => r.Enabled && r.SizingMode != SizingMode.Disabled && r.Account != null)
+                .Where(IsConnectedCopyRow)
                 .ToList();
 
             foreach (var row in rows)
