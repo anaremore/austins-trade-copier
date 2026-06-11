@@ -6713,15 +6713,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string BuildLeadSummary()
             {
                 if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (FollowerCount == 1)
-                        return "Lead for 1 row";
-
-                    if (FollowerCount > 1)
-                        return "Lead for " + FollowerCount.ToString(CultureInfo.InvariantCulture) + " rows";
-
                     return "Lead";
-                }
 
                 if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                     return "Lead/copy conflict";
