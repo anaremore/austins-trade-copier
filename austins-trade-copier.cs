@@ -299,7 +299,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Text = "No rows selected",
                 Foreground = BrushRgb(210, 216, 224),
                 FontWeight = FontWeights.Bold,
-                Width = 180,
+                Width = 220,
                 Margin = new Thickness(0, 0, 12, 6),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -589,9 +589,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Property = DataGridCell.IsSelectedProperty,
                 Value = true
             };
-            selectedTrigger.Setters.Add(new Setter(DataGridCell.BackgroundProperty, BrushRgb(64, 88, 118)));
+            selectedTrigger.Setters.Add(new Setter(DataGridCell.BackgroundProperty, BrushRgb(70, 104, 142)));
             selectedTrigger.Setters.Add(new Setter(DataGridCell.ForegroundProperty, Brushes.White));
-            selectedTrigger.Setters.Add(new Setter(DataGridCell.BorderBrushProperty, BrushRgb(111, 165, 226)));
+            selectedTrigger.Setters.Add(new Setter(DataGridCell.BorderBrushProperty, BrushRgb(126, 184, 244)));
             selectedTrigger.Setters.Add(new Setter(DataGridCell.BorderThicknessProperty, new Thickness(0, 1, 0, 1)));
             style.Triggers.Add(selectedTrigger);
 
@@ -600,7 +600,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void AddGridColumns(DataGrid grid)
         {
-            grid.Columns.Add(CreateTextColumn("Selected", "SelectionMarker", 64, null, true, "Rows marked SEL are selected for the Selected Rows buttons."));
+            grid.Columns.Add(CreateTextColumn("Sel", "SelectionMarker", 32, null, true, "Rows marked > are selected for the Selected Rows buttons."));
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
@@ -940,9 +940,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var selectedMarkerTrigger = new DataTrigger
                 {
                     Binding = new Binding("SelectionMarker"),
-                    Value = "SEL"
+                    Value = ">"
                 };
-                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.BackgroundProperty, BrushRgb(64, 88, 118)));
+                selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.BackgroundProperty, BrushRgb(70, 104, 142)));
                 selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.ForegroundProperty, Brushes.White));
                 selectedMarkerTrigger.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.Bold));
                 style.Triggers.Add(selectedMarkerTrigger);
@@ -993,10 +993,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Property = DataGridRow.IsSelectedProperty,
                 Value = true
             };
-            trigger.Setters.Add(new Setter(DataGridRow.BackgroundProperty, BrushRgb(64, 88, 118)));
+            trigger.Setters.Add(new Setter(DataGridRow.BackgroundProperty, BrushRgb(70, 104, 142)));
             trigger.Setters.Add(new Setter(DataGridRow.ForegroundProperty, Brushes.White));
-            trigger.Setters.Add(new Setter(DataGridRow.BorderBrushProperty, BrushRgb(111, 165, 226)));
-            trigger.Setters.Add(new Setter(DataGridRow.BorderThicknessProperty, new Thickness(0, 1, 0, 1)));
+            trigger.Setters.Add(new Setter(DataGridRow.BorderBrushProperty, BrushRgb(126, 184, 244)));
+            trigger.Setters.Add(new Setter(DataGridRow.BorderThicknessProperty, new Thickness(3, 1, 0, 1)));
             style.Triggers.Add(trigger);
         }
 
@@ -1547,7 +1547,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var selectedRows = new HashSet<AccountCopyRow>(GetSelectedRows());
             foreach (var row in accountRows)
-                row.SelectionMarker = selectedRows.Contains(row) ? "SEL" : string.Empty;
+                row.SelectionMarker = selectedRows.Contains(row) ? ">" : string.Empty;
 
             UpdateSelectedActionButtons();
         }
