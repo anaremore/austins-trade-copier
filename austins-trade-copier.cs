@@ -151,6 +151,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressLiveSettingsPause;
         private bool suppressManualLockHandling;
         private bool suppressSizingModeAutoSwitch;
+        private bool suppressLeadRoleRefresh;
         private bool rowRefreshPending;
         private string heldStatusMessage = string.Empty;
         private string heldStatusDetail = string.Empty;
@@ -1219,7 +1220,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             else if (RowPropertyCanInvalidateEnabledRow(e.PropertyName))
                 ValidateEnabledRowAfterEdit(row);
 
-            if (e.PropertyName == "LeadAccountName")
+            if (e.PropertyName == "LeadAccountName" && !suppressLeadRoleRefresh)
                 RefreshLeadRoleState();
 
             if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
@@ -4169,6 +4170,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RefreshAllRows()
         {
+            ClearLeadSelectionsForLeadRows();
             EnforceLeadRowsStayOff();
 
             foreach (var row in accountRows.ToList())
@@ -4224,6 +4226,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void RefreshLeadRoleState()
         {
+            ClearLeadSelectionsForLeadRows();
             EnforceLeadRowsStayOff();
 
             foreach (var candidate in accountRows.ToList())
@@ -4234,6 +4237,42 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             UpdateSelectedActionButtons();
             RefreshStatusSummary();
+        }
+
+        private void ClearLeadSelectionsForLeadRows()
+        {
+            var leadRows = accountRows
+                .Where(r => r != null
+                    && !string.IsNullOrWhiteSpace(r.LeadAccountName)
+                    && IsReferencedLeadAccount(r.AccountName, r))
+                .ToList();
+
+            if (leadRows.Count == 0)
+                return;
+
+            var wasEnableSuppressed = suppressEnableValidation;
+            var wasLiveSuppressed = suppressLiveSettingsPause;
+            var wasLeadRefreshSuppressed = suppressLeadRoleRefresh;
+            suppressEnableValidation = true;
+            suppressLiveSettingsPause = true;
+            suppressLeadRoleRefresh = true;
+            try
+            {
+                foreach (var row in leadRows)
+                {
+                    row.LeadAccountName = string.Empty;
+                    row.LastAction = "Lead account - own lead cleared";
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                    ClearMirroredTargetQuantities(row);
+                }
+            }
+            finally
+            {
+                suppressEnableValidation = wasEnableSuppressed;
+                suppressLiveSettingsPause = wasLiveSuppressed;
+                suppressLeadRoleRefresh = wasLeadRefreshSuppressed;
+            }
         }
 
         private void RefreshRowMetrics(AccountCopyRow row)
