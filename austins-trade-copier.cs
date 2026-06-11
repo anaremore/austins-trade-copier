@@ -257,6 +257,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Margin = new Thickness(0, 0, 12, 0),
                 ToolTip = "Simulate copied and reconcile orders without submitting live orders."
             };
+            ToolTipService.SetShowOnDisabled(dryRunCheckBox, true);
             sessionRiskRow.Children.Add(dryRunCheckBox);
 
             sessionRiskRow.Children.Add(CreateToolbarLabel("Risk"));
