@@ -4342,8 +4342,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 RefreshRowMetrics(row);
                 EvaluateRisk(row);
-                UpdateRowStatus(row);
                 UpdateRowRole(row);
+                UpdateRowStatus(row);
             }
 
             RefreshStatusSummary();
@@ -4390,8 +4390,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             foreach (var candidate in accountRows.ToList())
             {
-                UpdateRowStatus(candidate);
                 UpdateRowRole(candidate);
+                UpdateRowStatus(candidate);
             }
 
             UpdateSelectedActionButtons();
@@ -4594,6 +4594,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (row.Account.ConnectionStatus != ConnectionStatus.Connected)
             {
                 row.SetStatus("Error", "Disconnected");
+                return;
+            }
+
+            if (AccountHasCopyRows(row.AccountName, row))
+            {
+                row.SetStatus("Disabled", "Lead", "Lead account. It can drive copy rows but does not receive copied orders.");
                 return;
             }
 
