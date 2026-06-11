@@ -2212,7 +2212,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 label += " | Offline " + offlineCount;
 
             if (attentionCount > 0)
-                label += " | Review " + attentionCount;
+                label += " | Check " + attentionCount;
 
             return label;
         }
@@ -2539,7 +2539,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 parts.Add(offlineCount + " offline");
 
             if (loadedOffCount > 0)
-                parts.Add(loadedOffCount + " kept Off for review");
+                parts.Add(loadedOffCount + " kept Off");
 
             return string.Join(", ", parts) + ".";
         }
@@ -6125,7 +6125,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 parts.Add("Locked " + lockedCount);
 
             if (attentionCount > 0)
-                parts.Add("Review " + attentionCount);
+                parts.Add("Check " + attentionCount);
 
             if (offlineCount > 0)
                 parts.Add("Offline " + offlineCount);
@@ -6199,7 +6199,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     parts.Add("Locked " + lockedCount);
 
                 if (attentionCount > 0)
-                    parts.Add("Review " + attentionCount);
+                    parts.Add("Check " + attentionCount);
 
                 return string.Join(" | ", parts);
             }
