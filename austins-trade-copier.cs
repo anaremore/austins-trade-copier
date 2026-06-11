@@ -296,21 +296,21 @@ namespace NinjaTrader.NinjaScript.AddOns
             actionPanel.Children.Add(sessionRiskRow);
 
             var selectionRow = CreateToolbarRow();
-            selectionRow.Children.Add(CreateToolbarLabel("Selected Rows"));
+            selectionRow.Children.Add(CreateToolbarLabel("Selection"));
             selectedRowsTextBlock = new TextBlock
             {
-                Text = "No rows selected",
+                Text = "No selection",
                 Foreground = BrushRgb(210, 216, 224),
                 FontWeight = FontWeights.Bold,
                 Width = 280,
                 Margin = new Thickness(0, 0, 12, 6),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = "Current table selection for the Selected Rows buttons."
+                ToolTip = "Current highlighted table row(s)."
             };
             selectionRow.Children.Add(selectedRowsTextBlock);
 
-            reconcileSelectedButton = CreateButton("Reconcile Selected", Brushes.DimGray, "Adjust selected rows toward each row's lead positions using current sizing and limits.");
+            reconcileSelectedButton = CreateButton("Reconcile", Brushes.DimGray, "Adjust highlighted rows toward each row's lead positions using current sizing and limits.");
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
@@ -319,7 +319,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
             selectionRow.Children.Add(toggleSelectedButton);
 
-            unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows require confirmation and reset baselines when connected.");
+            unlockSelectedButton = CreateButton("Unlock", Brushes.DimGray, "Clear manual and risk locks on highlighted rows. Risk-locked rows require confirmation and reset baselines when connected.");
             unlockSelectedButton.Click += UnlockSelectedButton_Click;
             selectionRow.Children.Add(unlockSelectedButton);
 
@@ -327,7 +327,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            copyLeadSettingsButton = CreateButton("Copy Setup to Peers", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to other rows that use the selected row's lead. Lead selections stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Setup", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to other rows that use the highlighted row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -1192,8 +1192,16 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private bool AccountHasCopyRows(string accountName, AccountCopyRow exceptRow)
         {
+            return CountCopyRows(accountName, exceptRow) > 0;
+        }
+
+        private int CountCopyRows(string accountName, AccountCopyRow exceptRow)
+        {
+            if (string.IsNullOrWhiteSpace(accountName))
+                return 0;
+
             // Lead role is a setup relationship: if any other row follows this account, it is a lead immediately.
-            return accountRows.Any(r =>
+            return accountRows.Count(r =>
                 r != exceptRow
                 && !string.IsNullOrWhiteSpace(r.LeadAccountName)
                 && !AccountNamesEqual(r.AccountName, r.LeadAccountName)
@@ -1812,8 +1820,8 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (rows == null || rows.Count == 0)
             {
-                selectedRowsTextBlock.Text = "No rows selected";
-                selectedRowsTextBlock.ToolTip = "Click a row before using Selected Rows actions.";
+                selectedRowsTextBlock.Text = "No selection";
+                selectedRowsTextBlock.ToolTip = "Click or highlight row(s) before using selection actions.";
                 return;
             }
 
@@ -1832,7 +1840,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string BuildSelectedRowsLabel(List<AccountCopyRow> rows)
         {
             if (rows == null || rows.Count == 0)
-                return "No rows selected";
+                return "No selection";
 
             if (rows.Count == 1)
                 return BuildSelectedRowLabel(rows[0]);
@@ -4977,7 +4985,10 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void UpdateRowRole(AccountCopyRow row)
         {
-            if (AccountHasCopyRows(row.AccountName, row))
+            var followerCount = CountCopyRows(row.AccountName, row);
+            row.FollowerCount = followerCount;
+
+            if (followerCount > 0)
             {
                 row.RoleSummary = "Lead";
                 return;
@@ -5436,7 +5447,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private string BuildSelectedRowLabel(AccountCopyRow row)
         {
             if (row == null)
-                return "No rows selected";
+                return "No selection";
 
             if (ShouldUseSimpleSelectionSummary(row))
                 return row.AccountName + " | " + DescribeSelectedLead(row);
@@ -5665,6 +5676,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string statusDetail = "Ready";
             private string statusLevel = "Ready";
             private string roleSummary = "Available";
+            private int followerCount;
             private string positionSummary = "Flat";
             private string instrumentFilter = string.Empty;
             private double sessionPnl;
@@ -5844,7 +5856,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                         return "Clear manual lock so this row can take new copied entries again.";
 
                     if (AutoLocked)
-                        return "Risk lock is active. Use Unlock Selected or Reset Baselines to clear it.";
+                        return "Risk lock is active. Use Unlock or Reset Baselines to clear it.";
 
                     if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
                         return "Lead accounts stay off and do not receive copied entries.";
@@ -5902,6 +5914,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 get { return roleSummary; }
                 set { SetField(ref roleSummary, value, "RoleSummary"); }
+            }
+
+            public int FollowerCount
+            {
+                get { return followerCount; }
+                set { SetField(ref followerCount, Math.Max(0, value), "FollowerCount"); }
             }
 
             public string PlanSummary
@@ -6131,6 +6149,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 return string.Equals(leadSummary, "Lead", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Lead account", StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(leadSummary) && leadSummary.StartsWith("Lead for ", StringComparison.OrdinalIgnoreCase))
                     || string.Equals(leadSummary, "Lead/copy conflict", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Self-copy", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(leadSummary, "Needs lead", StringComparison.OrdinalIgnoreCase)
@@ -6142,7 +6161,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string BuildLeadSummary()
             {
                 if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (FollowerCount == 1)
+                        return "Lead for 1 row";
+
+                    if (FollowerCount > 1)
+                        return "Lead for " + FollowerCount.ToString(CultureInfo.InvariantCulture) + " rows";
+
                     return "Lead";
+                }
 
                 if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                     return "Lead/copy conflict";
@@ -6320,6 +6347,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "AutoLocked":
                     case "LockReason":
                     case "RoleSummary":
+                    case "FollowerCount":
                     case "Status":
                         OnPropertyChanged("PlanSummary");
                         break;
