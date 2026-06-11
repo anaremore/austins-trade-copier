@@ -25,7 +25,7 @@
 
 ## 🛠️ Installation
 
-1. Copy `austins-trade-copier.cs` into your NinjaTrader 8 `AddOns` directory.
+1. Run `.\scripts\install-ninjascript.ps1` to copy the add-on into your NinjaTrader 8 `AddOns` directory with the current Git short hash stamped into the bottom-right build tag.
 2. Open NinjaTrader, go to **NinjaScript Editor**, and press `F5` to compile.
 3. Open the copier from **Control Center > Tools > Austin's Trade Copier**.
 

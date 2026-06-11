@@ -105,7 +105,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private const string ProfileFolderName = "AustinTradeCopier";
         private const string ProfileFileExtension = ".xml";
         private const string BuildVersion = "0.1.0-dev";
-        private const string BuildCommit = "0b3e4f8";
+        private const string BuildCommit = "source";
         private const string BuildTag = "v" + BuildVersion + "+" + BuildCommit;
         private const int MaxEventLogLines = 500;
         private const int StatusMessageHoldSeconds = 6;
