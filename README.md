@@ -77,6 +77,8 @@ Profiles are stored under your NinjaTrader documents templates folder:
 
 Risk thresholds use the row baseline captured when the account row is created, loaded, or reset with **Reset Baselines**:
 
+The **Plan** column shows the selected limit action even before risk amounts are entered, for example `no limits, auto-close row when set`.
+
 - **Max Loss** locks when session PnL is less than or equal to the negative loss limit.
 - **Max DD** locks when drawdown from the row's session peak reaches the limit.
 - **Profit Target** locks when session PnL reaches the profit target.

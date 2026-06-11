@@ -5309,10 +5309,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (ProfitTarget > 0)
                     limits.Add("target " + ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
 
-                if (limits.Count == 0)
-                    return "no limits";
-
                 var action = LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
+                if (limits.Count == 0)
+                    return "no limits, " + action + " when set";
+
                 return "at " + string.Join(", ", limits) + ": " + action;
             }
 
