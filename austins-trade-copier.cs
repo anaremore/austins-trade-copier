@@ -1599,8 +1599,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var sourceRow = rows.Count == 1 ? rows[0] : null;
                 var sourceHasLead = sourceRow != null && !string.IsNullOrWhiteSpace(sourceRow.LeadAccountName);
                 var sourceBlockReason = GetCopySettingsSourceBlockReason(sourceRow);
-                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && string.IsNullOrEmpty(sourceBlockReason);
-                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceBlockReason);
+                var targetCount = string.IsNullOrEmpty(sourceBlockReason) ? GetCopySettingsTargetRows(sourceRow).Count : 0;
+                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && string.IsNullOrEmpty(sourceBlockReason) && targetCount > 0;
+                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceBlockReason, sourceRow, targetCount);
             }
 
             if (applyRowPresetButton != null)
@@ -1711,7 +1712,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 : "Apply " + presetLabel + " to " + rows.Count + " selected row(s). " + tooltip;
         }
 
-        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceBlockReason)
+        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceBlockReason, AccountCopyRow sourceRow, int targetCount)
         {
             if (selectedRowCount == 0)
                 return "Select one source copy row before copying settings.";
@@ -1725,7 +1726,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!string.IsNullOrEmpty(sourceBlockReason))
                 return sourceBlockReason;
 
-            return "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
+            if (targetCount == 0)
+            {
+                var leadName = sourceRow == null ? string.Empty : sourceRow.LeadAccountName;
+                return string.IsNullOrWhiteSpace(leadName)
+                    ? "No other follower rows use this source row's lead."
+                    : "No other follower rows use lead " + leadName + ".";
+            }
+
+            return "Copy mode, sizing, risk limits, Limit Action, and Symbols to " + targetCount + " follower row(s) that use the selected row's lead. Lead selections stay unchanged.";
         }
 
         private string BuildReconcileSelectedTooltip(int selectedRowCount, int eligibleCount)
@@ -1769,6 +1778,19 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "Set the selected row's fixed quantity above 0 before copying settings.";
 
             return string.Empty;
+        }
+
+        private List<AccountCopyRow> GetCopySettingsTargetRows(AccountCopyRow source)
+        {
+            if (source == null || string.IsNullOrWhiteSpace(source.LeadAccountName))
+                return new List<AccountCopyRow>();
+
+            var leadName = source.LeadAccountName;
+            return accountRows
+                .Where(r => r != source
+                    && AccountNamesEqual(r.LeadAccountName, leadName)
+                    && !AccountHasCopyRows(r.AccountName, r))
+                .ToList();
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
@@ -4066,10 +4088,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            var rows = accountRows.Where(r => r != source && AccountNamesEqual(r.LeadAccountName, leadName)).ToList();
+            var rows = GetCopySettingsTargetRows(source);
             if (rows.Count == 0)
             {
-                SetStatus("No other rows use lead " + leadName + ".");
+                SetStatus("No other follower rows use lead " + leadName + ".");
                 return;
             }
 
