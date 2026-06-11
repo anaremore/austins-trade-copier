@@ -605,7 +605,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
             grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Accounts followed by another row are Lead; Status and Conn show whether they are ready or disconnected."));
-            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders."));
+            grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders.", "LeadSelectionTooltip", "CanEditLeadSelection"));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
             grid.Columns.Add(CreateTextBoxColumn("Symbols", "InstrumentFilter", 128, null, TextAlignment.Left, false, false, "Optional symbol filter for this row. Leave blank to copy every instrument. Use roots or full contract names separated by commas, for example MES, MNQ, MES JUN26. Filters apply to copy, reconcile, Flatten Selected, Flatten On, and auto-close row."));
@@ -729,7 +729,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshStatusSummary();
         }
 
-        private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip)
+        private DataGridTemplateColumn CreateComboBoxColumn(string header, string propertyName, object itemsSource, string displayMemberPath, string selectedValuePath, double width, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null)
         {
             var factory = new FrameworkElementFactory(typeof(ComboBox));
             factory.SetValue(ItemsControl.ItemsSourceProperty, itemsSource);
@@ -741,8 +741,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.ForegroundProperty, Brushes.White);
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(92, 96, 104));
             factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
             factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
+
+            if (!string.IsNullOrWhiteSpace(tooltipPropertyName))
+                factory.SetBinding(FrameworkElement.ToolTipProperty, new Binding(tooltipPropertyName));
+
+            if (!string.IsNullOrWhiteSpace(isEnabledPropertyName))
+                factory.SetBinding(UIElement.IsEnabledProperty, new Binding(isEnabledPropertyName));
 
             if (!string.IsNullOrWhiteSpace(displayMemberPath))
                 factory.SetValue(ItemsControl.DisplayMemberPathProperty, displayMemberPath);
@@ -5438,6 +5445,28 @@ namespace NinjaTrader.NinjaScript.AddOns
                 }
             }
 
+            public bool CanEditLeadSelection
+            {
+                get
+                {
+                    return !string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            public string LeadSelectionTooltip
+            {
+                get
+                {
+                    if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                        return "This account is a lead because another row follows it. Clear those rows' Lead selections before assigning this account to a lead.";
+
+                    if (Enabled)
+                        return "Changing the Lead on an On row may pause it for review while copying is active.";
+
+                    return "Choose the account this row should copy. Leave blank to keep it available.";
+                }
+            }
+
             public bool CanToggleManualLock
             {
                 get
@@ -5921,6 +5950,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "AutoLocked":
                         OnPropertyChanged("CanToggleEnabled");
                         OnPropertyChanged("EnableTooltip");
+                        OnPropertyChanged("CanEditLeadSelection");
+                        OnPropertyChanged("LeadSelectionTooltip");
                         OnPropertyChanged("CanToggleManualLock");
                         OnPropertyChanged("ManualLockTooltip");
                         break;
