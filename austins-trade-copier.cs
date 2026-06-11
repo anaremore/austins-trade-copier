@@ -1385,9 +1385,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (e.PropertyName == "LeadAccountName" && !suppressLeadRoleRefresh)
                 RefreshLeadRoleState();
 
-            if (e.PropertyName == "LeadAccountName" || e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
+            if (e.PropertyName == "LeadAccountName")
             {
-                RefreshLeadAccountOptions();
+                SyncLeadAccountSubscriptions();
+            }
+            else if (e.PropertyName == "Enabled" || e.PropertyName == "SizingMode")
+            {
                 SyncLeadAccountSubscriptions();
             }
 
