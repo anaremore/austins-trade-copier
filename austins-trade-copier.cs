@@ -4207,13 +4207,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             var selectedRows = GetSelectedRows();
             if (selectedRows.Count == 0)
             {
-                SetStatus("Select one source row before copying settings to rows with the same lead.");
+                SetStatus("Select one source copy row before copying setup to peers.");
                 return;
             }
 
             if (selectedRows.Count > 1)
             {
-                SetStatus("Select exactly one source row before copying settings to rows with the same lead.");
+                SetStatus("Select exactly one source copy row before copying setup to peers.");
                 return;
             }
 
@@ -4228,7 +4228,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var leadName = source.LeadAccountName;
             if (string.IsNullOrWhiteSpace(leadName))
             {
-                SetStatus("Select a copy row with a lead before copying settings to rows with the same lead.");
+                SetStatus("Select a copy row with a lead before copying setup to peers.");
                 return;
             }
 
@@ -4241,7 +4241,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (isCopying)
             {
-                var prompt = "Copy settings from " + source.AccountName + " to " + rows.Count + " row(s) that use lead " + leadName + " while copying is active? Active target row baselines will be reset. Lead selections stay unchanged.";
+                var prompt = "Copy setup from " + source.AccountName + " to " + rows.Count + " peer row(s) using lead " + leadName + " while copying is active? Active target row baselines will be reset. Lead selections stay unchanged.";
                 var accountSummary = BuildRowAccountPromptLine(rows);
                 if (!string.IsNullOrEmpty(accountSummary))
                     prompt += "\n" + accountSummary;
@@ -4288,7 +4288,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
-            var message = "Copied settings from " + source.AccountName + " to " + appliedCount + " row(s) that use lead " + leadName;
+            var message = "Copied setup from " + source.AccountName + " to " + appliedCount + " peer row(s) using lead " + leadName;
             if (liveBaselineResetCount > 0)
                 message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
 
