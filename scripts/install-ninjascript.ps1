@@ -1,6 +1,7 @@
 param(
     [string] $SourcePath = (Join-Path $PSScriptRoot '..\austins-trade-copier.cs'),
     [string] $AddOnDirectory = '',
+    [string] $NinjaTraderUserDirectory = '',
     [string] $Version = '',
     [string] $NinjaTraderBin = '',
     [switch] $Verify
@@ -22,19 +23,37 @@ function Resolve-RequiredPath {
     return $resolved.ProviderPath
 }
 
-function Resolve-AddOnDirectory {
+function Resolve-NinjaTraderUserDirectory {
     param([string] $Path)
 
     if (-not [string]::IsNullOrWhiteSpace($Path)) {
         return $Path
     }
 
-    $documents = [Environment]::GetFolderPath('MyDocuments')
-    if ([string]::IsNullOrWhiteSpace($documents)) {
-        throw 'Unable to resolve the current user Documents folder. Pass -AddOnDirectory with your NinjaTrader AddOns folder.'
+    if (-not [string]::IsNullOrWhiteSpace($env:NINJATRADER_USER_DIR)) {
+        return $env:NINJATRADER_USER_DIR
     }
 
-    return Join-Path $documents 'NinjaTrader 8\bin\Custom\AddOns'
+    $documents = [Environment]::GetFolderPath('MyDocuments')
+    if ([string]::IsNullOrWhiteSpace($documents)) {
+        throw 'Unable to resolve the current user Documents folder. Pass -NinjaTraderUserDirectory or -AddOnDirectory.'
+    }
+
+    return Join-Path $documents 'NinjaTrader 8'
+}
+
+function Resolve-AddOnDirectory {
+    param(
+        [string] $Path,
+        [string] $UserDirectory
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        return $Path
+    }
+
+    $resolvedUserDirectory = Resolve-NinjaTraderUserDirectory $UserDirectory
+    return Join-Path $resolvedUserDirectory 'bin\Custom\AddOns'
 }
 
 function Get-GitShortHash {
@@ -78,7 +97,7 @@ $source = Resolve-RequiredPath $SourcePath 'NinjaScript source'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).ProviderPath
 $commit = Get-GitShortHash $repositoryRoot $source
 $versionToWrite = if ([string]::IsNullOrWhiteSpace($Version)) { $null } else { $Version.Trim() }
-$resolvedAddOnDirectory = Resolve-AddOnDirectory $AddOnDirectory
+$resolvedAddOnDirectory = Resolve-AddOnDirectory $AddOnDirectory $NinjaTraderUserDirectory
 
 if (-not (Test-Path -LiteralPath $resolvedAddOnDirectory)) {
     New-Item -ItemType Directory -Path $resolvedAddOnDirectory | Out-Null
