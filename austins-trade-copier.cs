@@ -6185,7 +6185,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "No selection";
 
             if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                return row.AccountName + " | Lead";
+                return row.AccountName + " | " + (string.IsNullOrWhiteSpace(row.PlanSummary) ? "Lead" : row.PlanSummary);
 
             if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                 return row.AccountName + " | Lead conflict";
@@ -6961,7 +6961,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             private string BuildLeadSummary()
             {
                 if (string.Equals(RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                    return "Lead";
+                    return BuildLeadFollowerSummary();
 
                 if (string.Equals(RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                     return "Lead/copy conflict";
@@ -6984,6 +6984,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return Enabled && SizingMode != SizingMode.Disabled
                     ? "Needs lead"
                     : "Available";
+            }
+
+            private string BuildLeadFollowerSummary()
+            {
+                if (FollowerCount <= 0)
+                    return "Lead";
+
+                return "Lead for " + FollowerCount.ToString(CultureInfo.InvariantCulture) + " row" + (FollowerCount == 1 ? string.Empty : "s");
             }
 
             private string BuildSizingSummary()
