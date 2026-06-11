@@ -306,11 +306,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 Text = "No selection",
                 Foreground = BrushRgb(210, 216, 224),
                 FontWeight = FontWeights.Bold,
-                Width = 280,
+                Width = 300,
                 Margin = new Thickness(0, 0, 12, 6),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = "Current highlighted table row(s)."
+                ToolTip = "Current selected table row(s)."
             };
             selectionRow.Children.Add(selectedRowsTextBlock);
 
@@ -1877,7 +1877,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (rows == null || rows.Count == 0)
             {
                 selectedRowsTextBlock.Text = "No selection";
-                selectedRowsTextBlock.ToolTip = "Click or highlight row(s) before using selection actions.";
+                selectedRowsTextBlock.ToolTip = "Click or select row(s) before using selection actions.";
                 return;
             }
 
@@ -1905,7 +1905,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var offCount = rows.Count - onCount;
             var offlineCount = rows.Count(IsOfflineRow);
             var attentionCount = rows.Count(IsAttentionRow);
-            var label = rows.Count + " highlighted | " + BuildAccountNamePreview(rows, 2);
+            var label = rows.Count + " selected | " + BuildAccountNamePreview(rows, 2);
             if (onCount > 0)
                 label += " | On " + onCount;
 
@@ -5687,7 +5687,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(IsAttentionRow);
-                var parts = new List<string> { "Highlighted " + rows.Count };
+                var parts = new List<string> { "Selected " + rows.Count };
                 parts.Add(BuildAccountNamePreview(rows, 8));
 
                 if (onCount > 0)
@@ -5713,7 +5713,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var row = rows[0];
             if (ShouldUseSimpleSelectionSummary(row))
-                return row.AccountName + " | " + DescribeSelectedLead(row);
+                return BuildSelectedRowLabel(row) + " | " + row.Status;
 
             var relationship = DescribeSelectedCopyRelationship(row);
             var sizing = DescribeSizing(row);
@@ -5752,9 +5752,37 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "No selection";
 
             if (ShouldUseSimpleSelectionSummary(row))
-                return row.AccountName + " | " + DescribeSelectedLead(row);
+                return DescribeSimpleSelectedRow(row);
 
             return DescribeSelectedCopyRelationship(row);
+        }
+
+        private string DescribeSimpleSelectedRow(AccountCopyRow row)
+        {
+            if (row == null)
+                return "No selection";
+
+            if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+            {
+                if (row.FollowerCount == 1)
+                    return row.AccountName + " leads 1 row";
+
+                if (row.FollowerCount > 1)
+                    return row.AccountName + " leads " + row.FollowerCount.ToString(CultureInfo.InvariantCulture) + " rows";
+
+                return row.AccountName + " leads";
+            }
+
+            if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
+                return row.AccountName + " has a lead conflict";
+
+            if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                return row.AccountName + " cannot copy itself";
+
+            if (string.IsNullOrWhiteSpace(row.LeadAccountName))
+                return row.AccountName + " " + (string.Equals(row.PlanSummary, "Needs lead", StringComparison.OrdinalIgnoreCase) ? "needs lead" : "available");
+
+            return row.AccountName + " follows " + row.LeadAccountName;
         }
 
         private bool ShouldUseSimpleSelectionSummary(AccountCopyRow row)
@@ -5793,7 +5821,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
                 return row.AccountName + " self-copy";
 
-            return row.AccountName + " <- " + DescribeSelectedLead(row);
+            return row.AccountName + " follows " + DescribeSelectedLead(row);
         }
 
         private string DescribeSizing(AccountCopyRow row)
