@@ -86,6 +86,8 @@ Risk actions:
 - **Lock entries only** blocks new or increasing entries, but allows position-reducing exits. Exit quantity is capped so a locked account cannot reverse.
 - **Auto-close row** immediately requests a flatten for matching managed row positions, then blocks new or increasing entries.
 
+Clearing a risk lock through **Unlock Selected** or **Reset Baselines** requires confirmation. Connected risk-locked rows reset their session PnL baselines before they can become eligible to copy again.
+
 `ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the copy row's current position.
 
 Reconciliation is selected-row only and requires confirmation. Unlocked rows are adjusted toward the lead account using their configured sizing rules. Locked rows reconcile by reducing exposure only; they will not open or increase a position.

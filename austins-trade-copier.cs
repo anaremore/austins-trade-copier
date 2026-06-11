@@ -285,11 +285,11 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
             selectionRow.Children.Add(toggleSelectedButton);
 
-            unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines.");
+            unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows require confirmation and reset baselines when connected.");
             unlockSelectedButton.Click += UnlockSelectedButton_Click;
             selectionRow.Children.Add(unlockSelectedButton);
 
-            resetBaselineButton = CreateButton("Reset Baselines", Brushes.DimGray, "Reset selected rows' session PnL baselines and clear auto risk locks.");
+            resetBaselineButton = CreateButton("Reset Baselines", Brushes.DimGray, "Reset selected rows' session PnL baselines. Risk-locked rows require confirmation because this clears auto risk locks.");
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
@@ -1439,7 +1439,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 unlockSelectedButton.IsEnabled = hasSelection;
                 unlockSelectedButton.ToolTip = hasSelection
-                    ? "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines."
+                    ? "Clear manual and risk locks on selected rows. Risk-locked rows require confirmation and reset baselines when connected."
                     : "Select one or more rows to unlock.";
             }
 
@@ -1447,7 +1447,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 resetBaselineButton.IsEnabled = hasSelection;
                 resetBaselineButton.ToolTip = hasSelection
-                    ? "Reset selected rows' session PnL baselines and clear auto risk locks."
+                    ? "Reset selected rows' session PnL baselines. Risk-locked rows require confirmation because this clears auto risk locks."
                     : "Select one or more rows before resetting baselines.";
             }
 
@@ -3341,6 +3341,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            if (!ConfirmRiskLockClear(rows, "Confirm Unlock Risk Locks", "Unlock", "This clears auto risk locks. Connected risk-locked rows will also reset their session PnL baselines. Enabled rows may become eligible to copy again."))
+                return;
+
             var autoResetCount = 0;
             var skippedBaselineCount = 0;
             foreach (var row in rows)
@@ -3383,6 +3386,23 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshAllRows();
         }
 
+        private bool ConfirmRiskLockClear(IList<AccountCopyRow> rows, string title, string actionName, string consequence)
+        {
+            var riskLockedRows = rows == null
+                ? new List<AccountCopyRow>()
+                : rows.Where(r => r != null && r.AutoLocked).Distinct().ToList();
+
+            if (riskLockedRows.Count == 0)
+                return true;
+
+            var prompt = actionName + " " + riskLockedRows.Count + " risk-locked row(s)?\n\n" + consequence;
+            var accountSummary = BuildRowAccountPromptLine(riskLockedRows);
+            if (!string.IsNullOrEmpty(accountSummary))
+                prompt += "\n" + accountSummary;
+
+            return MessageBox.Show(prompt, title, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+        }
+
         private void ResetBaselinesButton_Click(object sender, RoutedEventArgs e)
         {
             CommitGridEdits();
@@ -3393,6 +3413,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetStatus("Select one or more rows before resetting baselines.");
                 return;
             }
+
+            if (!ConfirmRiskLockClear(rows, "Confirm Reset Risk Locks", "Reset baselines for", "This sets session PnL baselines to current account PnL and clears auto risk locks. Enabled rows may become eligible to copy again."))
+                return;
 
             var resetCount = 0;
             var skippedCount = 0;
