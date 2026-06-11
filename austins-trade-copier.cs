@@ -4908,7 +4908,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                 return "Lead/copy conflict";
 
-            return "lead-only / unused";
+            return "Available";
         }
 
         private string DescribeSizing(AccountCopyRow row)
@@ -5447,9 +5447,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             private string BuildPlanSummary()
             {
+                var leadSummary = BuildLeadSummary();
+                if (ShouldUseLeadOnlyPlan(leadSummary))
+                    return leadSummary;
+
                 var parts = new List<string>
                 {
-                    BuildLeadSummary(),
+                    leadSummary,
                     BuildSizingSummary(),
                     BuildRiskSummary()
                 };
@@ -5468,6 +5472,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                     parts.Add(string.IsNullOrWhiteSpace(LockReason) ? "risk locked" : "locked: " + LockReason.ToLowerInvariant());
 
                 return string.Join(" | ", parts);
+            }
+
+            private bool ShouldUseLeadOnlyPlan(string leadSummary)
+            {
+                return string.Equals(leadSummary, "Lead account", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(leadSummary, "Lead/copy conflict", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(leadSummary, "Self-copy", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(leadSummary, "Needs lead", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(leadSummary, "Available", StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(leadSummary) && leadSummary.StartsWith("Missing lead ", StringComparison.OrdinalIgnoreCase));
             }
 
             private string BuildLeadSummary()
@@ -5491,7 +5505,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 return Enabled && SizingMode != SizingMode.Disabled
                     ? "Needs lead"
-                    : "Lead-only / unused";
+                    : "Available";
             }
 
             private string BuildSizingSummary()
