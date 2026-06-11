@@ -1473,15 +1473,19 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (rows.All(r => r.Enabled))
+            var onCount = rows.Count(r => r.Enabled);
+            var offCount = rows.Count - onCount;
+            if (offCount == 0)
             {
                 toggleSelectedButton.Content = "Disable Selected";
-                toggleSelectedButton.ToolTip = "Turn selected rows off. Rows stay visible and saved in profiles.";
+                toggleSelectedButton.ToolTip = "Turn " + onCount + " selected row(s) off. Rows stay visible and saved in profiles.";
                 return;
             }
 
-            toggleSelectedButton.Content = "Enable Selected";
-            toggleSelectedButton.ToolTip = "Turn on selected rows that are off. Invalid rows are skipped with reasons.";
+            toggleSelectedButton.Content = onCount == 0 ? "Enable Selected" : "Enable Off Rows";
+            toggleSelectedButton.ToolTip = onCount == 0
+                ? "Turn on " + offCount + " selected row(s). Invalid rows are skipped with reasons."
+                : "Turn on " + offCount + " off selected row(s); " + onCount + " already on. Invalid rows are skipped with reasons.";
         }
 
         private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceSizingBlockReason)
@@ -4394,10 +4398,12 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (rows.Count > 1)
             {
-                var enabledCount = rows.Count(IsConfiguredCopyRow);
+                var onCount = rows.Count(r => r.Enabled);
+                var offCount = rows.Count - onCount;
+                var copyRowCount = rows.Count(IsConfiguredCopyRow);
                 var lockedCount = rows.Count(r => IsConfiguredCopyRow(r) && r.IsEntryLocked);
                 var attentionCount = rows.Count(r => r.StatusLevel == "Error" || r.StatusLevel == "Desynced");
-                return "Selected: " + rows.Count + " rows | Enabled: " + enabledCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
+                return "Selected: " + rows.Count + " rows | On: " + onCount + " | Off: " + offCount + " | Copy rows: " + copyRowCount + " | Locked: " + lockedCount + " | Attention: " + attentionCount;
             }
 
             var row = rows[0];
