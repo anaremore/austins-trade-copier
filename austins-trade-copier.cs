@@ -603,7 +603,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
-            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Available accounts can be used as leads. Lead accounts are being copied by another row. Copy rows receive orders from their selected Lead."));
+            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Lead accounts are referenced by another row. Copy rows have a Lead selected. Available rows have no Lead selected yet."));
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", connectedAccountNames, null, null, 112, "Leave blank for lead-only or unused accounts. Choose another account here to make this row copy that account's filled orders."));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, "All copies entries and exits. Exits only blocks new entries while allowing exits."));
@@ -4546,13 +4546,13 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            if (activeCopyRow)
+            if (usedAsLead)
             {
-                row.RoleSummary = "Copy row";
+                row.RoleSummary = "Lead";
                 return;
             }
 
-            row.RoleSummary = usedAsLead ? "Lead" : "Available";
+            row.RoleSummary = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "Available" : "Copy row";
         }
 
         private string GetNearRiskLimitStatusText(AccountCopyRow row)
