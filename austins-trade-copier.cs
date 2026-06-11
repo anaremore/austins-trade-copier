@@ -2385,9 +2385,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.AutoLocked = rowWasAutoLocked;
                 row.LockReason = rowWasAutoLocked ? rowLockReason : string.Empty;
                 NormalizeLegacySizingMode(row);
-                rowLoadedOffReason = DisableLoadedRowWithInvalidSizing(row);
-                if (!string.IsNullOrWhiteSpace(rowLoadedOffReason))
+                var invalidSizingReason = DisableLoadedRowWithInvalidSizing(row);
+                if (!string.IsNullOrWhiteSpace(invalidSizingReason))
+                {
+                    rowLoadedOffReason = invalidSizingReason;
                     loadedOffCount++;
+                }
 
                 row.LastAction = GetLoadedProfileLastAction(row, rowWasAutoLocked, rowLoadedAvailableBecauseNoLead, rowLoadedOffReason);
 
