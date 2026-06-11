@@ -70,7 +70,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
    - **Fixed qty**: sends a fixed quantity once per lead order.
    - **Balance ratio**: scales by copy-row equity versus lead equity.
    - **Off**: keeps the row visible but does not copy entries.
-5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Risk Now** shows current progress, then shows `Locked`, `Auto-close`, `Retry close`, or `Check close` with the hit limit. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
+5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Status** shows `Risk lock`, `Auto-close`, `Retry close`, or `Check close` when a risk rule is active, and **Risk Now** shows the hit limit/progress. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming, resets active-row risk baselines, and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.

@@ -5723,7 +5723,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (row.ManualLock)
             {
-                row.SetStatus("Locked", "Locked", "Manual lock: exits only. Unlock this row to allow new entries.");
+                row.SetStatus("Locked", "Manual lock", "Manual lock blocks new copied entries and follows reducing exits only. Unlock this row to allow new entries.");
                 return;
             }
 
@@ -5794,9 +5794,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                     row.SetStatus("Error", "Retry close", detail + ". No close order has submitted yet; the copier will retry while copying is active.");
                     return;
                 }
+
+                row.SetStatus("Locked", "Auto-close", detail);
+                return;
             }
 
-            row.SetStatus("Locked", "Locked", detail);
+            row.SetStatus("Locked", "Risk lock", detail);
         }
 
         private bool LastActionShowsSizingZero(AccountCopyRow row)
