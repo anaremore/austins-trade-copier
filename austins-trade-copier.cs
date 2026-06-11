@@ -773,6 +773,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
             factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
+            var isLeadColumn = string.Equals(propertyName, "LeadAccountName", StringComparison.Ordinal);
             factory.AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(ComboBoxCell_SelectionChanged));
 
             if (!string.IsNullOrWhiteSpace(tooltipPropertyName))
@@ -787,7 +788,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var binding = new Binding(propertyName)
             {
                 Mode = BindingMode.TwoWay,
-                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+                UpdateSourceTrigger = isLeadColumn ? UpdateSourceTrigger.Explicit : UpdateSourceTrigger.PropertyChanged
             };
 
             if (string.IsNullOrWhiteSpace(selectedValuePath))
@@ -814,11 +815,22 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (comboBox == null || !string.Equals(comboBox.Tag as string, "LeadAccountName", StringComparison.Ordinal))
                 return;
 
-            if (!comboBox.IsKeyboardFocusWithin && !comboBox.IsDropDownOpen)
+            if (!comboBox.IsDropDownOpen)
+                return;
+
+            CommitLeadComboBoxSelection(comboBox);
+        }
+
+        private void CommitLeadComboBoxSelection(ComboBox comboBox)
+        {
+            if (comboBox == null || !string.Equals(comboBox.Tag as string, "LeadAccountName", StringComparison.Ordinal))
                 return;
 
             if (comboBox.SelectedItem == null && comboBox.SelectedValue == null)
                 return;
+
+            var row = comboBox.DataContext as AccountCopyRow;
+            var previousLead = row != null ? row.LeadAccountName : string.Empty;
 
             var selectedItemBinding = comboBox.GetBindingExpression(Selector.SelectedItemProperty);
             if (selectedItemBinding != null)
@@ -827,6 +839,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             var selectedValueBinding = comboBox.GetBindingExpression(Selector.SelectedValueProperty);
             if (selectedValueBinding != null)
                 selectedValueBinding.UpdateSource();
+
+            if (row != null && AccountNamesEqual(previousLead, row.LeadAccountName))
+                return;
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
