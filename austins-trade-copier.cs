@@ -332,7 +332,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             resetBaselineButton.Click += ResetBaselinesButton_Click;
             selectionRow.Children.Add(resetBaselineButton);
 
-            copyLeadSettingsButton = CreateButton("Copy Setup", Brushes.DimGray, "Copy the selected row's copy mode, Symbols, sizing, caps, risk limits, and Limit Action to peers with the same Lead. Lead and On/Off stay unchanged.");
+            copyLeadSettingsButton = CreateButton("Copy Setup", Brushes.DimGray, "Copy the selected row's copy mode, Symbols, sizing, caps, risk limits, and Limit Action to peers with the same Lead. Lead and On/Off stay unchanged; live targets pause for review.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
             actionPanel.Children.Add(selectionRow);
@@ -2189,7 +2189,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     : "No peer rows use lead " + leadName + ".";
             }
 
-            return "Copy this row's copy mode, Symbols, sizing, caps, risk limits, and Limit Action to " + targetCount + " peer row(s) using the same Lead. Lead and On/Off stay unchanged.";
+            return "Copy this row's copy mode, Symbols, sizing, caps, risk limits, and Limit Action to " + targetCount + " peer row(s) using the same Lead. Lead and On/Off stay unchanged; live targets pause for review.";
         }
 
         private string BuildReconcileSelectedTooltip(int selectedRowCount, int eligibleCount)
@@ -4937,7 +4937,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var prompt = "Copy setup from " + source.AccountName + " to " + rows.Count + " peer row(s) using lead " + leadName + " while copying is active?\n\n"
                     + "This copies Copy, Symbols, Sizing, Multiplier, Fixed Qty, Max Qty, Max Net, Max Loss, Max DD, Profit Target, and Limit Action.\n"
-                    + "Lead and On/Off stay unchanged. Active target row baselines will be reset.";
+                    + "Lead and On/Off stay unchanged. Connected live target rows will be manual-locked with baselines reset so you can review before unlocking.";
                 var accountSummary = BuildRowAccountPromptLine(rows);
                 if (!string.IsNullOrEmpty(accountSummary))
                     prompt += "\n" + accountSummary;
@@ -4947,7 +4947,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var appliedCount = 0;
-            var liveBaselineResetCount = 0;
+            var livePausedCount = 0;
             suppressLiveSettingsPause = true;
             try
             {
@@ -4968,8 +4968,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (isCopying && IsConnectedCopyRow(row))
                     {
                         row.ResetBaseline(ReadAccountPnl(row.Account), false);
-                        row.LastAction = "Copied live settings from " + source.AccountName;
-                        liveBaselineResetCount++;
+                        SetManualLockWithoutAction(row, true);
+                        row.LastAction = "Copied live settings from " + source.AccountName + " - row paused";
+                        livePausedCount++;
                     }
 
                     ClearLockedVirtualPositions(row);
@@ -4986,8 +4987,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             mirroredTargetQuantities.Clear();
             SyncLeadAccountSubscriptions();
             var message = "Copied copy/sizing/risk setup from " + source.AccountName + " to " + appliedCount + " peer row(s) using lead " + leadName;
-            if (liveBaselineResetCount > 0)
-                message += "; reset baselines for " + liveBaselineResetCount + " live row(s)";
+            if (livePausedCount > 0)
+                message += "; paused " + livePausedCount + " live row(s) for review";
 
             if (autoCloseRequestedCount > 0)
                 message += "; auto-close requested for " + autoCloseRequestedCount + " risk-locked row(s)";
