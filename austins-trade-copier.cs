@@ -2776,6 +2776,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return ReconcileOutcome.SkippedInvalid;
             }
 
+            var reduceOnlyReason = RowIsReduceOnly(row) ? GetReduceOnlyReason(row) : string.Empty;
+            if (!string.IsNullOrEmpty(reduceOnlyReason))
+                Log(row.AccountName + " reconcile is reduce-only because " + reduceOnlyReason + ". New exposure is blocked.");
+
             int zeroSizingCount;
             var desiredPositions = BuildDesiredPositions(row, out zeroSizingCount);
             var targetPositions = GetManagedPositionSnapshots(row, row.Account);
@@ -2811,13 +2815,17 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             if (IsDryRunSelected())
             {
-                row.LastAction = submitted > 0 ? "Dry run reconcile " + submitted + " order(s)" : zeroSizingCount > 0 ? "Reconcile sizing 0" : "Already reconciled";
-                Log(row.AccountName + " dry-run reconcile complete; orders simulated: " + submitted + ".");
+                row.LastAction = submitted > 0
+                    ? "Dry run reconcile " + submitted + " order(s)"
+                    : zeroSizingCount > 0 ? "Reconcile sizing 0" : string.IsNullOrEmpty(reduceOnlyReason) ? "Already reconciled" : "Reduce-only reconciled";
+                Log(row.AccountName + " dry-run reconcile complete; orders simulated: " + submitted + (string.IsNullOrEmpty(reduceOnlyReason) ? "." : "; reduce-only."));
             }
             else
             {
-                row.LastAction = submitted > 0 ? "Reconcile sent " + submitted + " order(s)" : zeroSizingCount > 0 ? "Reconcile sizing 0" : "Already reconciled";
-                Log(row.AccountName + " reconcile complete; orders sent: " + submitted + ".");
+                row.LastAction = submitted > 0
+                    ? "Reconcile sent " + submitted + " order(s)"
+                    : zeroSizingCount > 0 ? "Reconcile sizing 0" : string.IsNullOrEmpty(reduceOnlyReason) ? "Already reconciled" : "Reduce-only reconciled";
+                Log(row.AccountName + " reconcile complete; orders sent: " + submitted + (string.IsNullOrEmpty(reduceOnlyReason) ? "." : "; reduce-only."));
             }
 
             if (zeroSizingCount > 0)
