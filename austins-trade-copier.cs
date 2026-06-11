@@ -1391,6 +1391,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SyncLeadAccountSubscriptions();
             }
 
+            if (e.PropertyName == "LimitAction")
+                HandleLimitActionStateChange(row);
+
             if (RowPropertyAppliesRiskImmediately(e.PropertyName))
                 ApplyRiskSettingsEdit(row);
 
@@ -1615,6 +1618,39 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 suppressManualLockHandling = wasSuppressed;
             }
+        }
+
+        private void HandleLimitActionStateChange(AccountCopyRow row)
+        {
+            if (row == null || row.LimitAction == RiskAction.HardFlatten)
+                return;
+
+            if (!ClearAutoCloseState(row))
+                return;
+
+            if (!row.AutoLocked)
+                return;
+
+            var reason = string.IsNullOrWhiteSpace(row.LockReason) ? "Risk limit" : row.LockReason;
+            row.LastAction = reason + " - entries locked";
+            Log(row.AccountName + " auto-close state cleared; entries remain locked by " + reason + ".");
+        }
+
+        private bool ClearAutoCloseState(AccountCopyRow row)
+        {
+            if (row == null)
+                return false;
+
+            var hadAutoCloseState = row.AutoCloseRequested
+                || row.AutoCloseDryRunRequested
+                || row.AutoCloseRetryPending
+                || row.AutoCloseNeedsReview;
+
+            row.AutoCloseRequested = false;
+            row.AutoCloseDryRunRequested = false;
+            row.AutoCloseRetryPending = false;
+            row.AutoCloseNeedsReview = false;
+            return hadAutoCloseState;
         }
 
         private bool RowPropertyPausesLiveRow(string propertyName)
