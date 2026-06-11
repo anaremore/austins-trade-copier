@@ -636,7 +636,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private string BuildCopySetupColumnTooltip(string tooltip)
         {
-            return tooltip + " Lead rows are read-only because copy setup and row risk apply to follower rows.";
+            return tooltip + " Lead rows are read-only because copy setup and row risk apply to copy rows.";
         }
 
         private DataGridTemplateColumn CreateCheckBoxColumn(string header, string propertyName, double width, string tooltip)
@@ -4233,7 +4233,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var rows = GetCopySettingsTargetRows(source);
             if (rows.Count == 0)
             {
-                SetStatus("No other follower rows use lead " + leadName + ".");
+                SetStatus("No peer rows use lead " + leadName + ".");
                 return;
             }
 
@@ -5340,7 +5340,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "unknown";
 
             if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
-                return "Lead account";
+                return "Lead";
 
             if (string.Equals(row.RoleSummary, "Conflict", StringComparison.OrdinalIgnoreCase))
                 return "Lead/copy conflict";
