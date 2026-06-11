@@ -274,13 +274,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             reconcileSelectedButton.Click += ReconcileSelectedButton_Click;
             selectionRow.Children.Add(reconcileSelectedButton);
 
-            var enableSelectedButton = CreateButton("Enable Selected", Brushes.DimGray, "Enable selected valid rows. Invalid rows are skipped with reasons.");
-            enableSelectedButton.Click += EnableSelectedButton_Click;
-            selectionRow.Children.Add(enableSelectedButton);
-
-            var removeSelectedButton = CreateButton("Disable Selected", Brushes.DimGray, "Disable selected rows. Rows stay visible and saved in profiles.");
-            removeSelectedButton.Click += RemoveSelectedButton_Click;
-            selectionRow.Children.Add(removeSelectedButton);
+            var toggleSelectedButton = CreateButton("Enable / Disable", Brushes.DimGray, "If every selected row is on, turn selected rows off. Otherwise turn on selected rows that are off; invalid rows are skipped with reasons.");
+            toggleSelectedButton.Click += ToggleSelectedEnabledButton_Click;
+            selectionRow.Children.Add(toggleSelectedButton);
 
             var unlockSelectedButton = CreateButton("Unlock Selected", Brushes.DimGray, "Clear manual and risk locks on selected rows. Risk-locked rows also reset baselines.");
             unlockSelectedButton.Click += UnlockSelectedButton_Click;
@@ -3108,32 +3104,36 @@ namespace NinjaTrader.NinjaScript.AddOns
             return account.CreateOrder(instrument, action, orderType, OrderEntry.Automated, timeInForce, quantity, limitPrice, stopPrice, string.Empty, name, NinjaTrader.Core.Globals.MaxDate, null);
         }
 
-        private void EnableSelectedButton_Click(object sender, RoutedEventArgs e)
+        private void ToggleSelectedEnabledButton_Click(object sender, RoutedEventArgs e)
         {
             CommitGridEdits();
 
             var rows = GetSelectedRows();
             if (rows.Count == 0)
             {
-                SetStatus("Select one or more rows to enable.");
+                SetStatus("Select one or more rows to enable or disable.");
                 return;
             }
 
-            EnableRows(rows, "selected");
+            if (rows.All(r => r.Enabled))
+            {
+                DisableRows(rows, "selected");
+                return;
+            }
+
+            EnableRows(rows.Where(r => !r.Enabled), "selected");
         }
 
-        private void RemoveSelectedButton_Click(object sender, RoutedEventArgs e)
+        private void DisableRows(IEnumerable<AccountCopyRow> rows, string scopeDescription)
         {
-            CommitGridEdits();
-
-            var rows = GetSelectedRows();
-            if (rows.Count == 0)
+            var targetRows = rows == null ? new List<AccountCopyRow>() : rows.Where(r => r != null).Distinct().ToList();
+            if (targetRows.Count == 0)
             {
-                SetStatus("Select one or more rows to disable.");
+                SetStatus("No rows to disable.");
                 return;
             }
 
-            foreach (var row in rows)
+            foreach (var row in targetRows)
             {
                 row.Enabled = false;
                 SetManualLockWithoutAction(row, false);
@@ -3145,7 +3145,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             SyncLeadAccountSubscriptions();
             RefreshAllRows();
-            var message = "Disabled " + rows.Count + " selected row(s).";
+            var message = "Disabled " + targetRows.Count + " " + scopeDescription + " row(s).";
             SetStatus(message);
             Log(message);
         }
