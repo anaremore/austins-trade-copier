@@ -1228,11 +1228,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             string skipReason;
             if (!CanEnableRow(row, BuildDesiredLeadNames(new[] { row }), out skipReason))
             {
+                var friendlyReason = DescribeReadinessSkipReason(skipReason);
                 suppressEnableValidation = true;
                 try
                 {
                     row.Enabled = false;
-                    row.LastAction = "Enable skipped: " + skipReason;
+                    row.LastAction = "Enable skipped: " + friendlyReason;
                     ClearLockedVirtualPositions(row);
                     ClearMaxNetVirtualPositions(row);
                     ClearMirroredTargetQuantities(row);
@@ -1242,7 +1243,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     suppressEnableValidation = false;
                 }
 
-                var message = row.AccountName + " was not enabled: " + skipReason + ".";
+                var message = row.AccountName + " was not enabled: " + friendlyReason + ".";
                 SetStatus(message);
                 Log(message);
                 return;
@@ -1274,11 +1275,12 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (CanEnableRow(row, BuildDesiredLeadNames(new[] { row }), out skipReason))
                 return;
 
+            var friendlyReason = DescribeReadinessSkipReason(skipReason);
             suppressEnableValidation = true;
             try
             {
                 row.Enabled = false;
-                row.LastAction = "Disabled: " + skipReason;
+                row.LastAction = "Disabled: " + friendlyReason;
                 ClearLockedVirtualPositions(row);
                 ClearMaxNetVirtualPositions(row);
                 ClearMirroredTargetQuantities(row);
@@ -1288,7 +1290,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 suppressEnableValidation = false;
             }
 
-            var message = row.AccountName + " was disabled: " + skipReason + ".";
+            var message = row.AccountName + " was disabled: " + friendlyReason + ".";
             SetStatus(message);
             Log(message);
         }
@@ -2330,7 +2332,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 string skipReason;
                 if (!CanEnableRow(row, desiredLeadNames, out skipReason))
                 {
-                    AddStartIssue(issues, row, DescribeStartSkipReason(skipReason));
+                    AddStartIssue(issues, row, DescribeReadinessSkipReason(skipReason));
                     continue;
                 }
 
@@ -2376,7 +2378,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             return "Start blocked: " + issues.Count + " row issues. First: " + issues[0] + ".";
         }
 
-        private string DescribeStartSkipReason(string skipReason)
+        private string DescribeReadinessSkipReason(string skipReason)
         {
             switch (skipReason)
             {
@@ -3410,8 +3412,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 string skipReason;
                 if (!TryEnableRow(row, desiredLeadNames, out skipReason))
                 {
-                    row.LastAction = "Enable skipped: " + skipReason;
-                    IncrementReason(skipReasons, skipReason);
+                    var friendlyReason = DescribeReadinessSkipReason(skipReason);
+                    row.LastAction = "Enable skipped: " + friendlyReason;
+                    IncrementReason(skipReasons, friendlyReason);
                     continue;
                 }
 
