@@ -1542,9 +1542,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var sourceRow = rows.Count == 1 ? rows[0] : null;
                 var sourceHasLead = sourceRow != null && !string.IsNullOrWhiteSpace(sourceRow.LeadAccountName);
-                var sourceSizingBlockReason = GetCopySettingsSizingBlockReason(sourceRow);
-                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && string.IsNullOrEmpty(sourceSizingBlockReason);
-                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceSizingBlockReason);
+                var sourceBlockReason = GetCopySettingsSourceBlockReason(sourceRow);
+                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && string.IsNullOrEmpty(sourceBlockReason);
+                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceBlockReason);
             }
 
             if (applyRowPresetButton != null)
@@ -1611,7 +1611,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 : "Apply " + (preset != null ? preset.Label : "the selected preset") + " to " + rows.Count + " selected row(s). " + tooltip;
         }
 
-        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceSizingBlockReason)
+        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceBlockReason)
         {
             if (selectedRowCount == 0)
                 return "Select one source copy row before copying settings.";
@@ -1622,16 +1622,25 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!sourceHasLead)
                 return "Select a copy row with a lead before copying settings.";
 
-            if (!string.IsNullOrEmpty(sourceSizingBlockReason))
-                return sourceSizingBlockReason;
+            if (!string.IsNullOrEmpty(sourceBlockReason))
+                return sourceBlockReason;
 
             return "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
         }
 
-        private string GetCopySettingsSizingBlockReason(AccountCopyRow row)
+        private string GetCopySettingsSourceBlockReason(AccountCopyRow row)
         {
             if (row == null)
                 return "Select one source copy row before copying settings.";
+
+            if (string.Equals(row.RoleSummary, "Lead", StringComparison.OrdinalIgnoreCase))
+                return "Choose a copy row, not a lead account, before copying settings.";
+
+            if (AccountNamesEqual(row.AccountName, row.LeadAccountName))
+                return "Choose a row that copies a different lead before copying settings.";
+
+            if (string.Equals(row.Status, "Lead missing", StringComparison.OrdinalIgnoreCase))
+                return "Choose a row with a connected lead before copying settings.";
 
             if (row.SizingMode == SizingMode.Disabled)
                 return "Choose active sizing on the selected row before copying settings.";
@@ -3890,21 +3899,10 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             var source = selectedRows[0];
-            if (source.SizingMode == SizingMode.Disabled)
+            var sourceBlockReason = GetCopySettingsSourceBlockReason(source);
+            if (!string.IsNullOrEmpty(sourceBlockReason))
             {
-                SetStatus("Choose a source row with active sizing before copying settings to rows with the same lead.");
-                return;
-            }
-
-            if (source.SizingMode == SizingMode.Multiplier && source.Multiplier <= 0)
-            {
-                SetStatus("Set the selected row's multiplier above 0 before copying settings.");
-                return;
-            }
-
-            if (source.SizingMode == SizingMode.Fixed && source.FixedQuantity <= 0)
-            {
-                SetStatus("Set the selected row's fixed quantity above 0 before copying settings.");
+                SetStatus(sourceBlockReason);
                 return;
             }
 
