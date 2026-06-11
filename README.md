@@ -2,12 +2,6 @@
 
 **Austin's Trade Copier** is a NinjaTrader 8 add-on that lets you mirror trades from one lead account to multiple target accounts in real time. Built for traders managing multiple accounts, it provides a simple UI and robust functionality to streamline account management.
 
----
-
-![Austin's Trade Copier Screenshot](images/screenshot.png)
-
----
-
 ## 🚀 Features
 
 - 📈 **Trade Mirroring**: Automatically copies market, limit, and stop orders from a lead account to any number of target accounts.

@@ -560,7 +560,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextBoxColumn("Fixed Qty", "FixedQuantity", 64, null, TextAlignment.Right, true, false, "Editing this value switches Sizing to Fixed qty."));
             grid.Columns.Add(CreateTextBoxColumn("Max Qty", "MaxQuantity", 64, null, TextAlignment.Right, true, false, "Caps total copied quantity for each lead order. 0 disables the cap."));
 
-            grid.Columns.Add(CreateTextBoxColumn("Max Pos", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
+            grid.Columns.Add(CreateTextBoxColumn("Max Net", "MaxNetPosition", 70, null, TextAlignment.Right, true, false, "Caps this account row's net position size. 0 disables the cap."));
             grid.Columns.Add(CreateTextBoxColumn("Max Loss", "DailyLossLimit", 72, "{0:0}", TextAlignment.Right, true, true, "While copying, uses At Limit when session PnL reaches this loss. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Max DD", "MaxDrawdown", 70, "{0:0}", TextAlignment.Right, true, true, "While copying, uses At Limit when drawdown from peak session PnL reaches this amount. 0 disables the limit."));
             grid.Columns.Add(CreateTextBoxColumn("Profit Target", "ProfitTarget", 86, "{0:0}", TextAlignment.Right, true, true, "While copying, triggers At Limit after this session profit target is reached. 0 disables the target."));
@@ -2873,7 +2873,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 prompt += "\n" + autoCloseCount + " auto-close risk-locked row(s) will be skipped.";
 
             if (cappedCount > 0)
-                prompt += "\n" + cappedCount + " row(s) have Max Pos caps.";
+                prompt += "\n" + cappedCount + " row(s) have Max Net caps.";
 
             if (IsDryRunSelected())
                 prompt += "\nDry Run is on, so reconcile orders will be simulated.";
@@ -4879,7 +4879,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     caps.Add("order max " + MaxQuantity.ToString(CultureInfo.InvariantCulture));
 
                 if (MaxNetPosition > 0)
-                    caps.Add("pos max " + MaxNetPosition.ToString(CultureInfo.InvariantCulture));
+                    caps.Add("net max " + MaxNetPosition.ToString(CultureInfo.InvariantCulture));
 
                 return caps.Count == 0 ? sizing : sizing + " (" + string.Join(", ", caps) + ")";
             }
