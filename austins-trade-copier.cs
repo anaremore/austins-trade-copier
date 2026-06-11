@@ -156,6 +156,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressSizingModeAutoSwitch;
         private bool suppressLeadRoleRefresh;
         private bool rowRefreshPending;
+        private Dictionary<AccountCopyRow, string> pendingLeadSelectionSnapshot;
         private string heldStatusMessage = string.Empty;
         private string heldStatusDetail = string.Empty;
         private DateTime heldStatusUntil = DateTime.MinValue;
@@ -581,8 +582,25 @@ namespace NinjaTrader.NinjaScript.AddOns
                 MinHeight = 28,
                 ToolTip = tooltip
             };
+            button.PreviewMouseLeftButtonDown += Button_PreviewMouseLeftButtonDown;
             ToolTipService.SetShowOnDisabled(button, true);
             return button;
+        }
+
+        private void Button_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (accountsGrid == null || accountRows.Count == 0)
+                return;
+
+            CommitFocusedLeadComboBoxEdit();
+            CommitFocusedTextBoxEdit();
+            var snapshot = CaptureLeadSelections();
+            pendingLeadSelectionSnapshot = snapshot;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (object.ReferenceEquals(pendingLeadSelectionSnapshot, snapshot))
+                    pendingLeadSelectionSnapshot = null;
+            }), DispatcherPriority.Background);
         }
 
         private Style CreateGridHeaderStyle()
@@ -711,10 +729,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 binding.UpdateTarget();
 
             SelectRowForDirectCellAction(row);
-            RepairLeadSelectionsAfterDirectCellAction(leadSnapshot);
+            RepairLeadSelectionsAfterUiCommit(leadSnapshot);
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                RepairLeadSelectionsAfterDirectCellAction(leadSnapshot);
+                RepairLeadSelectionsAfterUiCommit(leadSnapshot);
             }), DispatcherPriority.Background);
 
             UpdateSelectedActionButtons();
@@ -752,9 +770,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 .ToDictionary(row => row, row => row.LeadAccountName ?? string.Empty);
         }
 
-        private void RepairLeadSelectionsAfterDirectCellAction(Dictionary<AccountCopyRow, string> leadSnapshot)
+        private void RepairLeadSelectionsAfterUiCommit(Dictionary<AccountCopyRow, string> leadSnapshot)
         {
-            if (!RestoreLeadSelectionsAfterDirectCellAction(leadSnapshot))
+            if (!RestoreLeadSelectionsAfterUiCommit(leadSnapshot))
                 return;
 
             ValidateEnabledRowsAfterLeadRestore();
@@ -762,7 +780,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             SyncLeadAccountSubscriptions();
         }
 
-        private bool RestoreLeadSelectionsAfterDirectCellAction(Dictionary<AccountCopyRow, string> leadSnapshot)
+        private bool RestoreLeadSelectionsAfterUiCommit(Dictionary<AccountCopyRow, string> leadSnapshot)
         {
             if (leadSnapshot == null || leadSnapshot.Count == 0)
                 return false;
@@ -2247,9 +2265,26 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountsGrid == null)
                 return;
 
+            var leadSnapshot = ConsumePendingLeadSelectionSnapshot();
+            CommitFocusedLeadComboBoxEdit();
             CommitFocusedTextBoxEdit();
+            if (leadSnapshot == null)
+                leadSnapshot = CaptureLeadSelections();
+
             accountsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             accountsGrid.CommitEdit(DataGridEditingUnit.Row, true);
+            RepairLeadSelectionsAfterUiCommit(leadSnapshot);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RepairLeadSelectionsAfterUiCommit(leadSnapshot);
+            }), DispatcherPriority.Background);
+        }
+
+        private Dictionary<AccountCopyRow, string> ConsumePendingLeadSelectionSnapshot()
+        {
+            var snapshot = pendingLeadSelectionSnapshot;
+            pendingLeadSelectionSnapshot = null;
+            return snapshot;
         }
 
         private void CommitFocusedTextBoxEdit()
