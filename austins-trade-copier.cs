@@ -1129,8 +1129,23 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (RowPropertyAffectsReadiness(e.PropertyName))
                 QueueRowRefresh();
 
-            if (e.PropertyName == "Enabled")
+            if (SelectedActionButtonsDependOnProperty(e.PropertyName))
                 UpdateSelectedActionButtons();
+        }
+
+        private bool SelectedActionButtonsDependOnProperty(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case "Enabled":
+                case "LeadAccountName":
+                case "SizingMode":
+                case "Multiplier":
+                case "FixedQuantity":
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private void ApplySizingModeFromEditedQuantityField(AccountCopyRow row, string propertyName)
@@ -1438,9 +1453,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var sourceRow = rows.Count == 1 ? rows[0] : null;
                 var sourceHasLead = sourceRow != null && !string.IsNullOrWhiteSpace(sourceRow.LeadAccountName);
-                var sourceHasActiveSizing = sourceRow != null && sourceRow.SizingMode != SizingMode.Disabled;
-                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && sourceHasActiveSizing;
-                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceHasActiveSizing);
+                var sourceSizingBlockReason = GetCopySettingsSizingBlockReason(sourceRow);
+                copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && string.IsNullOrEmpty(sourceSizingBlockReason);
+                copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceSizingBlockReason);
             }
 
             if (toggleSelectedButton == null)
@@ -1465,7 +1480,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             toggleSelectedButton.ToolTip = "Turn on selected rows that are off. Invalid rows are skipped with reasons.";
         }
 
-        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, bool sourceHasActiveSizing)
+        private string GetCopySettingsTooltip(int selectedRowCount, bool sourceHasLead, string sourceSizingBlockReason)
         {
             if (selectedRowCount == 0)
                 return "Select one source copy row before copying settings.";
@@ -1476,10 +1491,27 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!sourceHasLead)
                 return "Select a copy row with a lead before copying settings.";
 
-            if (!sourceHasActiveSizing)
-                return "Choose active sizing on the selected row before copying settings.";
+            if (!string.IsNullOrEmpty(sourceSizingBlockReason))
+                return sourceSizingBlockReason;
 
             return "Copy mode, sizing, risk limits, At Limit, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.";
+        }
+
+        private string GetCopySettingsSizingBlockReason(AccountCopyRow row)
+        {
+            if (row == null)
+                return "Select one source copy row before copying settings.";
+
+            if (row.SizingMode == SizingMode.Disabled)
+                return "Choose active sizing on the selected row before copying settings.";
+
+            if (row.SizingMode == SizingMode.Multiplier && row.Multiplier <= 0)
+                return "Set the selected row's multiplier above 0 before copying settings.";
+
+            if (row.SizingMode == SizingMode.Fixed && row.FixedQuantity <= 0)
+                return "Set the selected row's fixed quantity above 0 before copying settings.";
+
+            return string.Empty;
         }
 
         private bool RowPropertyAffectsReadiness(string propertyName)
