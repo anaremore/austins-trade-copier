@@ -4345,6 +4345,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LockReason = string.Empty;
                 row.AutoCloseRequested = false;
                 row.AutoCloseDryRunRequested = false;
+                row.AutoCloseRetryPending = false;
+                row.AutoCloseNeedsReview = false;
                 row.LastAction = wasAutoLocked
                     ? baselineReset ? "Unlocked - baseline reset" : "Unlocked - baseline unchanged"
                     : "Unlocked";
@@ -6889,6 +6891,8 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "MaxDrawdown":
                     case "ProfitTarget":
                     case "AutoLocked":
+                    case "AutoCloseRetryPending":
+                    case "AutoCloseNeedsReview":
                     case "LockReason":
                         OnPropertyChanged("RiskProgressSummary");
                         break;
