@@ -3229,6 +3229,9 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 row.ResetBaseline(ReadAccountPnl(row.Account));
                 row.LastAction = "Baseline reset";
+                ClearLockedVirtualPositions(row);
+                ClearMaxNetVirtualPositions(row);
+                ClearMirroredTargetQuantities(row);
                 resetCount++;
             }
 
@@ -3734,6 +3737,10 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             if (row == null || row.Account == null)
                 return;
+
+            ClearLockedVirtualPositions(row);
+            ClearMaxNetVirtualPositions(row);
+            ClearMirroredTargetQuantities(row);
 
             if (dryRunMode)
             {
