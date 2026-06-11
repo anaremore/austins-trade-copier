@@ -2457,7 +2457,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "Loaded available";
 
             return string.IsNullOrWhiteSpace(loadedOffReason)
-                ? "Loaded disabled"
+                ? "Loaded Off"
                 : "Loaded Off: " + loadedOffReason;
         }
 
