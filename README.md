@@ -55,7 +55,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
    - **Off**: keeps the row visible but does not copy entries.
 5. **Set Risk Rules** – Optional max loss, max drawdown, and profit-target values lock a row when hit. **Risk Now** shows current progress, then shows `Locked` or `Auto-close` with the hit limit. Use **Limit Action** to choose whether the row only locks new entries or auto-closes matching managed positions.
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
-7. **Start Copying** – The dashboard validates active rows before arming and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
+7. **Start Copying** – The dashboard validates active rows before arming, resets active-row risk baselines, and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
 9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selection**, or **Flatten All** when you intend to close positions. Use **Reconcile** only when you want selected rows adjusted back toward their configured leads.
 
@@ -79,7 +79,7 @@ Profiles are stored under the current Windows user's NinjaTrader documents templ
 
 Current profiles save table entries as `Row` elements. Older profiles that used `Follower` elements still load.
 
-Risk thresholds use the row baseline captured when the account row is created, loaded, or reset with **Reset Baselines**:
+Risk thresholds use the row baseline captured when the account row is created, loaded, when copying starts, or when reset with **Reset Baselines**:
 
 The **Plan** column shows the selected limit action even before risk amounts are entered, for example `no limits, auto-close row when set`.
 

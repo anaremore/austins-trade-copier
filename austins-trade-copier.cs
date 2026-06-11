@@ -266,7 +266,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var sessionRiskRow = CreateToolbarRow();
             sessionRiskRow.Children.Add(CreateToolbarLabel("Session"));
-            startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen, "Start or pause copying for On rows after preflight validation.");
+            startPauseButton = CreateButton("Start Copying", Brushes.SeaGreen, "Start or pause copying. Starting resets active row risk baselines after preflight validation.");
             startPauseButton.Width = 130;
             startPauseButton.Click += StartPauseButton_Click;
             sessionRiskRow.Children.Add(startPauseButton);
@@ -645,7 +645,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateTextColumn("Status", "Status", 104, null, true, "Current copier state for this row."));
             grid.Columns.Add(CreateTextColumn("PnL", "SessionPnl", 72, "{0:C0}", true, "Session PnL relative to this row's current baseline."));
             grid.Columns.Add(CreateTextColumn("DD", "Drawdown", 72, "{0:C0}", true, "Drawdown from peak session PnL."));
-            grid.Columns.Add(CreateTextColumn("Risk Now", "RiskProgressSummary", 150, null, true, "Current progress toward this row's Max Loss, Max DD, and Profit Target limits."));
+            grid.Columns.Add(CreateTextColumn("Risk Now", "RiskProgressSummary", 150, null, true, "Current progress from this row's session baseline toward Max Loss, Max DD, and Profit Target limits."));
             grid.Columns.Add(CreateTextColumn("Pos", "PositionSummary", 112, null, true, "Current account position summary."));
             grid.Columns.Add(CreateTextColumn("Conn", "ConnectionStatus", 86, null, true, "Current NinjaTrader connection status."));
             grid.Columns.Add(CreateTextColumn("Last Action", "LastAction", 200, null, true, "Most recent copier action or skip reason for this row."));
@@ -2756,8 +2756,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             startPauseButton.ToolTip = dryRunArmed
-                ? "Start a simulation session after preflight validation. Copied and reconcile orders are logged only."
-                : "Start live copying for On rows after preflight validation.";
+                ? "Start a simulation session after preflight validation; active row risk baselines reset. Copied and reconcile orders are logged only."
+                : "Start live copying for On rows after preflight validation; active row risk baselines reset.";
         }
 
         private void StartCopyingTrades()
