@@ -143,6 +143,7 @@ namespace NinjaTrader.NinjaScript.AddOns
         private bool suppressManualLockHandling;
         private bool rowRefreshPending;
         private string heldStatusMessage = string.Empty;
+        private string heldStatusDetail = string.Empty;
         private DateTime heldStatusUntil = DateTime.MinValue;
 
         private ComboBox profileComboBox;
@@ -2051,7 +2052,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (validationIssues.Count > 0)
             {
                 var validationMessage = FormatStartBlockedMessage(validationIssues);
-                SetStatus(validationMessage);
+                SetStatus(validationMessage, FormatStartBlockedDetail(validationIssues));
                 foreach (var issue in validationIssues)
                     Log("Start blocked: " + issue + ".");
 
@@ -2414,6 +2415,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return "Start blocked: " + issues[0] + ".";
 
             return "Start blocked: " + issues.Count + " row issues. First: " + issues[0] + ".";
+        }
+
+        private string FormatStartBlockedDetail(List<string> issues)
+        {
+            if (issues == null || issues.Count == 0)
+                return string.Empty;
+
+            return "Start blocked issues:" + Environment.NewLine
+                + string.Join(Environment.NewLine, issues.Select(issue => "- " + issue));
         }
 
         private string DescribeReadinessSkipReason(string skipReason)
@@ -4508,7 +4518,13 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void SetStatus(string message)
         {
+            SetStatus(message, string.Empty);
+        }
+
+        private void SetStatus(string message, string detail)
+        {
             heldStatusMessage = message ?? string.Empty;
+            heldStatusDetail = detail ?? string.Empty;
             heldStatusUntil = DateTime.Now.AddSeconds(StatusMessageHoldSeconds);
             RefreshStatusSummary();
         }
@@ -4522,11 +4538,14 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (!string.IsNullOrWhiteSpace(heldStatusMessage) && DateTime.Now <= heldStatusUntil)
             {
                 statusTextBlock.Text = heldStatusMessage + " | " + summary;
-                statusTextBlock.ToolTip = summary;
+                statusTextBlock.ToolTip = string.IsNullOrWhiteSpace(heldStatusDetail)
+                    ? summary
+                    : heldStatusDetail + Environment.NewLine + Environment.NewLine + summary;
                 return;
             }
 
             heldStatusMessage = string.Empty;
+            heldStatusDetail = string.Empty;
             statusTextBlock.Text = summary;
             statusTextBlock.ToolTip = summary;
         }
