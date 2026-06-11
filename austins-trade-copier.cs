@@ -5745,7 +5745,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             var nearRiskStatus = GetNearRiskLimitStatusText(row);
             if (!string.IsNullOrEmpty(nearRiskStatus))
             {
-                row.SetStatus("Warning", nearRiskStatus);
+                row.SetStatus("Warning", nearRiskStatus, BuildRiskWarningStatusDetail(row, nearRiskStatus));
                 return;
             }
 
@@ -5756,6 +5756,19 @@ namespace NinjaTrader.NinjaScript.AddOns
             }
 
             row.SetStatus(isCopying ? "Active" : "Ready", isCopying ? "Copying" : "Ready");
+        }
+
+        private string BuildRiskWarningStatusDetail(AccountCopyRow row, string status)
+        {
+            if (row == null)
+                return status;
+
+            var progress = row.RiskProgressSummary;
+            if (string.IsNullOrWhiteSpace(progress)
+                || string.Equals(progress, "No limits", StringComparison.OrdinalIgnoreCase))
+                return status;
+
+            return status + ": " + progress;
         }
 
         private string GetRiskLockStatusText(AccountCopyRow row)
