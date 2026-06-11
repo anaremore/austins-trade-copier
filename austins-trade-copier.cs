@@ -1581,6 +1581,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetAttribute(rowElement, "enabled", row.Enabled);
                 SetAttribute(rowElement, "manualLocked", row.ManualLock);
                 SetAttribute(rowElement, "autoLocked", row.AutoLocked);
+                SetAttribute(rowElement, "lockReason", row.LockReason);
                 SetAttribute(rowElement, "copyMode", row.CopyMode.ToString());
                 SetAttribute(rowElement, "sizingMode", row.SizingMode.ToString());
                 SetAttribute(rowElement, "multiplier", row.Multiplier);
@@ -1652,6 +1653,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var rowEnabled = GetBoolAttribute(element, "enabled", true);
                 var rowWasManualLocked = GetBoolAttribute(element, "manualLocked", false);
                 var rowWasAutoLocked = GetBoolAttribute(element, "autoLocked", false);
+                var rowLockReason = GetOptionalStringAttribute(element, "lockReason", rowWasAutoLocked ? "Risk limit" : string.Empty);
                 Account rowLead = null;
 
                 if (account == null && rowEnabled)
@@ -1663,7 +1665,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (rowWasAutoLocked && rowEnabled)
                 {
                     rowEnabled = false;
-                    Log("Profile loaded " + accountName + " disabled because it was risk-locked when saved.");
+                    Log("Profile loaded " + accountName + " disabled because it was risk-locked when saved" + (string.IsNullOrWhiteSpace(rowLockReason) ? string.Empty : " by " + rowLockReason) + ".");
                 }
 
                 if (!string.IsNullOrWhiteSpace(rowLeadName))
@@ -1702,8 +1704,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                 row.LimitAction = GetEnumAttribute(element, "limitAction", RiskAction.SoftLock);
                 row.InstrumentFilter = GetStringAttribute(element, "instrumentFilter", string.Empty);
                 row.ManualLock = rowEnabled && rowWasManualLocked;
+                row.AutoLocked = rowWasAutoLocked;
+                row.LockReason = rowWasAutoLocked ? rowLockReason : string.Empty;
                 NormalizeLegacySizingMode(row);
-                row.LastAction = row.Enabled ? row.ManualLock ? "Loaded manual lock" : "Loaded profile" : "Loaded disabled";
+                row.LastAction = rowWasAutoLocked ? "Loaded risk lock" : row.Enabled ? row.ManualLock ? "Loaded manual lock" : "Loaded profile" : "Loaded disabled";
 
                 accountRows.Add(row);
                 seenAccounts.Add(accountName);
