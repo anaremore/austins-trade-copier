@@ -609,7 +609,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             grid.Columns.Add(CreateCheckBoxColumn("On", "Enabled", 40, "Turn this copy row on. A row must have a Lead and active Sizing to receive copied orders.", "EnableTooltip", "CanToggleEnabled"));
 
             grid.Columns.Add(CreateTextColumn("Account", "AccountName", 112, null, true, "Connected NinjaTrader account."));
-            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Accounts followed by another row are Lead; Status and Conn show whether they are ready or disconnected."));
+            grid.Columns.Add(CreateTextColumn("Role", "RoleSummary", 72, null, true, "Role is based on setup. Accounts followed by another row are Lead; rows with a Lead are Copy."));
             grid.Columns.Add(CreateComboBoxColumn("Lead", "LeadAccountName", null, null, null, 112, "Choose the account this row should copy. The list hides this row and active copy rows; leave blank for lead-only or unused accounts.", "LeadSelectionTooltip", "CanEditLeadSelection", "LeadAccountOptions"));
             grid.Columns.Add(CreateTextColumn("Plan", "PlanSummary", 210, null, true, "Readable summary of this row's lead, sizing, copy mode, symbol filter, and risk limits."));
             grid.Columns.Add(CreateComboBoxColumn("Copy", "CopyMode", copyModeOptions, "Label", "Value", 78, BuildCopySetupColumnTooltip("All copies entries and exits. Exits only blocks new entries while allowing exits."), null, "CanEditCopySetup"));
@@ -5017,7 +5017,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
-            row.RoleSummary = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "Available" : "Copy row";
+            row.RoleSummary = string.IsNullOrWhiteSpace(row.LeadAccountName) ? "Available" : "Copy";
         }
 
         private string GetNearRiskLimitStatusText(AccountCopyRow row)
