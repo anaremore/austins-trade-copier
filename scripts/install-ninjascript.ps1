@@ -66,6 +66,10 @@ function Set-ConstantValue {
 
     $escapedValue = $Value.Replace('\', '\\').Replace('"', '\"')
     $pattern = 'private const string ' + [Regex]::Escape($Name) + ' = "[^"]*";'
+    if (-not [Regex]::IsMatch($Content, $pattern)) {
+        throw "Build stamp constant not found: $Name"
+    }
+
     $replacement = 'private const string ' + $Name + ' = "' + $escapedValue + '";'
     return [Regex]::Replace($Content, $pattern, $replacement, 1)
 }
