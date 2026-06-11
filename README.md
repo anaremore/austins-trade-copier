@@ -45,7 +45,7 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. Rows with no lead can stay available as lead-only or unused accounts.
 2. **Choose Leads Per Row** – In the **Lead** column, pick the account each enabled row should copy. Leave the lead account's own row disabled or with no lead.
 3. **Enable Copy Rows** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing.
-4. **Configure Copy Mode, Symbols, and Sizing** – Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
+4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets. Presets preserve Leads, Symbols, enabled state, and risk amounts. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
    - **Fixed qty**: sends a fixed quantity once per lead order.

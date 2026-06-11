@@ -133,6 +133,15 @@ namespace NinjaTrader.NinjaScript.AddOns
             new EnumOption(RiskAction.SoftLock, "Lock entries only"),
             new EnumOption(RiskAction.HardFlatten, "Auto-close row")
         };
+        private readonly List<RowPresetOption> rowPresetOptions = new List<RowPresetOption>
+        {
+            new RowPresetOption("1:1 copy", "Copy entries and exits at the lead account quantity.", TradeCopyMode.All, SizingMode.OneToOne, DefaultMultiplier, DefaultFixedQuantity, null),
+            new RowPresetOption("Multiplier x2", "Copy entries and exits at twice the lead account quantity.", TradeCopyMode.All, SizingMode.Multiplier, 2.0, DefaultFixedQuantity, null),
+            new RowPresetOption("Fixed 1", "Copy entries and exits with one contract per lead fill.", TradeCopyMode.All, SizingMode.Fixed, DefaultMultiplier, 1, null),
+            new RowPresetOption("Exits only", "Follow reducing exits only; block new or increasing exposure.", TradeCopyMode.ExitsOnly, SizingMode.OneToOne, DefaultMultiplier, DefaultFixedQuantity, null),
+            new RowPresetOption("Auto-close limits", "Keep sizing as-is and auto-close matching managed positions when limits are hit.", null, null, null, null, RiskAction.HardFlatten),
+            new RowPresetOption("Lock-entry limits", "Keep sizing as-is and block new entries when limits are hit.", null, null, null, null, RiskAction.SoftLock)
+        };
         private readonly DispatcherTimer telemetryTimer;
 
         private List<Account> connectedAccounts = new List<Account>();
@@ -155,6 +164,8 @@ namespace NinjaTrader.NinjaScript.AddOns
         private Button unlockSelectedButton;
         private Button resetBaselineButton;
         private Button copyLeadSettingsButton;
+        private ComboBox rowPresetComboBox;
+        private Button applyRowPresetButton;
         private CheckBox dryRunCheckBox;
         private TextBlock statusTextBlock;
         private TextBox eventLogTextBox;
@@ -300,6 +311,25 @@ namespace NinjaTrader.NinjaScript.AddOns
             copyLeadSettingsButton = CreateButton("Copy Settings", Brushes.DimGray, "Copy mode, sizing, risk limits, Limit Action, and Symbols to rows that use the selected row's lead. Lead selections stay unchanged.");
             copyLeadSettingsButton.Click += CopyLeadSettingsButton_Click;
             selectionRow.Children.Add(copyLeadSettingsButton);
+
+            selectionRow.Children.Add(CreateToolbarLabel("Row Preset"));
+            rowPresetComboBox = new ComboBox
+            {
+                Width = 150,
+                Height = 28,
+                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(4),
+                ItemsSource = rowPresetOptions,
+                DisplayMemberPath = "Label",
+                SelectedIndex = 0,
+                ToolTip = "Choose a common setup to apply to selected rows. Leads, Symbols, enabled state, and risk amounts are preserved."
+            };
+            selectionRow.Children.Add(rowPresetComboBox);
+
+            applyRowPresetButton = CreateButton("Apply", Brushes.DimGray, "Apply the selected row preset to selected rows.");
+            applyRowPresetButton.Width = 72;
+            applyRowPresetButton.Click += ApplyRowPresetButton_Click;
+            selectionRow.Children.Add(applyRowPresetButton);
             actionPanel.Children.Add(selectionRow);
 
             var actionSection = CreateSection("Controls", actionPanel);
@@ -1474,6 +1504,14 @@ namespace NinjaTrader.NinjaScript.AddOns
                 var sourceSizingBlockReason = GetCopySettingsSizingBlockReason(sourceRow);
                 copyLeadSettingsButton.IsEnabled = sourceRow != null && sourceHasLead && string.IsNullOrEmpty(sourceSizingBlockReason);
                 copyLeadSettingsButton.ToolTip = GetCopySettingsTooltip(rows.Count, sourceHasLead, sourceSizingBlockReason);
+            }
+
+            if (applyRowPresetButton != null)
+            {
+                applyRowPresetButton.IsEnabled = hasSelection;
+                applyRowPresetButton.ToolTip = hasSelection
+                    ? "Apply the selected row preset to " + rows.Count + " selected row(s). Leads, Symbols, enabled state, and risk amounts are preserved."
+                    : "Select one or more rows before applying a row preset.";
             }
 
             if (toggleSelectedButton == null)
@@ -3856,6 +3894,96 @@ namespace NinjaTrader.NinjaScript.AddOns
             RefreshAllRows();
         }
 
+        private void ApplyRowPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            CommitGridEdits();
+
+            var rows = GetSelectedRows();
+            if (rows.Count == 0)
+            {
+                SetStatus("Select one or more rows before applying a row preset.");
+                return;
+            }
+
+            var preset = rowPresetComboBox != null ? rowPresetComboBox.SelectedItem as RowPresetOption : null;
+            if (preset == null)
+            {
+                SetStatus("Choose a row preset before applying.");
+                return;
+            }
+
+            if (isCopying)
+            {
+                var prompt = "Apply row preset " + preset.Label + " to " + rows.Count + " selected row(s) while copying is active?\n\n"
+                    + "Connected live copy rows will be paused with baselines reset so you can review before unlocking.";
+                var accountSummary = BuildRowAccountPromptLine(rows);
+                if (!string.IsNullOrEmpty(accountSummary))
+                    prompt += "\n" + accountSummary;
+
+                if (MessageBox.Show(prompt, "Confirm Live Row Preset", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+            }
+
+            var appliedCount = 0;
+            var livePausedCount = 0;
+            suppressLiveSettingsPause = true;
+            try
+            {
+                foreach (var row in rows)
+                {
+                    ApplyRowPreset(row, preset);
+                    row.LastAction = "Applied preset " + preset.Label;
+                    if (isCopying && IsConnectedCopyRow(row))
+                    {
+                        row.ResetBaseline(ReadAccountPnl(row.Account), false);
+                        SetManualLockWithoutAction(row, true);
+                        row.LastAction = "Preset " + preset.Label + " applied - row paused";
+                        livePausedCount++;
+                    }
+
+                    ClearLockedVirtualPositions(row);
+                    ClearMaxNetVirtualPositions(row);
+                    ClearMirroredTargetQuantities(row);
+                    appliedCount++;
+                }
+            }
+            finally
+            {
+                suppressLiveSettingsPause = false;
+            }
+
+            SyncLeadAccountSubscriptions();
+            var message = "Applied row preset " + preset.Label + " to " + appliedCount + " selected row(s)";
+            if (livePausedCount > 0)
+                message += "; paused " + livePausedCount + " live row(s) for review";
+
+            message += ".";
+            SetStatus(message);
+            Log(message);
+            RefreshAllRows();
+        }
+
+        private void ApplyRowPreset(AccountCopyRow row, RowPresetOption preset)
+        {
+            if (row == null || preset == null)
+                return;
+
+            if (preset.Multiplier.HasValue)
+                row.Multiplier = preset.Multiplier.Value;
+
+            if (preset.FixedQuantity.HasValue)
+                row.FixedQuantity = preset.FixedQuantity.Value;
+
+            if (preset.CopyMode.HasValue)
+                row.CopyMode = preset.CopyMode.Value;
+
+            if (preset.LimitAction.HasValue)
+                row.LimitAction = preset.LimitAction.Value;
+
+            if (preset.SizingMode.HasValue)
+                row.SizingMode = preset.SizingMode.Value;
+        }
+
         private List<AccountCopyRow> GetSelectedRows()
         {
             if (accountsGrid == null)
@@ -4707,6 +4835,28 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             public object Value { get; private set; }
             public string Label { get; private set; }
+        }
+
+        private class RowPresetOption
+        {
+            public RowPresetOption(string label, string description, TradeCopyMode? copyMode, SizingMode? sizingMode, double? multiplier, int? fixedQuantity, RiskAction? limitAction)
+            {
+                Label = label;
+                Description = description;
+                CopyMode = copyMode;
+                SizingMode = sizingMode;
+                Multiplier = multiplier;
+                FixedQuantity = fixedQuantity;
+                LimitAction = limitAction;
+            }
+
+            public string Label { get; private set; }
+            public string Description { get; private set; }
+            public TradeCopyMode? CopyMode { get; private set; }
+            public SizingMode? SizingMode { get; private set; }
+            public double? Multiplier { get; private set; }
+            public int? FixedQuantity { get; private set; }
+            public RiskAction? LimitAction { get; private set; }
         }
 
         private class AccountCopyRow : INotifyPropertyChanged
