@@ -224,7 +224,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             saveProfileButton.Click += SaveProfileButton_Click;
             profilePanel.Children.Add(saveProfileButton);
 
-            var loadProfileButton = CreateButton("Load Profile", Brushes.DimGray, "Load the named profile. Copying must be paused before loading.");
+            var loadProfileButton = CreateButton("Load Profile", Brushes.DimGray, "Load the named profile after confirmation. This replaces the current table setup; positions and orders are not changed.");
             loadProfileButton.Click += LoadProfileButton_Click;
             profilePanel.Children.Add(loadProfileButton);
 
@@ -1623,6 +1623,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
             }
 
+            var profilePath = GetProfilePath(profileName);
+            if (!File.Exists(profilePath))
+            {
+                SetStatus("Profile " + profileName + " does not exist.");
+                return;
+            }
+
+            if (MessageBox.Show(BuildLoadProfilePrompt(profileName), "Confirm Load Profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
             try
             {
                 LoadProfile(profileName);
@@ -1634,6 +1644,16 @@ namespace NinjaTrader.NinjaScript.AddOns
                 SetStatus("Profile load failed.");
                 Log("ERROR profile load failed: " + ex.Message);
             }
+        }
+
+        private string BuildLoadProfilePrompt(string profileName)
+        {
+            var rowCount = accountRows.Count;
+            var enabledCount = accountRows.Count(IsConfiguredCopyRow);
+            return "Load profile " + profileName + "?\n\n"
+                + "This replaces the current table setup, including enabled rows, leads, sizing, symbols, and risk settings.\n"
+                + "Current table: " + rowCount + " row(s), " + enabledCount + " active copy row(s).\n\n"
+                + "Open positions and working orders are not changed.";
         }
 
         private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
