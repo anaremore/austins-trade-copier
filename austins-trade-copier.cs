@@ -592,9 +592,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountsGrid == null || accountRows.Count == 0)
                 return;
 
-            CommitFocusedLeadComboBoxEdit();
-            CommitFocusedTextBoxEdit();
             var snapshot = CaptureLeadSelections();
+            CommitFocusedLeadComboBoxEdit(snapshot);
+            CommitFocusedTextBoxEdit();
             pendingLeadSelectionSnapshot = snapshot;
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -719,9 +719,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             e.Handled = true;
-            CommitFocusedLeadComboBoxEdit();
-            CommitFocusedTextBoxEdit();
             var leadSnapshot = CaptureLeadSelections();
+            CommitFocusedLeadComboBoxEdit(leadSnapshot);
+            CommitFocusedTextBoxEdit();
             SetDirectCheckBoxValue(row, checkBox.Tag as string, checkBox.IsChecked != true);
 
             var binding = checkBox.GetBindingExpression(ToggleButton.IsCheckedProperty);
@@ -756,11 +756,16 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void CommitFocusedLeadComboBoxEdit()
         {
+            CommitFocusedLeadComboBoxEdit(null);
+        }
+
+        private void CommitFocusedLeadComboBoxEdit(Dictionary<AccountCopyRow, string> leadSnapshot)
+        {
             var focusedComboBox = Keyboard.FocusedElement as ComboBox;
             if (focusedComboBox == null)
                 return;
 
-            CommitLeadComboBoxSelection(focusedComboBox);
+            CommitLeadComboBoxSelection(focusedComboBox, leadSnapshot);
         }
 
         private Dictionary<AccountCopyRow, string> CaptureLeadSelections()
@@ -955,6 +960,11 @@ namespace NinjaTrader.NinjaScript.AddOns
 
         private void CommitLeadComboBoxSelection(ComboBox comboBox)
         {
+            CommitLeadComboBoxSelection(comboBox, null);
+        }
+
+        private void CommitLeadComboBoxSelection(ComboBox comboBox, Dictionary<AccountCopyRow, string> leadSnapshot)
+        {
             if (comboBox == null || !string.Equals(comboBox.Tag as string, "LeadAccountName", StringComparison.Ordinal))
                 return;
 
@@ -963,6 +973,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
             var row = comboBox.DataContext as AccountCopyRow;
             var previousLead = row != null ? row.LeadAccountName : string.Empty;
+            var selectedLead = GetSelectedLeadName(comboBox);
 
             var selectedItemBinding = comboBox.GetBindingExpression(Selector.SelectedItemProperty);
             if (selectedItemBinding != null)
@@ -972,6 +983,9 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (selectedValueBinding != null)
                 selectedValueBinding.UpdateSource();
 
+            if (row != null && leadSnapshot != null)
+                leadSnapshot[row] = selectedLead ?? string.Empty;
+
             if (row != null && AccountNamesEqual(previousLead, row.LeadAccountName))
                 return;
 
@@ -980,6 +994,17 @@ namespace NinjaTrader.NinjaScript.AddOns
                 RefreshLeadRoleState();
                 SyncLeadAccountSubscriptions();
             }), DispatcherPriority.Background);
+        }
+
+        private string GetSelectedLeadName(ComboBox comboBox)
+        {
+            if (comboBox == null)
+                return string.Empty;
+
+            if (comboBox.SelectedValue != null)
+                return comboBox.SelectedValue.ToString();
+
+            return comboBox.SelectedItem == null ? string.Empty : comboBox.SelectedItem.ToString();
         }
 
         private DataGridTemplateColumn CreateTextBoxColumn(string header, string propertyName, double width, string stringFormat, TextAlignment textAlignment, bool numericOnly, bool allowDecimal, string tooltip, string tooltipPropertyName = null, string isEnabledPropertyName = null)
@@ -2266,10 +2291,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 return;
 
             var leadSnapshot = ConsumePendingLeadSelectionSnapshot();
-            CommitFocusedLeadComboBoxEdit();
-            CommitFocusedTextBoxEdit();
             if (leadSnapshot == null)
                 leadSnapshot = CaptureLeadSelections();
+
+            CommitFocusedLeadComboBoxEdit(leadSnapshot);
+            CommitFocusedTextBoxEdit();
 
             accountsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             accountsGrid.CommitEdit(DataGridEditingUnit.Row, true);
