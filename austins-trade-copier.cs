@@ -699,8 +699,8 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (checkBox == null || row == null || !checkBox.IsEnabled)
                 return;
 
-            CommitGridEdits();
             SelectRowForDirectCellAction(row);
+            CommitFocusedTextBoxEdit();
             checkBox.IsChecked = checkBox.IsChecked != true;
 
             var binding = checkBox.GetBindingExpression(ToggleButton.IsCheckedProperty);
@@ -2079,6 +2079,13 @@ namespace NinjaTrader.NinjaScript.AddOns
             if (accountsGrid == null)
                 return;
 
+            CommitFocusedTextBoxEdit();
+            accountsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+            accountsGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        }
+
+        private void CommitFocusedTextBoxEdit()
+        {
             var focusedTextBox = Keyboard.FocusedElement as TextBox;
             if (focusedTextBox != null)
             {
@@ -2087,9 +2094,6 @@ namespace NinjaTrader.NinjaScript.AddOns
                 if (binding != null)
                     binding.UpdateSource();
             }
-
-            accountsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-            accountsGrid.CommitEdit(DataGridEditingUnit.Row, true);
         }
 
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
