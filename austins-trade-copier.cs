@@ -6182,21 +6182,21 @@ namespace NinjaTrader.NinjaScript.AddOns
         {
             var parts = new List<string>();
             if (row.DailyLossLimit > 0)
-                parts.Add("loss " + row.DailyLossLimit.ToString("0", CultureInfo.InvariantCulture));
+                parts.Add("max loss " + row.DailyLossLimit.ToString("0", CultureInfo.InvariantCulture));
 
             if (row.MaxDrawdown > 0)
-                parts.Add("DD " + row.MaxDrawdown.ToString("0", CultureInfo.InvariantCulture));
+                parts.Add("max DD " + row.MaxDrawdown.ToString("0", CultureInfo.InvariantCulture));
 
             if (row.ProfitTarget > 0)
-                parts.Add("target " + row.ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
+                parts.Add("profit target " + row.ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
 
-            var action = row.LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
+            var action = row.LimitAction == RiskAction.HardFlatten ? "auto-close" : "lock entries";
             if (parts.Count == 0)
                 return row.LimitAction == RiskAction.HardFlatten
-                    ? "no limits, auto-close row when set"
-                    : "no limits";
+                    ? "no limits set; action auto-close"
+                    : "no limits set";
 
-            return "at " + string.Join(", ", parts) + ": " + action;
+            return string.Join(", ", parts) + " -> " + action;
         }
 
         private string DescribeRiskProgressForSelection(AccountCopyRow row)
@@ -6960,21 +6960,21 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 var limits = new List<string>();
                 if (DailyLossLimit > 0)
-                    limits.Add("loss " + DailyLossLimit.ToString("0", CultureInfo.InvariantCulture));
+                    limits.Add("max loss " + DailyLossLimit.ToString("0", CultureInfo.InvariantCulture));
 
                 if (MaxDrawdown > 0)
-                    limits.Add("DD " + MaxDrawdown.ToString("0", CultureInfo.InvariantCulture));
+                    limits.Add("max DD " + MaxDrawdown.ToString("0", CultureInfo.InvariantCulture));
 
                 if (ProfitTarget > 0)
-                    limits.Add("target " + ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
+                    limits.Add("profit target " + ProfitTarget.ToString("0", CultureInfo.InvariantCulture));
 
-                var action = LimitAction == RiskAction.HardFlatten ? "auto-close row" : "lock entries only";
+                var action = LimitAction == RiskAction.HardFlatten ? "auto-close" : "lock entries";
                 if (limits.Count == 0)
                     return LimitAction == RiskAction.HardFlatten
-                        ? "no limits, auto-close row when set"
-                        : "no limits";
+                        ? "no limits set; action auto-close"
+                        : "no limits set";
 
-                return "at " + string.Join(", ", limits) + ": " + action;
+                return string.Join(", ", limits) + " -> " + action;
             }
 
             private string BuildRiskProgressSummary()
@@ -7092,6 +7092,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                     case "DailyLossLimit":
                     case "MaxDrawdown":
                     case "ProfitTarget":
+                    case "LimitAction":
                     case "AutoLocked":
                     case "AutoCloseRetryPending":
                     case "AutoCloseNeedsReview":

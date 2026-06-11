@@ -81,7 +81,7 @@ Current profiles save table entries as `Row` elements. Older profiles that used 
 
 Risk thresholds use the row baseline captured when the account row is created, loaded, when copying starts, or when reset with **Reset Baselines**:
 
-The **Plan** column shows the selected limit action even before risk amounts are entered, for example `no limits, auto-close row when set`.
+The **Plan** column shows the selected limit action even before risk amounts are entered, for example `no limits set; action auto-close`.
 
 - **Max Loss** locks when session PnL is less than or equal to the negative loss limit.
 - **Max DD** locks when drawdown from the row's session peak reaches the limit.
