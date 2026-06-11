@@ -672,6 +672,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             factory.SetValue(Control.BackgroundProperty, BrushRgb(64, 65, 70));
             factory.SetValue(Control.ForegroundProperty, Brushes.White);
             factory.SetValue(Control.BorderBrushProperty, BrushRgb(92, 96, 104));
+            factory.SetValue(FrameworkElement.ToolTipProperty, tooltip);
             factory.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(EditableCell_PreviewMouseLeftButtonDown));
             factory.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EditableCell_GotKeyboardFocus));
 
