@@ -27,7 +27,7 @@
 
 ![Austin's Trade Copier table-first dashboard](images/screenshot-11jun26.png)
 
-The current workflow is table-first: every connected account appears in the grid, copy rows choose their lead from the **Lead** column, and accounts with followers are marked as **Lead** automatically.
+The current workflow is table-first: every connected account appears in the grid, copy rows choose their lead from the **Lead** column, and accounts with copy rows are marked as **Lead** automatically.
 
 ---
 
@@ -59,12 +59,29 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 
 ---
 
+## 🔧 Script Options
+
+`scripts\install-ninjascript.ps1` supports these override parameters:
+
+- `-SourcePath` – Source `.cs` file to install. Defaults to this repo's `austins-trade-copier.cs`.
+- `-NinjaTraderUserDirectory` – NinjaTrader user data folder, usually `<Documents>\NinjaTrader 8`.
+- `-AddOnDirectory` – Exact destination folder, usually `<Documents>\NinjaTrader 8\bin\Custom\AddOns`.
+- `-NinjaTraderBin` – Folder containing NinjaTrader assemblies for `-Verify`.
+- `-Version` – Overrides the version text stamped into the bottom-right build tag.
+- `-Verify` – Runs the verifier after installing the stamped file.
+
+`scripts\verify-ninjascript.ps1` supports `-SourcePath`, `-NinjaTraderBin`, and `-OutputPath`.
+
+Environment variables are also honored: `NINJATRADER_USER_DIR`, `NINJATRADER_ADDON_DIR`, and `NINJATRADER_BIN`.
+
+---
+
 ## 📋 How to Use
 
 1. **Review the Account Table** – Connected NinjaTrader accounts are listed automatically. **Role** describes setup (`Lead`, `Copy`, or `Available`), **Plan** summarizes the row setup, and **Status** and **Conn** describe readiness and connection state. Rows with no lead can stay available as lead-only or unused accounts. The left setup columns stay pinned while you scroll across sizing and risk fields.
 2. **Choose Leads Per Row** – In the **Lead** column, pick the account each copy row should follow. The dropdown hides the row itself and active copy rows to avoid invalid setup. As soon as another row points at an account, that account is marked **Lead** and its Plan shows how many rows follow it. Its own Lead selection is cleared and disabled. If it was on, the copier turns it off because lead accounts drive copy rows instead of receiving copied orders. Copy setup and row risk cells are disabled on Lead rows because they apply to copy rows.
 3. **Turn Copy Rows On** – Check **On** for rows that should receive copied orders. A row needs a connected account, a different connected lead, and active sizing. The **Selection** toolbar's **Turn On/Off** button turns ready off rows on first; if none are ready, it turns selected On rows off. Rows that cannot turn on keep their setup and show the reason in **Last Action**.
-4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy Setup** from one copy row to push Copy, Symbols, sizing, caps, risk limits, and Limit Action to peer rows with the same Lead; Lead and On/Off stay unchanged. During active copying, connected live targets are manual-locked with baselines reset so you can review before unlocking. Pending table edits are committed before the next copied fill, so live setup changes take effect through the same review pause. Use **Copy** to choose normal `All` copying or `ExitsOnly`. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
+4. **Configure Copy Mode, Symbols, and Sizing** – Use **Row Preset** on selected copy or available rows for common setups like `1:1 copy`, `Multiplier x2`, `Fixed 1`, `Exits only`, or limit-action presets; lead rows are skipped. Presets preserve Leads, Symbols, On state, and risk amounts. Use **Copy Setup** from one copy row to push Copy, Symbols, sizing, caps, risk limits, and Limit Action to peer rows with the same Lead; Lead and On/Off stay unchanged. During active copying, connected live targets are manual-locked with baselines reset so you can review before unlocking. Pending table edits are committed before the next copied fill, so live setup changes take effect through the same review pause. Use **Copy** to choose normal `All` copying or **Exits only**. Leave **Symbols** blank to copy all instruments, or enter roots/full names such as `MNQ, MES`. Then pick a sizing mode per row:
    - **1:1**: copies the lead filled quantity.
    - **Multiplier**: copies `floor(lead filled quantity * multiplier)`.
    - **Fixed qty**: sends a fixed quantity once per lead order.
@@ -74,7 +91,20 @@ The verifier compiles `austins-trade-copier.cs` against the installed NinjaTrade
 6. **Save or Load a Profile** – Store the current dashboard as a profile if you want to reuse the setup. Saving over an existing profile and loading a profile both require confirmation because they replace saved or current table setup; neither action touches open positions or working orders.
 7. **Start Copying** – The dashboard validates active rows before arming, resets active-row risk baselines, and shows active, ready, locked, warning, desynced, and error states. Enable **Dry Run** first if you want to test the copy decisions without submitting copied orders.
 8. **Pause Copying** – Pausing stops new copy processing and leaves positions untouched.
-9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selection**, or **Flatten All** when you intend to close positions. Flatten does not pause copying; row-level flatten actions manual-lock affected rows so new entries stay blocked until you unlock them. Use **Reconcile** only when you want selected rows adjusted back toward their configured leads.
+9. **Flatten or Reconcile Deliberately** – Use **Flatten On**, **Flatten Selection**, or **Flatten All** when you intend to close positions. Flatten does not pause copying. **Flatten On** and **Flatten Selection** operate on managed rows, honor each row's **Symbols** filter, and manual-lock affected rows so new entries stay blocked until you unlock them. **Flatten All** operates account-wide across connected table accounts plus active lead accounts, ignores row **Symbols** filters, and leaves row On/Off setup unchanged. Use **Reconcile** only when you want selected rows adjusted back toward their configured leads.
+
+---
+
+## 🧾 Dashboard Reference
+
+The table is the primary setup surface:
+
+- **Setup columns**: **On**, **Account**, **Role**, **Lead**, and **Plan** show whether a row is active, what account it controls, whether it is a lead/copy/available row, which account it follows, and the plain-English setup summary.
+- **Copy setup columns**: **Copy**, **Symbols**, **Sizing**, **Multiplier**, **Fixed Qty**, and **Max Qty** control what gets copied and how order size is calculated.
+- **Risk columns**: **Max Net**, **Max Loss**, **Max DD**, **Profit Target**, **Limit Action**, and **Manual Lock** control exposure caps, lockouts, and whether a limit only blocks new entries or auto-closes the row's matching managed position.
+- **State columns**: **Status**, **PnL**, **DD**, **Risk Now**, **Pos**, **Conn**, and **Last Action** show what the copier knows right now. These are for review, not setup.
+
+The footer summarizes session mode, active rows, lead count, locks, warnings, and offline/review states. The event log records copied orders, skipped orders, lockouts, profile actions, and exported log paths.
 
 ---
 
@@ -96,6 +126,12 @@ Profiles are stored under NinjaTrader's active user data templates folder:
 
 For a standard install this is usually `<Documents>\NinjaTrader 8\templates\AustinTradeCopier`.
 
+Event log exports are written under:
+
+`<NinjaTrader user data>\templates\AustinTradeCopier\Logs`
+
+Exported files are named like `trade-copier-log-YYYYMMDD-HHMMSS.txt`.
+
 Current profiles save table entries as `Row` elements. Older profiles that used `Follower` elements still load.
 
 Risk thresholds use the row baseline captured when the account row is created, loaded, when copying starts, or when reset with **Reset Baselines**:
@@ -113,7 +149,7 @@ Risk actions:
 
 Clearing a risk lock through **Unlock** or **Reset Baselines** requires confirmation. Connected risk-locked rows reset their session PnL baselines before they can become eligible to copy again.
 
-`ExitsOnly` copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the copy row's current position.
+**Exits only** copy mode behaves like a planned reduce-only state: it blocks entries and exposure increases, but follows lead orders that reduce or close the copy row's current position.
 
 **Manual Lock** is available on On copy rows. It blocks new copied entries while still allowing reducing exits; unavailable rows show a tooltip explaining what must be set first.
 
